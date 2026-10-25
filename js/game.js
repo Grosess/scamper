@@ -256,12 +256,12 @@ const skinMat = new THREE.MeshLambertMaterial({ color: SCAMP_DARK });
 const sleeveMat = new THREE.MeshLambertMaterial({ color: 0x4dabff });
 const arms = [-1, 1].map((side) => {
   const g = new THREE.Group();
-  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.04, 0.2, 10), sleeveMat);
+  // stick arm + ball hand, like the character
+  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.3, 8), sleeveMat);
   sleeve.rotation.x = Math.PI / 2;
-  sleeve.position.z = 0.05;
-  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.048, 12, 8), skinMat);
-  hand.scale.set(1, 0.75, 1.2);
-  hand.position.z = -0.065;
+  sleeve.position.z = 0.03;
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), skinMat);
+  hand.position.z = -0.13;
   sleeve.renderOrder = hand.renderOrder = 10;
   g.add(sleeve, hand);
   g.userData.side = side;
@@ -291,7 +291,7 @@ function makeLabel(text, color, w = 256) {
 
 function makeAvatar(p) {
   const root = new THREE.Group();
-  const c = buildScamp(p.color);
+  const c = buildScamp(p.color, p.eye);
   root.add(c.rig);
 
   const label = makeLabel(p.name, '#ffffff');
@@ -333,15 +333,16 @@ function removeAvatar(p) {
 const players = new Map();  // id -> { id, name, color, tp (latest position), yaw, pitch, mode, avatar }
 let myId = null;
 
-function ensurePlayer(id, name, color) {
+function ensurePlayer(id, name, color, eye = '#ffffff') {
   let p = players.get(id);
   if (!p) {
-    p = { id, name, color, tp: new THREE.Vector3(0, -100, 0), yaw: 0, pitch: 0, mode: 0, snapNext: true, avatar: null };
+    p = { id, name, color, eye, talk: false, tp: new THREE.Vector3(0, -100, 0), yaw: 0, pitch: 0, mode: 0, snapNext: true, avatar: null };
     players.set(id, p);
     if (id !== myId) p.avatar = makeAvatar(p);
-  } else if (p.name !== name || p.color !== color) {
+  } else if (p.name !== name || p.color !== color || p.eye !== eye) {
     p.name = name;
     p.color = color;
+    p.eye = eye;
     if (p.avatar) { removeAvatar(p); p.avatar = makeAvatar(p); p.snapNext = true; }
   }
   return p;
@@ -362,6 +363,7 @@ function setPose(p, s) {
   p.yaw = +s[3] || 0;
   p.pitch = +s[4] || 0;
   p.mode = s[5] | 0;
+  p.talk = !!s[6];
 }
 
 const nameOf = (id) => (players.get(id) || { name: '???' }).name;
@@ -421,7 +423,7 @@ function applyState(s) {
   const oldChase = game.duel ? game.duel.chase : 0;
   const ids = new Set(s.roster.map((r) => r.id));
   for (const id of [...players.keys()]) if (!ids.has(id)) removePlayer(id);
-  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), r.color);
+  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye));
 
   if (s.map && (!World.map || s.map !== World.map.id)) loadMap(s.map);
   game.phase = s.phase;
@@ -435,7 +437,7 @@ function applyState(s) {
   game.lastTag = s.lastTag ? { from: s.lastTag.from, to: s.lastTag.to, at: performance.now() - s.lastTag.ago * 1000 } : null;
 
   const mine = players.get(myId);
-  if (mine) sleeveMat.color.set(mine.color);
+  if (mine) { sleeveMat.color.set(SCAMP_DARK); skinMat.color.set(SCAMP_DARK); }
 
   const playing = game.phase === 'playing';
   if (playing && game.mode === 'duel' && game.duel) {
@@ -483,13 +485,11 @@ function applySnap(m) {
 
 // ---------- host: rules ----------
 const H = { itSince: {}, prevIt: [], timeLeft: 0, releaseLeft: 0, resultsLeft: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
-const COLORS = ['#4dabff', '#ff4d8d', '#ffd23f', '#35d0a5', '#b06bff', '#ff8c42', '#7cff6b', '#ff6bd6', '#6bfff2', '#c0c8ff', '#ff5a5a', '#9be15d'];
+const COLORS = ['#2f3138', '#f4f1ea', '#ff8fa3', '#ffd166', '#7ed6c8', '#8fb4ff', '#c3a6ff', '#ffb37a', '#9be3a8', '#ff6b6b', '#a8dcef', '#b7bcc6'];
 
-function pickColor(want) {
-  const used = new Set([...players.values()].map((p) => p.color));
-  if (COLORS.includes(want) && !used.has(want)) return want;
-  return COLORS.find((c) => !used.has(c)) || COLORS[Math.floor(Math.random() * COLORS.length)];
-}
+const isHex = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+function pickColor(want) { return isHex(want) ? want.toLowerCase() : COLORS[Math.floor(Math.random() * COLORS.length)]; }
+const pickEye = (want) => (isHex(want) ? want.toLowerCase() : '#ffffff');
 function cleanName(n) { return String(n || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 14) || 'bobo'; }
 function uniqueName(n) {
   const taken = new Set([...players.values()].map((p) => p.name));
@@ -502,7 +502,7 @@ function buildState() {
     t: 'state', phase: game.phase, mode: game.mode, map: game.map, it: game.it.slice(), duel: game.duel, setup: game.setup,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null, scores: game.scores,
     round: game.round, result: game.result,
-    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color })),
+    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye })),
   };
 }
 function pushState() {
@@ -711,7 +711,7 @@ function hostHandle(from, m) {
       return;
     }
     const name = uniqueName(cleanName(m.name));
-    ensurePlayer(from, name, pickColor(m.color));
+    ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye));
     game.scores[from] = { it: 0, tags: 0 };
     if (game.phase === 'playing' && game.mode === 'infection') game.it.push(from);
     hostFeed(`${name} joined`);
@@ -751,7 +751,7 @@ function hostOnLeave(id) {
 
 function hostTick(dt) {
   const mine = players.get(myId);
-  if (mine) { mine.tp.copy(me.pos); mine.yaw = me.yaw; mine.pitch = me.pitch; mine.mode = me.mode(); }
+  if (mine) { mine.tp.copy(me.pos); mine.yaw = me.yaw; mine.pitch = me.pitch; mine.mode = me.mode(); mine.talk = talkT > 0; }
 
   if (game.phase === 'playing') {
     if (H.releaseLeft > 0) {
@@ -778,7 +778,7 @@ function hostTick(dt) {
   if (H.snapAcc >= 1 / CONFIG.net.sendRate - 0.005) {
     H.snapAcc = 0;
     const p = {};
-    for (const pl of players.values()) p[pl.id] = [r2(pl.tp.x), r2(pl.tp.y), r2(pl.tp.z), r2(pl.yaw), r2(pl.pitch), pl.mode];
+    for (const pl of players.values()) p[pl.id] = [r2(pl.tp.x), r2(pl.tp.y), r2(pl.tp.z), r2(pl.yaw), r2(pl.pitch), pl.mode, pl.talk ? 1 : 0];
     Net.broadcast({ t: 'snap', p, tl: r2(game.tl), rl: r2(game.rl) });
   }
 }
@@ -804,7 +804,7 @@ function clientTick(dt) {
   netAcc += dt;
   if (netAcc >= 1 / CONFIG.net.sendRate - 0.005) {
     netAcc = 0;
-    Net.send({ t: 'me', s: [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z), r2(me.yaw), r2(me.pitch), me.mode()] });
+    Net.send({ t: 'me', s: [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z), r2(me.yaw), r2(me.pitch), me.mode(), talkT > 0 ? 1 : 0] });
   }
 }
 
@@ -851,7 +851,13 @@ function tryTag(id) {
 const canTag = () => game.phase === 'playing' && game.rl <= 0 && isIt(myId);
 
 // big readable message for whoever was involved in a tag
+let talkT = 0;
+function taunt(secs = 1.1) {
+  talkT = Math.max(talkT, secs);
+  for (let i = 0; i < 5; i++) tone(260 + Math.random() * 260, 180 + Math.random() * 200, 0.07, 'square', 0.035, i * 0.11);
+}
 function showTagEvent(from, to) {
+  if (from === myId) talkT = Math.max(talkT, 0.8);
   if (from === myId || to === myId) shake = 0.5;
   nearFlag = false;
   if (to === myId) {
@@ -888,6 +894,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
   keys.add(e.code);
   if (bound('jump', e.code) && !e.repeat) me.queueJump();
+  if (bound('taunt', e.code) && !e.repeat) taunt();
   if (e.code === 'Enter' && Net.isHost && game.phase === 'lobby') hostStartRound();
 });
 addEventListener('keyup', (e) => {
@@ -971,7 +978,7 @@ function openPause() {
 function updatePauseUI() {
   const playing = game.phase === 'playing';
   const hostId = Net.isHost ? myId : CONFIG.net.prefix + Net.code;
-  $('pauseCode').textContent = Net.code || '----';
+  $('pauseCode').innerHTML = (Net.code || '----').split('').map((ch) => `<i>${esc(ch)}</i>`).join('');
   $('lobbySub').textContent = playing ? `${modeName()} in progress`
     : game.phase === 'results' ? 'Round over - back to warmup in a few seconds'
     : 'Warmup - free roam until the host starts a round';
@@ -1005,7 +1012,6 @@ const MODES = [
   { id: 'infection', name: 'Infection', desc: 'Tagged players become seekers. Survive the timer to win.' },
   { id: 'duel', name: 'Duel', desc: '1v1 timed chases. Tag or survive to score. First to the target wins.' },
 ];
-const ENV_NAME = { indoor: 'Indoor', sky: 'Open sky', void: 'Void' };
 const canEditSetup = () => Net.isHost && game.phase !== 'playing';
 function setupChanged() {
   game.setup = { mode: $('modeSel').value, round: +$('lenSel').value, chase: +$('chaseSel').value, target: +$('targetSel').value };
@@ -1023,8 +1029,8 @@ const pillSet = (el, sel) => {
 $('mapCards').innerHTML = MAPS.map((m) => {
   const [a, b] = m.accent || ['#333', '#555'];
   return `<button class="map-card" data-id="${m.id}">
-    <div class="map-thumb" style="background:linear-gradient(135deg, ${a}, ${b})">${esc(m.name)}</div>
-    <div class="map-body"><span class="env-badge">${ENV_NAME[m.env] || m.env}</span><div class="map-blurb-sm">${esc(m.blurb)}</div></div>
+    <div class="map-thumb" style="background:linear-gradient(90deg, ${a} 0 50%, ${b} 50% 100%)"></div>
+    <div class="map-body"><span class="map-name">${esc(m.name)}</span></div>
   </button>`;
 }).join('');
 $('mapCards').onclick = (e) => {
@@ -1062,6 +1068,7 @@ function renderSetup() {
   const edit = canEditSetup(), mode = $('modeSel').value, duel = mode === 'duel';
   document.querySelector('.setup').classList.toggle('locked', !edit);
   document.querySelectorAll('.map-card').forEach((c) => { c.classList.toggle('on', c.dataset.id === game.map); c.disabled = !edit; });
+  $('mapPickBlurb').textContent = World.map.blurb;
   document.querySelectorAll('.mode-card').forEach((c) => {
     c.classList.toggle('on', c.dataset.id === mode);
     c.disabled = !edit;
@@ -1074,7 +1081,6 @@ function renderSetup() {
   $('lenPills').classList.toggle('hidden', duel);
   $('duelPills').classList.toggle('hidden', !duel);
   $('lenLabel').textContent = duel ? 'Chase rules' : 'Round length';
-  $('setupNote').textContent = Net.isHost ? (game.phase === 'playing' ? 'Locked while the round is on' : 'You pick, everyone sees it') : 'Picked by the host';
   const mName = MODES.find((m) => m.id === mode).name;
   $('startSummary').innerHTML = duel
     ? `<b>${mName}</b> on <b>${esc(World.map.name)}</b> · ${$('chaseSel').selectedOptions[0].textContent} chases · first to ${$('targetSel').value}`
@@ -1087,10 +1093,12 @@ $('mapSel').onchange = () => {
 };
 $('mapList').innerHTML = MAPS.map((m) => `<li><b>${esc(m.name)}</b> - ${esc(m.blurb)}</li>`).join('');
 $('leaveBtn').onclick = () => { Net.destroy(); location.reload(); };
-$('copyBtn').onclick = () => {
-  const done = () => { $('copyBtn').textContent = 'Copied'; setTimeout(() => ($('copyBtn').textContent = 'Copy'), 1200); };
-  if (navigator.clipboard) navigator.clipboard.writeText(Net.code).then(done, () => {});
+const copyText = (btn, text, label) => {
+  const done = () => { btn.textContent = 'Copied!'; setTimeout(() => (btn.textContent = label), 1200); };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
 };
+$('copyBtn').onclick = () => copyText($('copyBtn'), Net.code, 'Copy code');
+$('inviteBtn').onclick = () => copyText($('inviteBtn'), `${location.origin}${location.pathname}?code=${Net.code}`, 'Copy invite link');
 
 // settings
 function bindRange(id, key, fmt) {
@@ -1117,7 +1125,7 @@ applySpeedVis();
 // key bindings
 const BIND_LABELS = {
   forward: 'Move forward', back: 'Move back', left: 'Move left', right: 'Move right',
-  jump: 'Jump / wall kick', run: 'Run', slide: 'Slide / crouch', scoreboard: 'Scoreboard', pause: 'Pause menu',
+  jump: 'Jump / wall kick', run: 'Run', slide: 'Slide / crouch', scoreboard: 'Scoreboard', pause: 'Pause menu', taunt: 'Taunt (talk)',
 };
 const KEY_NAMES = {
   Space: 'Space', ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl',
@@ -1356,7 +1364,7 @@ function updateGame(dt) {
     const sp = Math.min(30, Math.hypot(a.root.position.x - px, a.root.position.z - pz) / dt);
     a.spd += (sp - a.spd) * ease(8);
     a.vy += (Math.max(-30, Math.min(30, (a.root.position.y - py) / dt)) - a.vy) * ease(8);
-    animateScamp(a.scamp, dt, performance.now() / 1000, a.spd, p.mode, Math.abs(a.vy) > 1.5 && p.mode !== 1);
+    animateScamp(a.scamp, dt, performance.now() / 1000, a.spd, p.mode, Math.abs(a.vy) > 1.5 && p.mode !== 1, p.talk);
     a.root.rotation.y = lerpAngle(a.root.rotation.y, p.yaw, k);
     a.rig.rotation.x += ((p.mode === 1 ? 1.05 : 0) - a.rig.rotation.x) * k;
     a.rig.scale.y += ((p.mode === 2 ? 0.62 : 1) - a.rig.scale.y) * k;
@@ -1368,6 +1376,7 @@ function updateGame(dt) {
     if (it) nearestSeeker = Math.min(nearestSeeker, a.root.position.distanceTo(me.pos));
   }
 
+  talkT = Math.max(0, talkT - dt);
   updateHud(hs, frozen, nearestSeeker);
   twoPlayerFx(dt, nearestSeeker);
   sbTimer += dt;
@@ -1539,7 +1548,8 @@ const autoName = (n) => ADJ.some((a) => n.startsWith(a)) && NOUN.some((w) => n.e
 $('name').value = !settings.name || autoName(settings.name) ? 'bobo' : settings.name;
 
 // character preview + fur color on the main menu
-if (!COLORS.includes(settings.color)) settings.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+if (!settings.colorPicked || !isHex(settings.color)) settings.color = COLORS[0];   // black by default
+if (!isHex(settings.eye)) settings.eye = '#ffffff';
 const preview = (() => {
   const canvas = $('preview');
   const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -1556,12 +1566,14 @@ const preview = (() => {
   canvas.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointermove', (e) => { if (dragging) { spin += (e.clientX - lastX) * 0.012; lastX = e.clientX; } });
   canvas.addEventListener('pointerup', () => { dragging = false; });
-  const set = (color) => {
+  let chat = 2;
+  const set = () => {
     if (c) sc.remove(c.rig);
-    c = buildScamp(color);
+    c = buildScamp(settings.color, settings.eye);
     sc.add(c.rig);
+    chat = 0.6;
   };
-  set(settings.color);
+  set();
   return {
     set,
     render(dt) {
@@ -1571,23 +1583,35 @@ const preview = (() => {
       t += dt;
       if (!dragging) spin += (Math.sin(t * 0.6) * 0.6 - spin) * Math.min(1, dt * 1.5);
       c.rig.rotation.y = spin;
-      animateScamp(c, dt, t, 0, 0, false);
+      chat -= dt;
+      if (chat < -4 - Math.random() * 3) chat = 0.9;
+      animateScamp(c, dt, t, 0, 0, false, chat > 0);
       r.render(sc, cam);
     },
   };
 })();
 function renderPreview(dt) { preview.render(dt); }
-$('swatches').innerHTML = COLORS.map((c) => `<button class="swatch" style="background:${c}" data-color="${c}" aria-label="Color ${c}"></button>`).join('');
-const markSwatch = () => document.querySelectorAll('.swatch').forEach((b) => b.classList.toggle('on', b.dataset.color === settings.color));
-markSwatch();
-$('swatches').addEventListener('click', (e) => {
-  const b = e.target.closest('.swatch');
-  if (!b) return;
-  settings.color = b.dataset.color;
+// body + eye colors: one split bar - left half body, right half eyes. Click a half for the color picker.
+// label text flips dark/light so it's readable on any color
+const inkFor = (hex) => { const c = new THREE.Color(hex); return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.6 ? '#1f2433' : '#ffffff'; };
+const markColors = () => {
+  $('bodyColor').value = settings.color;
+  $('eyeColor').value = settings.eye;
+  for (const [id, c] of [['bodySwatch', settings.color], ['eyeSwatch', settings.eye]]) {
+    $(id).style.background = c;
+    $(id).style.color = inkFor(c);
+  }
+};
+const setColors = (body, eye) => {
+  if (body) { settings.color = body; settings.colorPicked = true; }
+  if (eye) settings.eye = eye;
   saveSettings();
-  preview.set(settings.color);
-  markSwatch();
-});
+  preview.set();
+  markColors();
+};
+$('bodyColor').addEventListener('input', (e) => setColors(e.target.value, null));
+$('eyeColor').addEventListener('input', (e) => setColors(null, e.target.value));
+markColors();
 
 function getName() {
   const n = cleanName($('name').value);
@@ -1623,7 +1647,7 @@ $('hostBtn').onclick = () => {
   Net.host((err) => {
     if (err) { setStatus(err, true); menuBusy(false); return; }
     myId = Net.id;
-    ensurePlayer(myId, name, pickColor(settings.color));
+    ensurePlayer(myId, name, pickColor(settings.color), pickEye(settings.eye));
     game.scores[myId] = { it: 0, tags: 0 };
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
@@ -1640,20 +1664,38 @@ function join() {
   setStatus(`Joining ${code}…`);
   menuBusy(true);
   Net.join(code, (err) => {
-    if (err) { setStatus(err, true); menuBusy(false); return; }
+    if (err) {
+      setStatus(err, true);
+      menuBusy(false);
+      syncCode();
+      void $('codeBoxes').offsetWidth;
+      $('codeBoxes').classList.add('bad');
+      return;
+    }
     myId = Net.id;
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
     enterGame();
-    Net.send({ t: 'hello', name, color: settings.color });
+    Net.send({ t: 'hello', name, color: settings.color, eye: settings.eye });
   });
 }
 $('joinBtn').onclick = join;
 // four letter boxes: type to advance, backspace to go back, paste fills them all
 const codeBoxes = [...document.querySelectorAll('#codeBoxes input')];
 const syncCode = () => {
-  $('codeInput').value = codeBoxes.map((c) => c.value).join('');
+  const code = codeBoxes.map((c) => c.value).join('');
+  $('codeInput').value = code;
   codeBoxes.forEach((c) => c.classList.toggle('filled', !!c.value));
+  $('codeBoxes').classList.remove('bad');
+  const ready = code.length === 4;
+  $('joinBtn').classList.toggle('ready', ready);
+  if (!codeBoxes[0].disabled) $('joinBtn').disabled = !ready;
+  $('joinBtn').textContent = ready ? `Join ${code}` : 'Enter 4 letters';
+};
+codeBoxes.forEach((c) => (c.placeholder = '_'));
+$('pasteBtn').onclick = () => {
+  if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then((t) => fillCode(t), () => codeBoxes[0].focus());
+  else codeBoxes[0].focus();
 };
 const fillCode = (text, from = 0) => {
   const letters = text.toUpperCase().replace(/[^A-Z]/g, '').split('');
@@ -1679,30 +1721,8 @@ codeBoxes.forEach((box, i) => {
   box.addEventListener('focus', () => box.select());
 });
 const urlCode = new URLSearchParams(location.search).get('code');
-if (urlCode) fillCode(urlCode);
+if (urlCode) fillCode(urlCode); else syncCode();
 
-// rotating tips in the menu sidebars
-const TIPS = [
-  'Jump out of a slide to keep all that speed.',
-  'Hold slide as you land to chain into another slide.',
-  'Wall kicks go where you look. Look away from the wall to launch off it.',
-  "You can't kick the same wall twice - bounce between two walls to climb.",
-  'Push into a ledge mid-air to pull yourself up.',
-  'Falling into the void makes you a seeker. Watch your step.',
-  'Glowing rings are jump pads. Some of them aim you somewhere good.',
-  'Tag people by running into them. Fresh seekers wait 1.5s before they can tag.',
-  'Holding back in the air brakes your momentum.',
-  'Press P to pause, Tab for the scoreboard.',
-];
-let tipIdx = Math.floor(Math.random() * TIPS.length);
-const showTip = () => {
-  const els = document.querySelectorAll('.tip-text');
-  els.forEach((e) => e.classList.add('fade'));
-  setTimeout(() => els.forEach((e) => { e.textContent = TIPS[tipIdx]; e.classList.remove('fade'); }), 300);
-  tipIdx = (tipIdx + 1) % TIPS.length;
-};
-showTip();
-setInterval(showTip, 7000);
 
 addEventListener('beforeunload', () => Net.destroy());
 

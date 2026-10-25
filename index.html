@@ -16,9 +16,7 @@
   <div id="menu" class="screen shell">
     <aside class="side">
       <div class="brand">
-        <h1 class="logo">SCAM<span>PER</span></h1>
-        <p class="tagline">Parkour tag with your friends</p>
-        <div class="sticker">NEW · DUEL MODE + ROOFTOPS</div>
+        <h1 class="logo">SCAMPER</h1>
       </div>
       <nav class="nav" data-group="menu">
         <button class="nav-btn active" data-view="play"><span class="nav-num">01</span>Play</button>
@@ -26,23 +24,17 @@
         <button class="nav-btn" data-view="controls"><span class="nav-num">03</span>Controls</button>
         <button class="nav-btn" data-view="howto"><span class="nav-num">04</span>How to play</button>
       </nav>
-      <div class="tip"><b>TIP</b><span class="tip-text"></span></div>
-      <div class="side-foot">v1.2 · peer-to-peer · no account needed</div>
     </aside>
 
     <main class="content">
       <section class="view play-view" data-view="play">
         <header class="view-head">
           <h2>Play</h2>
-          <p>Pick your Scamp, then host a lobby or jump into a friend's.</p>
         </header>
 
         <div class="play-layout">
           <div class="tile char-card">
-            <div class="char-top">
-              <div class="tile-kicker">Your Scamp</div>
-              <span class="char-hint">drag to spin</span>
-            </div>
+            <div class="char-top"><span class="char-hint">drag to spin · T to talk</span></div>
             <div class="stage">
               <canvas id="preview" aria-label="Your character"></canvas>
               <div class="stage-floor"></div>
@@ -50,21 +42,23 @@
             <label class="field">Player name
               <input id="name" maxlength="14" autocomplete="off" spellcheck="false">
             </label>
-            <div class="field">Fur color</div>
-            <div id="swatches" class="swatches"></div>
+            <div class="field">Colors</div>
+            <div class="color-split">
+              <label class="half" id="bodySwatch"><span>Body</span><input type="color" id="bodyColor" aria-label="Body color"></label>
+              <label class="half" id="eyeSwatch"><span>Eyes</span><input type="color" id="eyeColor" aria-label="Eye color"></label>
+            </div>
           </div>
 
           <div class="play-actions">
             <div class="tile action host-card">
-              <div class="tile-kicker">Host</div>
               <h3>Start a lobby</h3>
-              <p>You get a 4-letter code to read out loud. You pick the map, the mode, and when rounds start.</p>
-              <div class="chips"><span>6 maps</span><span>3 modes</span><span>up to 12 players</span></div>
               <button id="hostBtn" class="btn primary big-btn">Host game</button>
             </div>
             <div class="tile action join-card">
-              <div class="tile-kicker">Join</div>
-              <h3>Got a code?</h3>
+              <div class="join-head">
+                <h3>Join a lobby</h3>
+                <button id="pasteBtn" class="chip-btn" type="button">Paste</button>
+              </div>
               <div class="code-boxes" id="codeBoxes">
                 <input maxlength="1" autocomplete="off" spellcheck="false" aria-label="Code letter 1">
                 <input maxlength="1" autocomplete="off" spellcheck="false" aria-label="Code letter 2">
@@ -168,8 +162,11 @@
         <div id="pauseTitle" class="pause-title">PAUSED</div>
         <div class="code-chip">
           <span>Join code</span>
-          <b id="pauseCode">----</b>
-          <button id="copyBtn" class="chip-btn">Copy</button>
+          <div id="pauseCode" class="code-tiles"></div>
+          <div class="chip-row">
+            <button id="copyBtn" class="chip-btn">Copy code</button>
+            <button id="inviteBtn" class="chip-btn">Copy invite link</button>
+          </div>
         </div>
       </div>
       <nav class="nav" data-group="pause">
@@ -179,53 +176,51 @@
         <button class="nav-btn" data-view="controls">Controls</button>
         <button id="leaveBtn" class="nav-btn danger">Leave game</button>
       </nav>
-      <div class="tip"><b>TIP</b><span class="tip-text"></span></div>
       <div class="side-foot">Press P or Esc anytime to pause</div>
     </aside>
 
     <main class="content">
       <section class="view" data-view="lobby">
         <header class="view-head"><h2>Lobby</h2><p id="lobbySub"></p></header>
+        <div class="lobby-grid">
+          <div class="tile setup">
+            <div class="setup-step"><span class="step-num">1</span>Map</div>
+            <div id="mapCards" class="map-cards"></div>
+            <p id="mapPickBlurb" class="map-pick-blurb"></p>
 
-        <div class="tile setup">
-          <div class="setup-head">
-            <div class="tile-kicker">Next round</div>
-            <span id="setupNote" class="note"></span>
+            <div class="setup-step"><span class="step-num">2</span>Mode</div>
+            <div id="modeCards" class="mode-cards"></div>
+
+            <div class="setup-step"><span class="step-num">3</span><span id="lenLabel">Round length</span></div>
+            <div id="lenPills" class="pills"></div>
+            <div id="duelPills" class="duel-pills hidden">
+              <div class="pill-row"><span>Each chase</span><div id="chasePills" class="pills"></div></div>
+              <div class="pill-row"><span>First to</span><div id="targetPills" class="pills"></div></div>
+            </div>
+
+            <div class="start-row">
+              <div id="startSummary" class="start-summary"></div>
+              <div id="hostControls">
+                <button id="startBtn" class="btn hot big-btn">Start round</button>
+                <button id="endBtn" class="btn hot big-btn">End round</button>
+              </div>
+              <p id="clientNote" class="note"></p>
+            </div>
+
+            <!-- the real values live here; the cards above drive them -->
+            <div class="hidden">
+              <select id="mapSel"></select><p id="mapBlurb"></p>
+              <select id="modeSel"><option value="classic">Classic tag</option><option value="infection">Infection</option><option value="duel">Duel (1v1)</option></select>
+              <span id="lenField"><select id="lenSel"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></span>
+              <span id="duelOpts"><select id="chaseSel"><option value="20">20 sec</option><option value="30" selected>30 sec</option><option value="60">1 min</option><option value="90">1:30</option></select>
+              <select id="targetSel"><option value="5">5</option><option value="7">7</option><option value="10" selected>10</option></select></span>
+            </div>
           </div>
 
-          <div class="setup-step"><span class="step-num">1</span>Map</div>
-          <div id="mapCards" class="map-cards"></div>
-
-          <div class="setup-step"><span class="step-num">2</span>Mode</div>
-          <div id="modeCards" class="mode-cards"></div>
-
-          <div class="setup-step"><span class="step-num">3</span><span id="lenLabel">Round length</span></div>
-          <div id="lenPills" class="pills"></div>
-          <div id="duelPills" class="duel-pills hidden">
-            <div class="pill-row"><span>Each chase</span><div id="chasePills" class="pills"></div></div>
-            <div class="pill-row"><span>First to</span><div id="targetPills" class="pills"></div></div>
+          <div class="tile">
+            <div class="tile-kicker" id="playerCount"></div>
+            <ul id="playerList" class="player-list"></ul>
           </div>
-
-          <div id="hostControls">
-            <div id="startSummary" class="start-summary"></div>
-            <button id="startBtn" class="btn hot big-btn">Start round</button>
-            <button id="endBtn" class="btn hot big-btn">End round</button>
-          </div>
-          <p id="clientNote" class="note"></p>
-
-          <!-- the real values live here; the cards above drive them -->
-          <div class="hidden">
-            <select id="mapSel"></select><p id="mapBlurb"></p>
-            <select id="modeSel"><option value="classic">Classic tag</option><option value="infection">Infection</option><option value="duel">Duel (1v1)</option></select>
-            <span id="lenField"><select id="lenSel"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></span>
-            <span id="duelOpts"><select id="chaseSel"><option value="20">20 sec</option><option value="30" selected>30 sec</option><option value="60">1 min</option><option value="90">1:30</option></select>
-            <select id="targetSel"><option value="5">5</option><option value="7">7</option><option value="10" selected>10</option></select></span>
-          </div>
-        </div>
-
-        <div class="tile">
-          <div class="tile-kicker" id="playerCount"></div>
-          <ul id="playerList" class="player-list"></ul>
         </div>
       </section>
 

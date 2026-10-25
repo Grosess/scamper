@@ -1,11 +1,11 @@
 # Scamper
 
-A first-person parkour tag game for the browser. You play as a Scamp (a masked raccoon). Run, slide, wall-kick, and play with friends using a 4-letter join code.
+A first-person parkour tag game for the browser. You play as a little eraser-block person with stick limbs. Run, slide, wall-kick, and play with friends using a 4-letter join code.
 
 ## Play
 
 1. Open `index.html` in Chrome, Edge, or Firefox. Double-clicking the file works fine.
-2. Pick a name and fur color. One person clicks **Host game** and reads out the 4-letter code (e.g. `MOKU`).
+2. Pick a name, a body color and an eye color. One person clicks **Host game** and reads out the 4-letter code.
 3. Everyone else types the code and clicks **Join game**.
 4. The host presses **Esc** and goes to **Lobby**, picks a map and mode, then clicks **Start round**. Pressing Enter in-game also starts a round.
 
@@ -23,6 +23,7 @@ Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on 
 | Space | Jump. In the air next to a wall, it's a wall kick toward where you're looking |
 | C / Right click | Slide (when running fast) or crouch |
 | (contact) | Run into someone to tag them. New seekers have a 1.5s cooldown |
+| T | Talk (your head flaps open; everyone sees it) |
 | Tab | Scoreboard |
 | P / Esc | Pause menu |
 
@@ -64,7 +65,7 @@ Every file is static, so any static host will work: GitHub Pages, itch.io (uploa
 | `js/config.js` | Every movement number (speed, air control, slide, wall kick, gravity), tag rules, default keys |
 | `js/map.js` | The map kit: `box` (can be rotated), `ramp`, `pad`, `stairs`, `slab`, `bridge`, `tower` (multi-floor buildings), `kickShaft`, `enclose` (indoor box), `pile` / `container` (shipping containers). Maps pick `env: 'void' / 'indoor' / 'sky'` |
 | `js/maps/*.js` | One file per map. Copy one to make your own, then add a `<script>` line for it in `index.html`. A map can list its own `spots` (spotlights) |
-| `js/character.js` | The Scamp character model and its animation |
+| `js/character.js` | The block character (body + hinged head, stick limbs) and its animation |
 | `js/player.js` | Movement code |
 | `js/world.js` | Collision, level features, textures |
 | `js/game.js` | Camera, HUD, menus, sounds, and the tag rules |

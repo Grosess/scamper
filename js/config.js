@@ -85,6 +85,7 @@ const CONFIG = {
     slide: ['KeyC', 'Mouse2'],      // Mouse2 = right mouse button
     scoreboard: ['Tab'],
     pause: ['KeyP'],
+    taunt: ['KeyT'],
   },
 
   net: {
