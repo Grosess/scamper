@@ -1,0 +1,97 @@
+// ============================================================
+//  CATENARIES - tuning
+//  Change numbers here to change how the game feels.
+//  Units are meters and seconds.
+// ============================================================
+const CONFIG = {
+  move: {
+    walkSpeed: 6,
+    runSpeed: 10,          // hold Shift (no stamina, run forever)
+    crouchSpeed: 3.5,
+    groundAccel: 14,       // higher = snappier starts/stops
+    groundFriction: 10,
+    overspeedDecay: 1.8,   // how fast extra speed (from slides/kicks) fades on the ground
+    coastDecay: 3.5,       // let go of the keys at high speed: how fast you coast down to running speed
+    speedTurn: 5,          // how sharply you can turn on the ground while above running speed
+    airAccel: 20,          // extra air acceleration when you're slow
+    airTurn: 3.4,          // how fast (radians/sec) you can swing your momentum in the air
+    airBrake: 9,           // speed lost per second when holding back in the air
+    gravity: 26,
+    maxFall: 45,
+    jumpSpeed: 9,
+    coyoteTime: 0.1,       // can still jump this long after running off a ledge
+    jumpBuffer: 0.14,      // pressing jump slightly before landing still counts
+    stepHeight: 0.45,      // auto step-up onto small ledges
+
+    slideMinSpeed: 6.5,    // need at least this speed to start a slide
+    slideBoost: 4.5,       // speed added when a slide starts
+    slideBoostCooldown: 0.9,
+    slideBoostCap: 13,     // no slide boost above this speed (stops slide-hop speed stacking)
+    slideFriction: 5,      // speed lost per second while sliding on flat ground
+    slideTurn: 2.6,        // how fast you can steer a slide (radians/sec)
+    slideStopSpeed: 4,
+    slopeSlideAccel: 1.0,  // how hard ramps pull you downhill while sliding
+    maxSpeed: 24,
+
+    wallKickUp: 8.8,
+    wallKickOut: 5.5,      // push away from the wall
+    wallKickForward: 7.5,  // push toward where you're looking
+    wallKickKeep: 0.35,    // how much sideways speed you keep through a kick
+    wallKickCooldown: 0.15,
+    wallDetect: 0.4,       // how close a wall must be to kick it
+    wallHangTime: 0.28,    // tiny hang when you hit a wall in the air
+    wallHangGravity: 0.12,
+
+    mantleMaxHeight: 1.8,  // pull yourself up ledges up to this height above your feet
+
+    radius: 0.35,
+    standHeight: 1.8,
+    crouchHeight: 0.95,
+    eyeFromTop: 0.14,
+  },
+
+  camera: {
+    fov: 90,
+    speedFov: 14,          // extra FOV at high speed
+    bob: 0.06,
+    slideRoll: 0.06,
+    shake: 1.0,            // camera shake strength (0 = off)
+    wallRoll: 0.09,
+  },
+
+  tag: {
+    touchRange: 1.3,       // run into someone to tag them (contact only)
+    lagSlack: 1.8,         // host accepts tags this much farther apart, for lag (same for everyone)
+    tagDelay: 1.5,         // after becoming IT you can't tag for this long
+    seekerSpeed: 1.05,     // seekers run this much faster than runners
+    noTagBack: 3,          // seconds before you can tag back whoever tagged you
+    releaseDelay: 5,       // seekers are frozen this long at round start
+    duelRelease: 3,        // both duelists are frozen this long before each chase
+    duelChaserSpeed: 1.08, // the duel chaser runs this much faster...
+    duelReachBonus: 0.4,   // ...and tags from this much farther away
+    duelSpawnSpread: 0.6,  // 0 = chase starts close, 1 = as far apart as the map allows
+    resultsTime: 9,
+    maxPlayers: 12,
+  },
+
+  // Key codes: https://developer.mozilla.org/docs/Web/API/KeyboardEvent/code
+  keys: {
+    forward: ['KeyW', 'ArrowUp'],
+    back: ['KeyS', 'ArrowDown'],
+    left: ['KeyA', 'ArrowLeft'],
+    right: ['KeyD', 'ArrowRight'],
+    jump: ['Space'],
+    run: ['ShiftLeft', 'ShiftRight'],
+    slide: ['KeyC', 'Mouse2'],      // Mouse2 = right mouse button
+    scoreboard: ['Tab'],
+    pause: ['KeyP'],
+  },
+
+  net: {
+    prefix: 'catenaries-v1-',  // change this to make your own private "universe" of codes
+    sendRate: 20,
+    // To use your own PeerJS server instead of the free public one, fill this in:
+    // peerServer: { host: 'your-server.com', port: 443, path: '/', secure: true },
+    peerServer: null,
+  },
+};

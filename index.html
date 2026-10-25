@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catenaries</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ================= main menu ================= -->
+  <div id="menu" class="screen shell">
+    <aside class="side">
+      <div class="brand">
+        <h1 class="logo">CATEN<span>ARIES</span></h1>
+        <p class="tagline">Parkour tag with your friends</p>
+        <div class="sticker">NEW · DUEL MODE + ROOFTOPS</div>
+      </div>
+      <nav class="nav" data-group="menu">
+        <button class="nav-btn active" data-view="play"><span class="nav-num">01</span>Play</button>
+        <button class="nav-btn" data-view="settings"><span class="nav-num">02</span>Settings</button>
+        <button class="nav-btn" data-view="controls"><span class="nav-num">03</span>Controls</button>
+        <button class="nav-btn" data-view="howto"><span class="nav-num">04</span>How to play</button>
+      </nav>
+      <div class="tip"><b>TIP</b><span class="tip-text"></span></div>
+      <div class="side-foot">v1.2 · peer-to-peer · no account needed</div>
+    </aside>
+
+    <main class="content">
+      <section class="view play-view" data-view="play">
+        <header class="view-head">
+          <h2>Play</h2>
+          <p>Pick your Scamp, then host a lobby or jump into a friend's.</p>
+        </header>
+
+        <div class="play-layout">
+          <div class="tile char-card">
+            <div class="char-top">
+              <div class="tile-kicker">Your Scamp</div>
+              <span class="char-hint">drag to spin</span>
+            </div>
+            <div class="stage">
+              <canvas id="preview" aria-label="Your character"></canvas>
+              <div class="stage-floor"></div>
+            </div>
+            <label class="field">Player name
+              <input id="name" maxlength="14" autocomplete="off" spellcheck="false">
+            </label>
+            <div class="field">Fur color</div>
+            <div id="swatches" class="swatches"></div>
+          </div>
+
+          <div class="play-actions">
+            <div class="tile action host-card">
+              <div class="tile-kicker">Host</div>
+              <h3>Start a lobby</h3>
+              <p>You get a 4-letter code to read out loud. You pick the map, the mode, and when rounds start.</p>
+              <div class="chips"><span>6 maps</span><span>3 modes</span><span>up to 12 players</span></div>
+              <button id="hostBtn" class="btn primary big-btn">Host game</button>
+            </div>
+            <div class="tile action join-card">
+              <div class="tile-kicker">Join</div>
+              <h3>Got a code?</h3>
+              <div class="code-boxes" id="codeBoxes">
+                <input maxlength="1" autocomplete="off" spellcheck="false" aria-label="Code letter 1">
+                <input maxlength="1" autocomplete="off" spellcheck="false" aria-label="Code letter 2">
+                <input maxlength="1" autocomplete="off" spellcheck="false" aria-label="Code letter 3">
+                <input maxlength="1" autocomplete="off" spellcheck="false" aria-label="Code letter 4">
+              </div>
+              <input id="codeInput" type="hidden">
+              <button id="joinBtn" class="btn big-btn">Join game</button>
+              <div id="menuStatus" role="status"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="settings">
+        <header class="view-head"><h2>Settings</h2><p>Saved on this device.</p></header>
+        <div class="slot" data-panel="settings"></div>
+      </section>
+
+      <section class="view hidden" data-view="controls">
+        <header class="view-head"><h2>Controls</h2><p>Click a key to rebind it. Esc cancels, Backspace clears.</p></header>
+        <div class="slot" data-panel="controls"></div>
+      </section>
+
+      <section class="view hidden" data-view="howto">
+        <header class="view-head"><h2>How to play</h2><p>Don't get caught, or catch everyone.</p></header>
+        <div class="howto">
+          <div class="tile">
+            <div class="tile-kicker">Mode</div>
+            <h3>Classic tag</h3>
+            <p>One player is IT. Tag someone to pass it on, and they can't tag you straight back. The player who spends the least time as IT wins.</p>
+          </div>
+          <div class="tile">
+            <div class="tile-kicker">Mode</div>
+            <h3>Infection</h3>
+            <p>Tagged players join the seekers. Runners win if anyone is still free when time runs out.</p>
+          </div>
+          <div class="tile wide">
+            <div class="tile-kicker">Mode</div>
+            <h3>Duel (1v1)</h3>
+            <p>Exactly two players. One chases, one evades, and each chase is on a short timer. Tag them and you score; survive and they score. Whoever wins a chase evades next. First to 10 (or whatever the host picks) wins.</p>
+          </div>
+          <div class="tile wide">
+            <div class="tile-kicker">The void</div>
+            <p>Every map floats in a black void. Fall off during a round and you come back as a seeker: IT in Classic, infected in Infection, and in a Duel your opponent scores.</p>
+          </div>
+          <div class="tile wide">
+            <div class="tile-kicker">Maps</div>
+            <ul id="mapList" class="tips"></ul>
+          </div>
+          <div class="tile wide">
+            <div class="tile-kicker">Level features</div>
+            <ul class="tips">
+              <li><b>Jump pads</b> (glowing rings) launch you up onto high spots.</li>
+              <li><b>Water slides</b> (striped ramps) make you slide no matter what.</li>
+              <li><b>Bouncy stuff</b>: ball pits, lifeboats and pool trampolines throw you back up.</li>
+            </ul>
+          </div>
+          <div class="tile wide">
+            <div class="tile-kicker">Movement</div>
+            <ul class="tips">
+              <li><b>Slide</b> while running for a burst of speed. Sliding downhill on a ramp builds even more.</li>
+              <li><b>Jump out of a slide</b> to keep your speed. Hold slide as you land to chain another one.</li>
+              <li><b>Wall kick:</b> jump next to a wall while in the air. You'll launch toward where you're looking.</li>
+              <li>Kick back and forth between two walls to climb. You can't kick the same wall twice in a row.</li>
+              <li><b>Mantle:</b> push into a ledge in mid-air to pull yourself up.</li>
+              <li>To tag, just <b>run into</b> someone. When you become IT you get a short cooldown before you can tag, and in Classic you can't tag straight back.</li>
+              <li>Seekers run a little faster than runners.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= in-game HUD ================= -->
+  <div id="hud" class="hidden">
+    <div id="topbar">
+      <div id="codeBadge">CODE <b id="codeText">----</b></div>
+      <div id="phaseBox"><div id="phaseText"></div><div id="timerText"></div></div>
+      <div id="roleBadge" class="hidden"></div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="banner"></div>
+    <div id="feed"></div>
+    <div id="hint"></div>
+    <div id="speed"></div>
+    <div id="speedlines"></div>
+    <div id="pointer"><div class="arrow"></div><span></span></div>
+    <div id="countdown"></div>
+    <div id="vignette"></div>
+    <div id="flash"></div>
+  </div>
+
+  <div id="scoreboard" class="hidden"></div>
+
+  <!-- ================= escape menu ================= -->
+  <div id="pause" class="screen shell pause hidden">
+    <aside class="side">
+      <div class="brand">
+        <div id="pauseTitle" class="pause-title">PAUSED</div>
+        <div class="code-chip">
+          <span>Join code</span>
+          <b id="pauseCode">----</b>
+          <button id="copyBtn" class="chip-btn">Copy</button>
+        </div>
+      </div>
+      <nav class="nav" data-group="pause">
+        <button id="resumeBtn" class="nav-btn resume">Resume</button>
+        <button class="nav-btn active" data-view="lobby">Lobby</button>
+        <button class="nav-btn" data-view="settings">Settings</button>
+        <button class="nav-btn" data-view="controls">Controls</button>
+        <button id="leaveBtn" class="nav-btn danger">Leave game</button>
+      </nav>
+      <div class="tip"><b>TIP</b><span class="tip-text"></span></div>
+      <div class="side-foot">Press P or Esc anytime to pause</div>
+    </aside>
+
+    <main class="content">
+      <section class="view" data-view="lobby">
+        <header class="view-head"><h2>Lobby</h2><p id="lobbySub"></p></header>
+
+        <div class="tile setup">
+          <div class="setup-head">
+            <div class="tile-kicker">Next round</div>
+            <span id="setupNote" class="note"></span>
+          </div>
+
+          <div class="setup-step"><span class="step-num">1</span>Map</div>
+          <div id="mapCards" class="map-cards"></div>
+
+          <div class="setup-step"><span class="step-num">2</span>Mode</div>
+          <div id="modeCards" class="mode-cards"></div>
+
+          <div class="setup-step"><span class="step-num">3</span><span id="lenLabel">Round length</span></div>
+          <div id="lenPills" class="pills"></div>
+          <div id="duelPills" class="duel-pills hidden">
+            <div class="pill-row"><span>Each chase</span><div id="chasePills" class="pills"></div></div>
+            <div class="pill-row"><span>First to</span><div id="targetPills" class="pills"></div></div>
+          </div>
+
+          <div id="hostControls">
+            <div id="startSummary" class="start-summary"></div>
+            <button id="startBtn" class="btn hot big-btn">Start round</button>
+            <button id="endBtn" class="btn hot big-btn">End round</button>
+          </div>
+          <p id="clientNote" class="note"></p>
+
+          <!-- the real values live here; the cards above drive them -->
+          <div class="hidden">
+            <select id="mapSel"></select><p id="mapBlurb"></p>
+            <select id="modeSel"><option value="classic">Classic tag</option><option value="infection">Infection</option><option value="duel">Duel (1v1)</option></select>
+            <span id="lenField"><select id="lenSel"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></span>
+            <span id="duelOpts"><select id="chaseSel"><option value="20">20 sec</option><option value="30" selected>30 sec</option><option value="60">1 min</option><option value="90">1:30</option></select>
+            <select id="targetSel"><option value="5">5</option><option value="7">7</option><option value="10" selected>10</option></select></span>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-kicker" id="playerCount"></div>
+          <ul id="playerList" class="player-list"></ul>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="settings">
+        <header class="view-head"><h2>Settings</h2><p>Saved on this device.</p></header>
+        <div class="slot" data-panel="settings"></div>
+      </section>
+
+      <section class="view hidden" data-view="controls">
+        <header class="view-head"><h2>Controls</h2><p>Click a key to rebind it. Esc cancels, Backspace clears.</p></header>
+        <div class="slot" data-panel="controls"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- shared panels (moved into whichever menu is open) -->
+  <div id="panelStore" class="hidden">
+    <div id="settingsPanel" class="tile">
+      <label class="field range">Mouse sensitivity <span id="sensVal"></span>
+        <input type="range" id="sens" min="0.2" max="3" step="0.05">
+      </label>
+      <label class="field range">Field of view <span id="fovVal"></span>
+        <input type="range" id="fov" min="70" max="110" step="1">
+      </label>
+      <label class="field range">Camera shake <span id="shakeAmtVal"></span>
+        <input type="range" id="shakeAmt" min="0" max="1.5" step="0.05">
+      </label>
+      <label class="field range">Volume <span id="volVal"></span>
+        <input type="range" id="vol" min="0" max="1" step="0.05">
+      </label>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="autorun"><span></span>Always run</label>
+        <label class="toggle"><input type="checkbox" id="invertY"><span></span>Invert mouse Y</label>
+        <label class="toggle"><input type="checkbox" id="showSpeed"><span></span>Show speedometer</label>
+      </div>
+    </div>
+
+    <div id="controlsPanel" class="tile">
+      <table class="binds"><tbody id="bindRows"></tbody></table>
+      <div class="binds-foot">
+        <span class="note">Tag: run into people · Esc also pauses</span>
+        <button id="resetBinds" class="btn small">Reset to defaults</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= disconnect / error ================= -->
+  <div id="msg" class="screen center hidden">
+    <div class="tile dialog">
+      <h2 id="msgTitle"></h2>
+      <p id="msgText" class="note"></p>
+      <button class="btn primary" onclick="location.reload()">Back to menu</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/maps/lobby.js"></script>
+  <script src="js/maps/shipyard.js"></script>
+  <script src="js/maps/poolrooms.js"></script>
+  <script src="js/maps/playplace.js"></script>
+  <script src="js/maps/liner.js"></script>
+  <script src="js/maps/rooftops.js"></script>
+  <script src="js/character.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
