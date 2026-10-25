@@ -705,6 +705,12 @@ function hostTryTag(tagger, target) {
 function hostHandle(from, m) {
   if (m.t === 'hello') {
     if (players.has(from)) return;
+    if (m.v !== CONFIG.version) {
+      // different versions can't play together - tell them exactly what to do
+      Net.sendTo(from, { t: 'oldver', v: CONFIG.version });
+      setTimeout(() => Net.kick(from), 400);
+      return;
+    }
     if (players.size >= CONFIG.tag.maxPlayers) {
       Net.sendTo(from, { t: 'full' });
       setTimeout(() => Net.kick(from), 300);
@@ -792,6 +798,14 @@ function clientHandle(m) {
     case 'feed': addFeed(String(m.text).slice(0, 120)); break;
     case 'tagev': showTagEvent(String(m.from), String(m.to)); break;
     case 'full': inGame = false; showMsg('Lobby full', 'That game already has the maximum number of players.'); break;
+    case 'oldver': {
+      inGame = false;
+      const theyNewer = (+m.v || 0) > CONFIG.version;
+      showMsg('Different versions', theyNewer
+        ? 'The host has a newer version of Scamper. Refresh this page (Cmd/Ctrl+Shift+R), then join again.'
+        : 'The host has an older version of Scamper. Ask them to refresh their page, then host again.');
+      break;
+    }
   }
 }
 
@@ -1676,7 +1690,7 @@ function join() {
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
     enterGame();
-    Net.send({ t: 'hello', name, color: settings.color, eye: settings.eye });
+    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye });
   });
 }
 $('joinBtn').onclick = join;

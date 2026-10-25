@@ -24,7 +24,11 @@ const Net = {
   },
 
   _opts() {
-    return Object.assign({ debug: 1 }, CONFIG.net.peerServer || {});
+    // ?relay=1 forces everything through TURN relays (what happens on strict networks) - for testing
+    const relayOnly = /[?&]relay=1/.test(location.search);
+    const iceServers = CONFIG.net.iceServers.concat(CONFIG.net.turn ? [CONFIG.net.turn] : []);
+    const config = { iceServers, iceTransportPolicy: relayOnly ? 'relay' : 'all' };
+    return Object.assign({ debug: 1, config }, CONFIG.net.peerServer || {});
   },
 
   host(cb) {
@@ -60,21 +64,27 @@ const Net = {
     c.on('error', () => {});
   },
 
-  join(code, cb) {
+  // join a lobby. If the code isn't found right away it tries once more (the host may have
+  // just reconnected to the matchmaking server), then explains what went wrong.
+  join(code, cb, attempt = 0) {
     const peer = new Peer(this._opts());
-    let done = false;
-    const fail = (msg) => {
+    let done = false, reached = false;
+    const fail = (msg, retry) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       peer.destroy();
-      cb(msg);
+      if (retry && attempt === 0) setTimeout(() => this.join(code, cb, 1), 1500);
+      else cb(msg);
     };
-    const timer = setTimeout(() => fail('Could not reach that game. Check the code and try again.'), 12000);
+    const timer = setTimeout(() => fail(reached
+      ? 'Found the lobby but could not connect to the host. One of your networks is blocking direct connections - try a phone hotspot, or set up a relay (see README).'
+      : 'Could not reach the matchmaking server. Check your internet and try again.', !reached), 20000);
 
     peer.on('open', (id) => {
       this.id = id;
-      const c = peer.connect(CONFIG.net.prefix + code, { reliable: true, serialization: 'json' });
+      reached = true;
+      const c = peer.connect(CONFIG.net.prefix + code, { reliable: true, serialization: 'json', metadata: { v: CONFIG.version } });
       c.on('open', () => {
         if (done) return;
         done = true;
@@ -89,8 +99,9 @@ const Net = {
       c.on('error', () => {});
     });
     peer.on('error', (err) => {
-      if (err.type === 'peer-unavailable') fail(`No game found with code ${code}.`);
-      else if (!done) fail(describeError(err));
+      if (err.type === 'peer-unavailable') {
+        fail(`No game found with code ${code}. Check the code, and make sure you're both on the latest version (refresh the page).`, true);
+      } else if (!done) fail(describeError(err));
     });
   },
 

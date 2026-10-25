@@ -4,6 +4,7 @@
 //  Units are meters and seconds.
 // ============================================================
 const CONFIG = {
+  version: 3,   // bump when a change makes old and new players unable to play together
   move: {
     walkSpeed: 6,
     runSpeed: 10,          // hold Shift (no stamina, run forever)
@@ -89,10 +90,20 @@ const CONFIG = {
   },
 
   net: {
-    prefix: 'scamper-v1-',  // change this to make your own private "universe" of codes
+    prefix: 'scamper-v1-',  // lobby namespace. Changing it splits players into separate "universes" - leave it
     sendRate: 20,
     // To use your own PeerJS server instead of the free public one, fill this in:
     // peerServer: { host: 'your-server.com', port: 443, path: '/', secure: true },
     peerServer: null,
+    // How browsers find a route to each other (STUN works on most home networks).
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+    ],
+    // A TURN relay passes traffic along when two networks can't connect directly (common on
+    // phones, school and work wifi). There's no reliable free public one any more - make a free
+    // account at a TURN provider (e.g. metered.ca) and paste its details here, e.g.:
+    // turn: { urls: ['turn:global.relay.metered.ca:80', 'turn:global.relay.metered.ca:443?transport=tcp'], username: '...', credential: '...' },
+    turn: null,
   },
 };
