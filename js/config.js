@@ -1,5 +1,5 @@
 // ============================================================
-//  CATENARIES - tuning
+//  SCAMPER - tuning
 //  Change numbers here to change how the game feels.
 //  Units are meters and seconds.
 // ============================================================
@@ -88,7 +88,7 @@ const CONFIG = {
   },
 
   net: {
-    prefix: 'catenaries-v1-',  // change this to make your own private "universe" of codes
+    prefix: 'scamper-v1-',  // change this to make your own private "universe" of codes
     sendRate: 20,
     // To use your own PeerJS server instead of the free public one, fill this in:
     // peerServer: { host: 'your-server.com', port: 443, path: '/', secure: true },

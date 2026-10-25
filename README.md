@@ -1,4 +1,4 @@
-# Catenaries
+# Scamper
 
 A first-person parkour tag game for the browser. You play as a Scamp (a masked raccoon). Run, slide, wall-kick, and play with friends using a 4-letter join code.
 

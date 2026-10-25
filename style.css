@@ -476,8 +476,8 @@ button { font-family: inherit; }
 #hostControls .big-btn { margin-top: 0; }
 @media (max-width: 760px) { .mode-cards { grid-template-columns: 1fr; } }
 
-.logo { font-size: 52px; }
-.logo span { transform: translateX(22px); }
+.logo { font-size: 54px; }
+.logo span { transform: translateX(26px); }
 
 /* ================= 2-player helpers ================= */
 #pointer { position: absolute; left: 0; top: 0; display: none; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }

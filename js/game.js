@@ -17,11 +17,11 @@ if (typeof THREE === 'undefined' || typeof Peer === 'undefined') {
 // ---------- settings ----------
 const settings = Object.assign(
   { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1 },
-  Object.keys(loadJSON('catenaries-settings')).length ? loadJSON('catenaries-settings') : loadJSON('tagrush-settings'));
+  ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
-function saveSettings() { try { localStorage.setItem('catenaries-settings', JSON.stringify(settings)); } catch (e) {} }
+function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} }
 
 // ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
