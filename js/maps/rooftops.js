@@ -4,7 +4,7 @@
 //   penthouses   2-floor rooftop structures with walls, doorways and stairs inside
 //   sky bridges  link penthouse floors/roofs to neighboring roofs at 12, 16 and 20
 //   billboards   hang over two alleys - jump in under one and kick between it and the tall
-//                building's wall to climb (striped)
+//                building's wall to climb (orange)
 //   planks       steep plank ramps one floor up across two alleys
 //   pads         launch you up the big height jumps (onto the 24 tower, the water tower...)
 defineMap({

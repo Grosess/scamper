@@ -16,8 +16,9 @@
 //    k.balls(x, y, z, width, depth, count, colors)        pile of balls
 //    k.net(x, y, z, width, height, depth, color)          see-through net wall
 //
-//  Box opts: { tex: 'grid'|'ribs'|'tiles'|'planks'|'foam'|'stripes'|'patch'|'kick'|'windows'|'none',
-//              uv: scale, noShadow: true, emissive: '#color', opacity: 0..1 }
+//  Box opts: { tex: 'kick' (wall-kick surface: always bright orange-red) | 'net' (see-through),
+//              noShadow: true, emissive: '#color', opacity: 0..1 }
+//  Everything is flat color - other tex/uv values are left over from old textures and do nothing.
 //
 //  Helpers below: ground(), enclose(), slab(), posts(), stairs(), tower(), bridge(),
 //  kickShaft(), pile(), container().

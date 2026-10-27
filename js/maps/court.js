@@ -4,7 +4,7 @@
 //               south side you slide under or hop onto
 //   ring        four low vault walls and four juke pillars around the center
 //   corners     four 4m towers, each with a different way up:
-//               NE kick chimney (striped) - NW ramp - SE step blocks - SW jump pad
+//               NE kick chimney (orange) - NW ramp - SE step blocks - SW jump pad
 // Floors and ceilings never trap your head: the hall is 12m tall.
 defineMap({
   id: 'court',
@@ -49,7 +49,7 @@ defineMap({
 
     // --- corner towers (top 4), four different ways up ---
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(sx * 8, 0, sz * 8, 3, 4, 3, WHITE, F);
-    // NE: kick chimney between the tower and a striped wall 2.7m away
+    // NE: kick chimney between the tower and an orange kick wall 2.7m away
     k.box(3.6, 0, -8, 0.4, 4, 3, BLUE, { tex: 'kick', uv: 0.5 });
     // NW: ramp up the west face
     k.ramp(-8, -4.25, 3, 4.5, 0, 4, '-z', MINT, F);

@@ -4,12 +4,12 @@
 //   stairs       gallery 4 -> 8 (NE + SW corners), gallery 8 -> 12 (east + west galleries)
 //   bridges      across the atrium at 8 (two) and 12 (one)
 //   kick routes  elevator shafts on the east + west, column pairs in front of the north + south
-//                galleries - all striped. Kick up and step off at the floor you want.
+//                galleries - all orange. Kick up and step off at the floor you want.
 defineMap({
   id: 'lobby',
   accent: ['#1f5fe0', '#ff3d55'],
   name: 'Hotel Lobby',
-  blurb: 'A four-storey hotel atrium. Galleries, escalators, sky bridges and striped elevator shafts to kick up.',
+  blurb: 'A four-storey hotel atrium. Galleries, escalators, sky bridges and orange elevator shafts to kick up.',
   env: 'indoor',
   sky: '#0c0e14',
   fog: [60, 140],
@@ -82,7 +82,7 @@ defineMap({
     for (const x of [-9.05, -6.95, 6.95, 9.05]) k.deco(x, 0, 11, 0.1, 1.1, 10, '#9fd6e8', { tex: 'none', opacity: 0.5 });
     stairs(k, 0, -6, '-z', 6, 0, 4, RED, Object.assign({ run: 1.0 }, F));   // grand staircase
 
-    // --- kick routes (striped) ---
+    // --- kick routes (orange) ---
     for (const s of [-1, 1]) {
       kickShaft(k, s * 20.6, 0, 'x', 3, 0, 12, RED);            // elevator shafts against E/W galleries
       kickShaft(k, -16, s * 15, 'z', 2, 0, 12, RED);            // column pairs in front of N/S galleries

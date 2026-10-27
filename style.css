@@ -298,6 +298,7 @@ button { font-family: inherit; }
 #flash.go { animation: flash 0.5s ease-out; }
 @keyframes flash { from { opacity: 1; } to { opacity: 0; } }
 
+#fps { position: absolute; bottom: 22px; right: 22px; padding: 3px 10px; font-family: Bungee, Impact, sans-serif; font-size: 14px; color: var(--ink); background: rgba(255, 255, 255, 0.92); border: 2px solid var(--ink); }
 #speedlines { position: absolute; inset: -10%; opacity: 0; pointer-events: none; transition: opacity 0.15s;
   background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255, 255, 255, 0) 0deg 4deg, rgba(255, 255, 255, 0.3) 4deg 4.6deg, rgba(255, 255, 255, 0) 4.6deg 9deg);
   -webkit-mask: radial-gradient(circle at 50% 50%, transparent 32%, #000 70%); mask: radial-gradient(circle at 50% 50%, transparent 32%, #000 70%);

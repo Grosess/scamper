@@ -6,7 +6,7 @@
 //   .  corridor                     .  corridor (floor on top of the ground floor)
 //   v  vent - 3m crawl tunnel       w  low wall to vault
 //   w  low wall to vault            o  shaft: hole down to the ground floor. The corridor under it
-//   c  crate to juke around            has striped walls - wall-kick up through it, or drop down
+//   c  crate to juke around            has orange kick walls - wall-kick up through it, or drop down
 //                                   S  stairwell hole (stairs below)
 //
 // Ground floor ceiling is 3.6m up, upper floor ceiling 4.4m up - nothing to bump your head on.

@@ -1,7 +1,7 @@
 // THE LINER - a huge ship on the open ocean (floors every 4m):
 //   superstructure   4 floors of cabins at the stern (walls with doorways, stairs inside), roof 16
 //   bridge house     3 floors amidships, linked to the superstructure at 8 and 12
-//   funnels          two funnels 3m apart with striped inner faces = a kick chimney up to 22m
+//   funnels          two funnels 3m apart with orange inner faces = a kick chimney up to 22m
 //   foredeck         stacked cargo container piles (5.2 / 7.8 / 10.4) with an alley between
 //   lifeboats        bouncy lifeboats hanging over the side launch you onto the cargo
 //   crow's nest      18m up the bow mast; launch pad on top of the tallest cargo pile

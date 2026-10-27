@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -146,6 +146,7 @@
     <div id="feed"></div>
     <div id="hint"></div>
     <div id="speed"></div>
+    <div id="fps" class="hidden"></div>
     <div id="speedlines"></div>
     <div id="pointer"><div class="arrow"></div><span></span></div>
     <div id="countdown"></div>
@@ -255,7 +256,8 @@
         <label class="toggle"><input type="checkbox" id="autorun"><span></span>Always run</label>
         <label class="toggle"><input type="checkbox" id="invertY"><span></span>Invert mouse Y</label>
         <label class="toggle"><input type="checkbox" id="showSpeed"><span></span>Show speedometer</label>
-        <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (for slower computers)</label>
+        <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, smoother)</label>
+        <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
       </div>
     </div>
 
@@ -279,21 +281,21 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/config.js?v=6"></script>
-  <script src="js/map.js?v=6"></script>
-  <script src="js/maps/court.js?v=6"></script>
-  <script src="js/maps/blocks.js?v=6"></script>
-  <script src="js/maps/corridors.js?v=6"></script>
-  <script src="js/maps/lobby.js?v=6"></script>
-  <script src="js/maps/shipyard.js?v=6"></script>
-  <script src="js/maps/poolrooms.js?v=6"></script>
-  <script src="js/maps/playplace.js?v=6"></script>
-  <script src="js/maps/liner.js?v=6"></script>
-  <script src="js/maps/rooftops.js?v=6"></script>
-  <script src="js/character.js?v=6"></script>
-  <script src="js/world.js?v=6"></script>
-  <script src="js/player.js?v=6"></script>
-  <script src="js/net.js?v=6"></script>
-  <script src="js/game.js?v=6"></script>
+  <script src="js/config.js?v=7"></script>
+  <script src="js/map.js?v=7"></script>
+  <script src="js/maps/court.js?v=7"></script>
+  <script src="js/maps/blocks.js?v=7"></script>
+  <script src="js/maps/corridors.js?v=7"></script>
+  <script src="js/maps/lobby.js?v=7"></script>
+  <script src="js/maps/shipyard.js?v=7"></script>
+  <script src="js/maps/poolrooms.js?v=7"></script>
+  <script src="js/maps/playplace.js?v=7"></script>
+  <script src="js/maps/liner.js?v=7"></script>
+  <script src="js/maps/rooftops.js?v=7"></script>
+  <script src="js/character.js?v=7"></script>
+  <script src="js/world.js?v=7"></script>
+  <script src="js/player.js?v=7"></script>
+  <script src="js/net.js?v=7"></script>
+  <script src="js/game.js?v=7"></script>
 </body>
 </html>

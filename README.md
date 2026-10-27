@@ -36,15 +36,15 @@ Striped walls are wall-kick routes.
 | --- | --- | --- |
 | The Court | indoor | Small parkour court for tight chases: vaults, A-frame, slide table, juke pillars, four towers with different ways up |
 | The Blocks | void | 3x3 blocks with 3m alleys: every alley is a kick chimney, each alley segment has a vault/slide bar/crate, rooftop-to-street chases |
-| The Corridors | indoor | Two floors of looping 3m hallways drawn from ASCII grids in the map file (edit them to redraw the maze): vents to slide through, vault walls, striped kick shafts and stairwells between floors |
-| Hotel Lobby | indoor | Four-storey atrium: galleries at 4/8/12, escalators, grand staircase, sky bridges, striped elevator shafts and column pairs to kick up |
+| The Corridors | indoor | Two floors of looping 3m hallways drawn from ASCII grids in the map file (edit them to redraw the maze): vents to slide through, vault walls, orange kick shafts and stairwells between floors |
+| Hotel Lobby | indoor | Four-storey atrium: galleries at 4/8/12, escalators, grand staircase, sky bridges, orange elevator shafts and column pairs to kick up |
 | Container Yard | sky + sea | Container piles up to 18m, container bridges you can run through or over, skewed containers, a crane |
 | The Poolrooms | indoor | Tiled bathhouse in a tiled box: bath houses, balcony/gallery/roof bridges, fountain, slides, kick shafts |
 | Fun Zone | indoor | Nine pastel play towers, enclosed tube bridges, kick shafts, slides, ball pits, trampolines |
-| The Liner | sky + sea | Cabin decks, a bridge house, a striped 22m funnel chimney, cargo piles, bouncy lifeboats, a crow's nest |
-| Rooftops | void | Roofs 4-24m, penthouses, sky bridges, striped billboard kick chimneys, a water tower |
+| The Liner | sky + sea | Cabin decks, a bridge house, an orange 22m funnel kick chimney, cargo piles, bouncy lifeboats, a crow's nest |
+| Rooftops | void | Roofs 4-24m, penthouses, sky bridges, orange billboard kick chimneys, a water tower |
 
-Level features: **jump pads** (glowing rings), **water slides** (striped ramps that always make you slide), **bouncy surfaces**, and **kick walls** (bold diagonal stripes).
+Level features: **jump pads** (glowing squares), **water slides** (ramps that always make you slide), **bouncy surfaces**, and **kick walls** (always bright orange-red).
 
 ### Modes
 - **Classic tag**: one person is IT. Tag someone to pass it on, and they can't tag you straight back. Whoever spends the least time as IT wins. Falling off makes you IT.

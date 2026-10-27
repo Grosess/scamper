@@ -5,7 +5,7 @@
 //   12          east + west roof bridges
 //   center      pool with a 3-tier fountain (3.2 / 6.4 / 9.6), bounce pads in the water
 //   cabanas     four poolside huts; their roofs are level with the balcony
-//   kick shafts striped shafts in front of the balconies (north/south up to 8, east/west up to 12)
+//   kick shafts orange shafts in front of the balconies (north/south up to 8, east/west up to 12)
 //   slides      balcony -> pool (north/south), fountain -> balcony (east/west sky slides)
 defineMap({
   id: 'poolrooms',

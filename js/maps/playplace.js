@@ -2,7 +2,7 @@
 // 3 x 3 grid of play towers: corners 2 floors (roof 8), edges 3 (roof 12), center 4 (roof 16).
 //   tube bridges  padded walls on both sides: columns at 4, rows at 8, center cross at 12
 //   outer walls   the outside faces of the structure are padded, with doorways
-//   kick shafts   striped shafts up the outside of each corner tower to its roof (8)
+//   kick shafts   orange kick shafts up the outside of each corner tower to its roof (8)
 //   slides        tube slides off every outer tower
 //   courtyards    four trampolines (two big ones); padded partitions break up the lanes
 defineMap({

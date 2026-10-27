@@ -16,7 +16,7 @@ if (typeof THREE === 'undefined' || typeof Peer === 'undefined') {
 
 // ---------- settings ----------
 const settings = Object.assign(
-  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perf: false },
+  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
@@ -25,11 +25,13 @@ function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.st
 
 // ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-// render resolution: starts at up to 1.5x on sharp screens and drops on its own when frames run slow
-const res = { max: 1, now: 1, avg: 1 / 60, best: 1 / 60, slow: 0, fast: 0 };
+// render resolution: the screen's full sharpness (up to 2x). If frames run slow it eases down a
+// little, but never below 3/4 of that or below 1 pixel per screen pixel
+const res = { max: 1, min: 1, now: 1, avg: 1 / 60, best: 1 / 60, slow: 0, fast: 0 };
 function setResMax() {
-  res.max = Math.min(devicePixelRatio, settings.perf ? 1 : 1.5);
-  res.now = Math.min(res.now, res.max) || res.max;
+  res.max = Math.min(devicePixelRatio, 2);
+  res.min = Math.min(res.max, Math.max(1, res.max * 0.75));
+  res.now = res.max;
   renderer.setPixelRatio(res.now);
 }
 setResMax();
@@ -144,13 +146,10 @@ function buildSky(m) {
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   spotGroup.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false })));
-  const tex = makeTexture('water');
-  tex.repeat.set(90, 90);
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(760, 760), new THREE.MeshLambertMaterial({ color: '#2577c8', map: tex }));
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(760, 760), new THREE.MeshLambertMaterial({ color: '#2f86d6' }));
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = m.sea !== undefined ? m.sea : -3;
   spotGroup.add(sea);
-  World._anim.push((t, dt) => { tex.offset.x += dt * 0.02; tex.offset.y += dt * 0.012; });
 }
 
 // steel trusses across the top - one instanced mesh, so it costs a single draw call
@@ -1142,12 +1141,10 @@ function bindToggle(id, key, after) {
   el.checked = !!settings[key];
   el.onchange = () => { settings[key] = el.checked; saveSettings(); if (after) after(); };
 }
-// performance mode: lower resolution cap, no shadows
+// performance mode (on by default): no shadows
 function applyPerf() {
-  setResMax();
-  renderer.setSize(innerWidth, innerHeight);
-  if (sun.castShadow === !settings.perf) return;
-  sun.castShadow = !settings.perf;
+  if (sun.castShadow === !settings.perfMode) return;
+  sun.castShadow = !settings.perfMode;
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
   renderer.shadowMap.needsUpdate = true;
 }
@@ -1160,7 +1157,9 @@ bindRange('shakeAmt', 'shake', (v) => (v === 0 ? 'off' : `${Math.round(v * 100)}
 bindToggle('autorun', 'autorun');
 bindToggle('invertY', 'invertY');
 bindToggle('showSpeed', 'showSpeed', applySpeedVis);
-bindToggle('perf', 'perf', applyPerf);
+bindToggle('perf', 'perfMode', applyPerf);
+bindToggle('showFps', 'showFps', () => $('fps').classList.toggle('hidden', !settings.showFps));
+$('fps').classList.toggle('hidden', !settings.showFps);
 applySpeedVis();
 
 // key bindings
@@ -1262,7 +1261,7 @@ function autoRes(raw) {
   else if (res.avg < res.best * 1.08) { res.fast += raw; res.slow = 0; }
   else { res.slow = res.fast = 0; }
   let next = res.now;
-  if (res.slow > 1) next = Math.max(0.6, res.now - 0.15);
+  if (res.slow > 1) next = Math.max(res.min, res.now - 0.15);
   else if (res.fast > 6) next = Math.min(res.max, res.now + 0.1);
   if (next !== res.now) {
     res.now = next;
@@ -1272,12 +1271,23 @@ function autoRes(raw) {
   }
 }
 
+// frame rate readout (Settings → Show frame rate), refreshed twice a second
+let fpsFrames = 0, fpsSince = 0;
+function countFps(now) {
+  fpsFrames++;
+  if (now - fpsSince < 500) return;
+  if (settings.showFps && fpsSince) setText('fps', `${Math.round(fpsFrames * 1000 / (now - fpsSince))} FPS`);
+  fpsFrames = 0;
+  fpsSince = now;
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const raw = (now - last) / 1000;
   const dt = Math.max(0, Math.min(raw, 0.05));   // first frame can be negative
   last = now;
   autoRes(raw);
+  countFps(now);
   World.animate(now / 1000, dt);
   if (inGame) updateGame(dt);
   else {
