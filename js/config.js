@@ -4,7 +4,7 @@
 //  Units are meters and seconds.
 // ============================================================
 const CONFIG = {
-  version: 3,   // bump when a change makes old and new players unable to play together
+  version: 4,   // bump when a change makes old and new players unable to play together
   move: {
     walkSpeed: 6,
     runSpeed: 10,          // hold Shift (no stamina, run forever)

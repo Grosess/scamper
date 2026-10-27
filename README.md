@@ -34,6 +34,8 @@ Striped walls are wall-kick routes.
 
 | Map | Setting | What it is |
 | --- | --- | --- |
+| The Court | indoor | Small parkour court for tight chases: vaults, A-frame, slide table, juke pillars, four towers with different ways up |
+| The Blocks | void | 3x3 blocks with 3m alleys: every alley is a kick chimney, each alley segment has a vault/slide bar/crate, rooftop-to-street chases |
 | Hotel Lobby | indoor | Four-storey atrium: galleries at 4/8/12, escalators, grand staircase, sky bridges, striped elevator shafts and column pairs to kick up |
 | Container Yard | sky + sea | Container piles up to 18m, container bridges you can run through or over, skewed containers, a crane |
 | The Poolrooms | indoor | Tiled bathhouse in a tiled box: bath houses, balcony/gallery/roof bridges, fountain, slides, kick shafts |
