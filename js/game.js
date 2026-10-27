@@ -1234,8 +1234,14 @@ function frame(now) {
   else {
     const mc = World.map.menuCam;
     menuT += dt * 0.07;
-    camera.position.set(Math.cos(menuT) * mc.r, mc.y, Math.sin(menuT) * mc.r);
-    camera.lookAt(0, Math.min(2, mc.y - 1), 0);
+    if (mc.path) {   // drift slowly back and forth between two points, looking toward the second
+      const [a, b] = mc.path, f = (1 - Math.cos(menuT * 2)) / 2;
+      camera.position.set(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f);
+      camera.lookAt(b[0] * 2 - a[0], b[1] - 0.3, b[2] * 2 - a[2]);
+    } else {
+      camera.position.set(Math.cos(menuT) * mc.r, mc.y, Math.sin(menuT) * mc.r);
+      camera.lookAt(0, Math.min(2, mc.y - 1), 0);
+    }
   }
   renderPreview(dt);
   renderer.render(scene, camera);
