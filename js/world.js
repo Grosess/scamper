@@ -45,13 +45,14 @@ const World = {
     };
     // cartoon outlines on every solid piece
     const lineMat = new THREE.LineBasicMaterial({ color: map.outlineColor || '#0d0f14', transparent: true, opacity: 0.7 });
+    // static pieces are collected per material and merged into one mesh each after the map is
+    // built (a few dozen draw calls instead of hundreds), all outlines into one line mesh
+    const buckets = new Map(), edges = [];
     const mesh = (geo, material, o = {}) => {
-      const m = new THREE.Mesh(geo, material);
-      m.castShadow = !o.noShadow;
-      m.receiveShadow = true;
-      this.group.add(m);
-      if (map.outline !== false && o.outline !== false) this.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), lineMat));
-      return m;
+      const key = material.uuid + (o.noShadow ? '|n' : '');
+      if (!buckets.has(key)) buckets.set(key, { material, shadow: !o.noShadow, geos: [] });
+      buckets.get(key).geos.push(geo);
+      if (map.outline !== false && o.outline !== false) edges.push(new THREE.EdgesGeometry(geo, 25));
     };
 
     const kit = {
@@ -163,6 +164,19 @@ const World = {
     };
 
     map.build(kit);
+
+    for (const { material, shadow, geos } of buckets.values()) {
+      const m = new THREE.Mesh(mergeGeometries(geos), material);
+      m.castShadow = shadow;
+      m.receiveShadow = true;
+      m.matrixAutoUpdate = false;
+      this.group.add(m);
+    }
+    if (edges.length) {
+      const l = new THREE.LineSegments(mergeGeometries(edges), lineMat);
+      l.matrixAutoUpdate = false;
+      this.group.add(l);
+    }
   },
 
   animate(t, dt) {
@@ -210,6 +224,22 @@ const World = {
     p.pos.z += wz * push;
     const vn = p.vel.x * wx + p.vel.z * wz;
     if (vn < 0) { p.vel.x -= wx * vn; p.vel.z -= wz * vn; }
+  },
+
+  // height of the highest surface under (x, z) at or below y (-Infinity over the void)
+  floorBelow(x, y, z) {
+    let best = -Infinity;
+    for (const b of this.boxes) {
+      const t = b.max.y;
+      if (t > y || t <= best || x < b.min.x || x > b.max.x || z < b.min.z || z > b.max.z) continue;
+      if (!b.rot || this._rotHit(b, x, z, 0.01)) best = t;
+    }
+    for (const r of this.ramps) {
+      if (!inFootprint(r, x, z, 0)) continue;
+      const t = rampHeight(r, x, z);
+      if (t <= y && t > best) best = t;
+    }
+    return best;
   },
 
   // free space above the player's head (for capping jumps under low ceilings)
@@ -354,6 +384,37 @@ const World = {
     return null;
   },
 };
+
+// join geometries that share the same attributes into one (indexed) geometry
+function mergeGeometries(geos) {
+  const names = Object.keys(geos[0].attributes);
+  let verts = 0;
+  for (const g of geos) verts += g.attributes.position.count;
+  const out = new THREE.BufferGeometry(), arrays = {};
+  for (const n of names) arrays[n] = new Float32Array(verts * geos[0].attributes[n].itemSize);
+  const indexed = geos[0].index !== null;
+  let icount = 0;
+  if (indexed) for (const g of geos) icount += g.index.count;
+  const index = indexed ? (verts > 65535 ? new Uint32Array(icount) : new Uint16Array(icount)) : null;
+  let vo = 0, io = 0;
+  for (const g of geos) {
+    for (const n of names) {
+      const a = g.attributes[n];
+      arrays[n].set(a.array, vo * a.itemSize);
+    }
+    if (indexed) {
+      const src = g.index.array;
+      for (let i = 0; i < src.length; i++) index[io + i] = src[i] + vo;
+      io += src.length;
+    }
+    vo += g.attributes.position.count;
+    g.dispose();
+  }
+  for (const n of names) out.setAttribute(n, new THREE.BufferAttribute(arrays[n], geos[0].attributes[n].itemSize));
+  if (index) out.setIndex(new THREE.BufferAttribute(index, 1));
+  out.computeBoundingSphere();
+  return out;
+}
 
 function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 

@@ -16,7 +16,7 @@ if (typeof THREE === 'undefined' || typeof Peer === 'undefined') {
 
 // ---------- settings ----------
 const settings = Object.assign(
-  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1 },
+  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perf: false },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
@@ -24,11 +24,20 @@ function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; }
 function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} }
 
 // ---------- renderer / scene ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+// render resolution: starts at up to 1.5x on sharp screens and drops on its own when frames run slow
+const res = { max: 1, now: 1, avg: 1 / 60, best: 1 / 60, slow: 0, fast: 0 };
+function setResMax() {
+  res.max = Math.min(devicePixelRatio, settings.perf ? 1 : 1.5);
+  res.now = Math.min(res.now, res.max) || res.max;
+  renderer.setPixelRatio(res.now);
+}
+setResMax();
 renderer.setSize(innerWidth, innerHeight);
+// the world never moves, so its shadows are drawn once per map (players get a blob shadow instead)
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 document.body.prepend(renderer.domElement);
@@ -177,6 +186,7 @@ function loadMap(id) {
   const m = getMap(id);
   World.load(scene, m);
   buildSpots(m);
+  renderer.shadowMap.needsUpdate = true;
   scene.background.set(m.sky);
   scene.fog.color.set(m.sky);
   scene.fog.near = m.fog[0];
@@ -289,6 +299,7 @@ function makeLabel(text, color, w = 256) {
   return s;
 }
 
+const blobGeo = new THREE.PlaneGeometry(1.3, 1.3);
 function makeAvatar(p) {
   const root = new THREE.Group();
   const c = buildScamp(p.color, p.eye);
@@ -318,11 +329,16 @@ function makeAvatar(p) {
   xray.visible = false;
   root.add(label, itMark, ring, xray);
   scene.add(root);
-  return { root, rig: c.rig, scamp: c, bodyMat: c.fur, itMark, ring, xray, spd: 0, vy: 0 };
+  const blob = new THREE.Mesh(blobGeo, new THREE.MeshBasicMaterial({ color: 0x000000, map: glowTex, transparent: true, opacity: 0.4, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+  blob.rotation.x = -Math.PI / 2;
+  scene.add(blob);
+  return { root, rig: c.rig, scamp: c, bodyMat: c.fur, itMark, ring, xray, blob, spd: 0, vy: 0 };
 }
 
 function removeAvatar(p) {
-  scene.remove(p.avatar.root);
+  scene.remove(p.avatar.root, p.avatar.blob);
+  p.avatar.blob.material.dispose();
   p.avatar.root.traverse((o) => {
     if (o.geometry) o.geometry.dispose();
     if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
@@ -1126,6 +1142,16 @@ function bindToggle(id, key, after) {
   el.checked = !!settings[key];
   el.onchange = () => { settings[key] = el.checked; saveSettings(); if (after) after(); };
 }
+// performance mode: lower resolution cap, no shadows
+function applyPerf() {
+  setResMax();
+  renderer.setSize(innerWidth, innerHeight);
+  if (sun.castShadow === !settings.perf) return;
+  sun.castShadow = !settings.perf;
+  scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+  renderer.shadowMap.needsUpdate = true;
+}
+applyPerf();
 const applySpeedVis = () => $('speed').classList.toggle('hidden', !settings.showSpeed);
 bindRange('sens', 'sens', (v) => v.toFixed(2));
 bindRange('fov', 'fov', (v) => `${v}°`);
@@ -1134,6 +1160,7 @@ bindRange('shakeAmt', 'shake', (v) => (v === 0 ? 'off' : `${Math.round(v * 100)}
 bindToggle('autorun', 'autorun');
 bindToggle('invertY', 'invertY');
 bindToggle('showSpeed', 'showSpeed', applySpeedVis);
+bindToggle('perf', 'perf', applyPerf);
 applySpeedVis();
 
 // key bindings
@@ -1225,10 +1252,32 @@ let last = performance.now(), acc = 0, prevRl = 0;
 let fovNow = settings.fov, eyeH = M.standHeight - M.eyeFromTop, roll = 0, landOff = 0;
 let camFoot = 0, fovPunch = 0, pitchKick = 0, rollKick = 0, carve = 0, prevYaw = 0, stepSide = 1, bob = 0, bobW = 0, kickAnim = 0, kickSide = 1, tagAnim = 0, menuT = 0, sbTimer = 0;
 
+// watch frame times: drop the resolution when frames take clearly longer than the screen's refresh,
+// creep back up when there's room. res.best tracks the screen's refresh interval.
+function autoRes(raw) {
+  if (!(raw > 0 && raw < 0.25) || document.hidden) return;
+  res.avg += (raw - res.avg) * 0.05;
+  res.best = Math.min(res.best * 1.0005, Math.max(1 / 240, res.avg));
+  if (res.avg > res.best * 1.25) { res.slow += raw; res.fast = 0; }
+  else if (res.avg < res.best * 1.08) { res.fast += raw; res.slow = 0; }
+  else { res.slow = res.fast = 0; }
+  let next = res.now;
+  if (res.slow > 1) next = Math.max(0.6, res.now - 0.15);
+  else if (res.fast > 6) next = Math.min(res.max, res.now + 0.1);
+  if (next !== res.now) {
+    res.now = next;
+    res.slow = res.fast = 0;
+    renderer.setPixelRatio(next);
+    renderer.setSize(innerWidth, innerHeight);
+  }
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.max(0, Math.min((now - last) / 1000, 0.05));   // first frame can be negative
+  const raw = (now - last) / 1000;
+  const dt = Math.max(0, Math.min(raw, 0.05));   // first frame can be negative
   last = now;
+  autoRes(raw);
   World.animate(now / 1000, dt);
   if (inGame) updateGame(dt);
   else {
@@ -1351,7 +1400,7 @@ function updateGame(dt) {
   const sp = Math.max(0, Math.min(1, (hs - M.walkSpeed) / (18 - M.walkSpeed)));
   fovPunch *= Math.exp(-5 * dt);
   fovNow += (settings.fov + C.speedFov * sp + fovPunch - fovNow) * ease(10);
-  $('speedlines').style.opacity = Math.max(0, Math.min(0.85, (hs - 12) / 10)).toFixed(2);
+  setSpeedlines(Math.max(0, Math.min(0.85, (hs - 12) / 10)).toFixed(2));
   motionAudio(hs, onFoot);
   if (Math.abs(camera.fov - fovNow) > 0.01) { camera.fov = fovNow; camera.updateProjectionMatrix(); }
 
@@ -1394,6 +1443,14 @@ function updateGame(dt) {
     if (a.xray.visible) a.xray.children[2].scale.setScalar(0.5 + Math.min(1.2, a.root.position.distanceTo(me.pos) / 25));
     a.bodyMat.emissive.setHex(it ? 0x661018 : 0x000000);
     if (it) nearestSeeker = Math.min(nearestSeeker, a.root.position.distanceTo(me.pos));
+    // blob shadow on whatever is under them, fading as they get higher
+    const rp = a.root.position, fy = World.floorBelow(rp.x, rp.y + 0.3, rp.z), up = rp.y - fy;
+    a.blob.visible = fy > -1e8 && up < 6;
+    if (a.blob.visible) {
+      a.blob.position.set(rp.x, fy + 0.02, rp.z);
+      a.blob.scale.setScalar(1 + up * 0.12);
+      a.blob.material.opacity = 0.42 * (1 - up / 6);
+    }
   }
 
   talkT = Math.max(0, talkT - dt);
@@ -1429,6 +1486,15 @@ function motionAudio(hs, onFoot) {
   const stride = Math.floor(bob / Math.PI);
   if (onFoot && hs > 2 && stride !== lastStep) { stepSide = -stepSide; tone(stepSide > 0 ? 150 : 135, 60, 0.06, 'triangle', 0.05 + hs / 400); }
   lastStep = stride;
+}
+
+let speedOp = '';
+function setSpeedlines(op) {
+  if (op === speedOp) return;
+  speedOp = op;
+  const el = $('speedlines');
+  el.style.opacity = op;
+  el.classList.toggle('on', op !== '0.00');
 }
 
 // --- 2-player helpers: where's the other player, heartbeat, countdowns, close calls ---
@@ -1555,9 +1621,9 @@ function updateHud(hs, frozen, nearestSeeker) {
   setText('hint', hint);
 
   const v = $('vignette');
-  v.classList.toggle('it', amIt);
-  const danger = !amIt && playing && game.rl <= 0 ? Math.max(0, 1 - nearestSeeker / 14) : 0;
-  v.style.setProperty('--danger', danger.toFixed(2));
+  if (v.classList.contains('it') !== amIt) v.classList.toggle('it', amIt);
+  const danger = (!amIt && playing && game.rl <= 0 ? Math.max(0, 1 - nearestSeeker / 14) : 0).toFixed(2);
+  if (danger !== v.dataset.d) { v.dataset.d = danger; v.style.setProperty('--danger', danger); }
 }
 
 // ---------- menu ----------

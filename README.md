@@ -12,7 +12,7 @@ A first-person parkour tag game for the browser. You play as a little eraser-blo
 Each friend needs their own copy of the files, or you can put the folder online (see below) and send everyone the link.
 A link like `index.html?code=MOKU` pre-fills the code.
 
-Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on the main menu and in the Esc menu.
+Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on the main menu and in the Esc menu. Resolution adjusts itself when frames run slow; turn on **Performance mode** in Settings on slower computers (lower resolution, no shadows).
 
 ### Default controls
 

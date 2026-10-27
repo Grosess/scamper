@@ -24,7 +24,7 @@ function buildScamp(color, eyeColor = '#ffffff') {
     const g = new THREE.BoxGeometry(w, h, d);
     const m = new THREE.Mesh(g, mat);
     m.position.set(x, y, z);
-    m.castShadow = true;
+    m.castShadow = false;   // players get a cheap blob shadow instead (game.js)
     parent.add(m);
     if (edges) { const l = new THREE.LineSegments(new THREE.EdgesGeometry(g), outline); l.position.copy(m.position); parent.add(l); }
     return m;
