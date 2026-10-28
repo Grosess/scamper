@@ -338,7 +338,7 @@ const World = {
       m4.makeScale(b.r, b.r * 1.08, b.r);
       m4.setPosition(b.p.x, b.p.y, b.p.z);
       set.im.setMatrixAt(i, m4);
-      const e = b.r * 1.02 + 0.012;
+      const e = b.r * 1.01 + 0.006;
       m4.makeScale(e, e * 1.08, e);
       m4.setPosition(b.p.x, b.p.y, b.p.z);
       set.rim.setMatrixAt(i, m4);

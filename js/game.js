@@ -81,6 +81,8 @@ scene.add(camera);
 
 const hemi = new THREE.HemisphereLight();
 scene.add(hemi);
+const ambient = new THREE.AmbientLight(0xffffff, 0);
+scene.add(ambient);
 const sun = new THREE.DirectionalLight(0xffffff, 0.8);
 sun.position.set(30, 60, 20);
 sun.castShadow = true;
@@ -129,7 +131,7 @@ function buildSpots(m) {
   const spacing = m.spots ? m.size * 0.7 : m.size * 0.55;
   if (m.env === 'sky') { buildSky(m); return; }
   if (m.env === 'space') { buildSpace(m); return; }
-  if (m.env === 'fog') { if (m.mist) buildMist(m); return; }
+  if (m.env === 'fog') return;
   const indoor = m.env === 'indoor';
   for (const s of list) {
     const y = s.y || h, ang = s.angle || Math.atan(spacing * 0.85 / y), color = s.color || m.spotColor || '#fff2dc';
@@ -181,44 +183,6 @@ function buildSky(m) {
   spotGroup.add(sea);
 }
 
-// drifting fog banks: big soft cloud sprites low over the ground, sliding slowly through the map
-const mistTex = (() => {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d');
-  let seed = 9;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 14; i++) {
-    const x = 34 + rnd() * 60, y = 44 + rnd() * 40, r = 18 + rnd() * 28;
-    const gr = g.createRadialGradient(x, y, 0, x, y, r);
-    gr.addColorStop(0, 'rgba(255,255,255,0.42)');
-    gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 128, 128);
-  }
-  return new THREE.CanvasTexture(c);
-})();
-function buildMist(m) {
-  const tint = new THREE.Color(m.sky).lerp(new THREE.Color('#ffffff'), 0.35);
-  let seed = 4;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const area = m.size * 2.2;
-  for (let i = 0; i < m.mist; i++) {
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, color: tint, transparent: true, opacity: 0.5 + rnd() * 0.3, depthWrite: false }));
-    const s = 14 + rnd() * 16;
-    sp.scale.set(s, s * 0.45, 1);
-    sp.position.set((rnd() - 0.5) * area, 0.8 + rnd() * 5, (rnd() - 0.5) * area);
-    const vx = 0.25 + rnd() * 0.5, vz = (rnd() - 0.5) * 0.3;
-    spotGroup.add(sp);
-    World._anim.push((t, dt) => {
-      sp.position.x += vx * dt;
-      sp.position.z += vz * dt;
-      if (sp.position.x > area / 2) sp.position.x -= area;
-      if (Math.abs(sp.position.z) > area / 2) sp.position.z = -Math.sign(sp.position.z) * area / 2;
-    });
-  }
-}
-
 // space: stars, and a planet hanging in the black
 function buildSpace(m) {
   const n = 1400, pts = new Float32Array(n * 3);
@@ -231,16 +195,25 @@ function buildSpace(m) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pts, 3));
   spotGroup.add(new THREE.Points(g, new THREE.PointsMaterial({ color: '#ffffff', size: 1.6, sizeAttenuation: false, fog: false })));
+  // the planet: flat colors with a dark outline, like everything else
   const p = m.planet || { x: -160, y: 120, z: -220, r: 34, color: '#5b8fd8', land: '#7fc48f' };
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(p.r, 40, 24), new THREE.MeshLambertMaterial({ color: p.color, fog: false }));
+  const geo = new THREE.SphereGeometry(p.r, 40, 24);
+  const planet = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: p.color, fog: false }));
   planet.position.set(p.x, p.y, p.z);
-  spotGroup.add(planet);
+  const rim = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#0d0f14', side: THREE.BackSide, fog: false }));
+  rim.scale.setScalar(1.025);
+  rim.position.copy(planet.position);
+  spotGroup.add(rim, planet);
   for (const [a, b, s] of [[0.4, 0.3, 0.42], [2.2, -0.2, 0.35], [4.1, 0.5, 0.3]]) {
-    const land = new THREE.Mesh(new THREE.SphereGeometry(p.r * 1.004, 24, 12, a, s * 3, Math.PI / 2 + b, s * 2.2),
-      new THREE.MeshLambertMaterial({ color: p.land, fog: false }));
+    const land = new THREE.Mesh(new THREE.SphereGeometry(p.r * 1.006, 24, 12, a, s * 3, Math.PI / 2 + b, s * 2.2),
+      new THREE.MeshBasicMaterial({ color: p.land, fog: false }));
     land.position.copy(planet.position);
     spotGroup.add(land);
   }
+  // a pale ice cap on top
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(p.r * 1.004, 24, 6, 0, Math.PI * 2, 0, 0.45), new THREE.MeshBasicMaterial({ color: '#eef3fa', fog: false }));
+  cap.position.copy(planet.position);
+  spotGroup.add(cap);
 }
 
 // steel trusses across the top - one instanced mesh, so it costs a single draw call
@@ -290,8 +263,12 @@ function loadMap(id) {
   hemi.color.set(m.hemi[0]);
   hemi.groundColor.set(m.hemi[1]);
   const day = m.env === 'sky';
-  hemi.intensity = m.hemi[2] * (day ? 1.0 : 0.45);
-  sun.intensity = m.sun[0] * (day ? 1.0 : 0.45);
+  // flat look: most of the light is an even fill, the sun and sky only add a little shading
+  const lit = m.hemi[2] * (day ? 1.0 : 0.45) + m.sun[0] * (day ? 1.0 : 0.45);
+  hemi.intensity = lit * 0.3;
+  sun.intensity = m.sun[0] * (day ? 1.0 : 0.45) * 0.35;
+  ambient.color.set(m.hemi[0]);
+  ambient.intensity = lit * 0.62;
   if (day) sun.position.set(m.sun[1], m.sun[2], m.sun[3]);
   else sun.position.set(m.sun[1] * 0.25, 60, m.sun[3] * 0.25);   // shadows fall straight down, like the lights
   const sc = sun.shadow.camera;

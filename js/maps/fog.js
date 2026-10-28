@@ -17,7 +17,6 @@ defineMap({
   sky: '#7f889a',
   fog: [7, 40],
   fogDensity: 0.055,       // real (exponential) fog, thicker with distance
-  mist: 18,                // drifting fog banks
   hemi: ['#e2e8f5', '#5a6070', 2.5],
   sun: [1.3, 20, 50, 30],
   size: 26,

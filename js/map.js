@@ -33,7 +33,7 @@
 //    'void'    black void, steel rafters + spotlights
 //    'indoor'  build walls + ceiling with enclose(); ceiling lights
 //    'sky'     daylight sky with sea at `sea` height
-//    'fog'     just the sky color + fog. fogDensity: 0.05 = real exponential fog, mist: N = N drifting fog banks
+//    'fog'     just the sky color + fog. fogDensity: 0.05 = real exponential fog
 //    'space'   black sky, stars and a planet
 //
 //  Other defineMap fields:

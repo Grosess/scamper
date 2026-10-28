@@ -84,7 +84,9 @@ class LocalPlayer {
       if (slick && wl > 0 && ns < 4) { v.x += wx * 10 * dt; v.z += wz * 10 * dt; }
       if (ns < M.slideStopSpeed && !slick) { this.sliding = false; this.crouching = true; }
     } else if (this.grounded) {
-      const target = (this.crouching ? M.crouchSpeed : (inp.run ? M.runSpeed : M.walkSpeed)) * this.speedMul;
+      // crouch-walking is slow only when you choose it: squeezed under something low, you keep full speed
+      const slow = this.crouching && World.canStand(this);
+      const target = (slow ? M.crouchSpeed : (inp.run ? M.runSpeed : M.walkSpeed)) * this.speedMul;
       if (wl > 0) {
         const along = hs > 0.01 ? (v.x * wx + v.z * wz) / hs : 0;
         if (hs > target + 0.5 && along > 0.3) {
@@ -174,8 +176,7 @@ class LocalPlayer {
         this.jumpBuf = 0;
         if (this.sliding) { this.sliding = false; this.crouching = inp.crouch; }
         this.ev.jump = true;
-      } else if (this.wall && this.kickCd <= 0 &&
-                 (!this.lastKickN || this.lastKickN.x * this.wall.n.x + this.lastKickN.z * this.wall.n.z < 0.5)) {
+      } else if (this.wall && this.kickCd <= 0) {   // any wall, even the same one again
         this.kick(this.wall.n, fx, fz);
       }
     }

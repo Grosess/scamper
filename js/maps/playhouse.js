@@ -184,6 +184,6 @@ defineMap({
     // the balloon room (north-east, floors 0-7.6): a cloud of balloons
     const rx0 = X(8) - S / 2, rx1 = X(12) + S / 2, rz0 = Z(0) - S / 2, rz1 = Z(4) + S / 2;
     const BAL = ['#ff8fa3', '#ffd166', '#7ed6c8', '#8fb4ff', '#c3a6ff', '#ffb37a', '#9be3a8', '#ff6b6b', '#a8dcef'];
-    k.balloons((rx0 + rx1) / 2, 0, (rz0 + rz1) / 2, rx1 - rx0, LV[1] * 2 - T, rz1 - rz0, 42, BAL, { seed: 5 });
+    k.balloons((rx0 + rx1) / 2, 0, (rz0 + rz1) / 2, rx1 - rx0, LV[1] * 2 - T, rz1 - rz0, 75, BAL, { seed: 5 });
   },
 });
