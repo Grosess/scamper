@@ -6,7 +6,9 @@
 //              run through them at pile-top level, or along their roofs
 //   skewed     containers dumped at angles on the dock and on top of piles (real collision)
 //   leaners    containers tipped against the edge piles as ramps
-//   crane      gantry beam 21m up; the pad on the tallest pile launches you onto it
+//   crane      gantry beam 21m up; the pad on the tallest pile launches you onto it. Its trolley
+//              and hanging spreader are solid - the spreader is a perch over the middle alley
+//   kick towers orange access shafts at both ends of the crane: kick up from the dock to the beam
 defineMap({
   id: 'shipyard',
   accent: ['#a8322d', '#23408e'],
@@ -35,7 +37,7 @@ defineMap({
     }
     for (let v = -22; v <= 22; v += 11) for (const s of [-1, 1]) {
       k.box(v, 0, s * 25.2, 0.5, 0.7, 0.5, '#2b2f35', { tex: 'none' });
-      k.box(s * 25.2, 0, v, 0.5, 0.7, 0.5, '#2b2f35', { tex: 'none' });
+      if (v !== 0) k.box(s * 25.2, 0, v, 0.5, 0.7, 0.5, '#2b2f35', { tex: 'none' });   // (the kick towers stand at v = 0)
     }
 
     // --- the piles: LAYERS[row][col], row = z, col = x ---
@@ -80,9 +82,12 @@ defineMap({
     const Y = '#f1c40f';
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box(sx * 21, 0, sz * 2.2, 1.2, 21, 1.2, Y, { tex: 'none' });
     k.box(0, 21, 0, 43.2, 0.8, 3, Y, { tex: 'grid' });
-    k.deco(6, 19.4, 0, 3, 1.6, 2.6, '#c0392b', { tex: 'none' });
-    k.deco(6, 12, 0, 0.08, 7.4, 0.08, '#222222', { tex: 'none' });
-    k.deco(6, 11.4, 0, 4.4, 0.6, 2.6, '#c0392b', { tex: 'none' });
+    // trolley, cable and spreader - all solid, hung over the east end (clear of the pad's flight)
+    k.box(13.5, 19.4, 0, 3, 1.6, 2.6, '#c0392b');
+    k.box(13.5, 12, 0, 0.14, 7.4, 0.14, '#222222', { tex: 'none' });
+    k.box(13.5, 11.4, 0, 4.4, 0.6, 2.6, '#c0392b');
     k.pad(4.5, 18.2, 3, 1.2, 1.2, 15, { push: { x: 0, z: -2.5 } });
+    // kick towers just past each end of the beam: wall-kick up from the dock, step onto the beam
+    for (const s of [-1, 1]) kickShaft(k, s * 23.5, 0, 'x', 3, 0, 21.8, Y);
   },
 });

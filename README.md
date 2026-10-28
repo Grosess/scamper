@@ -22,40 +22,36 @@ Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on 
 | Shift | Run (no stamina) |
 | Space | Jump. In the air next to a wall, it's a wall kick toward where you're looking |
 | C / Right click | Slide (when running fast) or crouch |
-| (contact) | Run into someone to tag them. New seekers have a 1.5s cooldown |
+| (contact) | Run into someone to tag them (pass the bomb, steal the crown, catch the runner) |
 | T | Talk (your head flaps open; everyone sees it) |
-| Tab | Scoreboard |
+| Tab | Big leaderboard (a small one is always on the right) |
 | P / Esc | Pause menu |
+
+### Modes
+- **Bomb Tag**: one player gets the bomb. Run into someone to pass it on (no instant pass-backs). When the fuse runs out, whoever holds it is out and spectates as a ghost; a new bomb drops on someone else. Last one standing wins. The fuse scales with the player count so a game takes 1.5-3.5 minutes; with 2 players each has 2 lives. The holder runs a little faster.
+- **King of the Tag**: the king scores a point every second. Run into the king to steal the crown (a new king is safe for 2s). If the king falls off, the crown drops in the middle for anyone to grab. Most points wins. Chasers run a little faster.
+- **Duel (1v1)**: exactly 2 players taking turns to chase. Catch the runner before the timer ends to score, survive to score; falling off scores for your opponent. First to 3/5/7 wins. The chaser sees the runner's outline through walls and runs a little faster.
+- **Race**: everyone starts together on a race course. Get to the finish first. No checkpoints - fall off and you're back at the start. The leaderboard shows meters to go. After the first finisher, everyone else has 60 seconds.
+
+Your stats (games, wins, tags, best race times...) are saved in your browser - see **Stats** in the main menu.
 
 ### Maps
 
 Floors are 4m apart everywhere, and jumps under low ceilings are capped, so you never bump your head.
-Striped walls are wall-kick routes.
+Orange walls are wall-kick routes.
 
 | Map | Setting | What it is |
 | --- | --- | --- |
-| The Court | indoor | Small parkour court for tight chases: vaults, A-frame, slide table, juke pillars, four towers with different ways up |
-| The Blocks | void | 3x3 blocks with 3m alleys: every alley is a kick chimney, each alley segment has a vault/slide bar/crate, rooftop-to-street chases |
-| The Corridors | indoor | Two floors of looping 3m hallways drawn from ASCII grids in the map file (edit them to redraw the maze): vents to slide through, vault walls, orange kick shafts and stairwells between floors |
-| Hotel Lobby | indoor | Four-storey atrium: galleries at 4/8/12, escalators, grand staircase, sky bridges, orange elevator shafts and column pairs to kick up |
-| Container Yard | sky + sea | Container piles up to 18m, container bridges you can run through or over, skewed containers, a crane |
-| The Poolrooms | indoor | Tiled bathhouse in a tiled box: bath houses, balcony/gallery/roof bridges, fountain, slides, kick shafts |
-| Fun Zone | indoor | Nine pastel play towers, enclosed tube bridges, kick shafts, slides, ball pits, trampolines |
-| The Liner | sky + sea | Cabin decks, a bridge house, an orange 22m funnel kick chimney, cargo piles, bouncy lifeboats, a crow's nest |
-| Rooftops | void | Roofs 4-24m, penthouses, sky bridges, orange billboard kick chimneys, a water tower |
+| Rooftops | void | City roofs 4-24m over the void with 3m alleys you can kick up (even after falling in), fire escapes, orange kick signs, penthouses, sky bridges, pads |
+| Container Yard | sky + sea | Container piles up to 18m, container bridges you can run through or over, skewed containers, a solid crane with kick towers |
+| The Corridors | indoor | Two floors of looping 3m hallways drawn from ASCII grids in the map file: vents to slide through, vault walls, kick shafts and stairwells between floors |
+| Fog | fog | A suburban street lost in thick drifting fog: gable roofs, kick alleys, fences, a treehouse, a park with a merry-go-round |
+| The Playhouse | indoor | A three-storey padded play structure on a 3m grid: crawl tunnels, nets, rope bridges, trampolines, and a room full of balloons that dodge you |
+| Moon Base | space | Low gravity. Habitat modules and tubes on a floating rock split by a rift, a comm tower, a lander, a hangar |
+| Cloud Spire | race | A 3-lap spiral climb around a spire high over the sea: ferries, sweepers, pistons, chimneys, a cannon to the top |
+| The Gauntlet | race | A winding course over a violet haze: spinner plaza, slide tunnel, kick tower, crossing ferries, lifts and a kick-shaft shortcut |
 
-Level features: **jump pads** (glowing squares), **water slides** (ramps that always make you slide), **bouncy surfaces**, and **kick walls** (always bright orange-red).
-
-### Modes
-- **Classic tag**: one person is IT. Tag someone to pass it on, and they can't tag you straight back. Whoever spends the least time as IT wins. Falling off makes you IT.
-- **Infection**: tagged players become seekers too. Runners win if anyone survives until the timer runs out. Falling off infects you.
-- **Duel (1v1)**: needs exactly 2 players. One chases and one evades, with a short countdown per chase (20s to 1:30, default 30s). A tag scores for the chaser, surviving scores for the evader, and falling off scores for your opponent. Whoever wins a chase evades next. First to 10 (or 5 or 7) wins.
-
-### Playing with 2 people
-- With exactly 2 players the lobby picks **Duel** for you (the host can still change it).
-- An arrow at the screen edge (or a marker over their head) always shows where the other player is and how far.
-- The duel chaser also sees the evader as a green outline through walls, runs a bit faster and tags from a bit farther.
-- A heartbeat speeds up as the seeker closes in; near-misses get a "CLOSE CALL!".
+Level features: **jump pads** (glowing squares), **moving platforms** you can ride, **spinning bars** that shove you, and **kick walls** (always bright orange-red).
 
 ## Put it online (optional)
 
@@ -66,12 +62,12 @@ Every file is static, so any static host will work: GitHub Pages, itch.io (uploa
 | File | What's in it |
 | --- | --- |
 | `js/config.js` | Every movement number (speed, air control, slide, wall kick, gravity), tag rules, default keys |
-| `js/map.js` | The map kit: `box` (can be rotated), `ramp`, `pad`, `stairs`, `slab`, `bridge`, `tower` (multi-floor buildings), `kickShaft`, `enclose` (indoor box), `pile` / `container` (shipping containers). Maps pick `env: 'void' / 'indoor' / 'sky'` |
+| `js/map.js` | The map kit: `box` (can be rotated), `ramp`, `pad`, `stairs`, `slab`, `bridge`, `tower` (multi-floor buildings), `kickShaft`, `enclose` (indoor box), `pile` / `container` (shipping containers). `mover` (moving/spinning boxes), `balloons`, `wall` (invisible). Maps pick `env: 'void' / 'indoor' / 'sky' / 'fog' / 'space'`, can override movement (`move: { gravity }`), and race courses set `kind: 'race'` |
 | `js/maps/*.js` | One file per map. Copy one to make your own, then add a `<script>` line for it in `index.html`. A map can list its own `spots` (spotlights) |
 | `js/character.js` | The block character (body + hinged head, stick limbs) and its animation |
 | `js/player.js` | Movement code |
-| `js/world.js` | Collision, level features, textures |
-| `js/game.js` | Camera, HUD, menus, sounds, and the tag rules |
+| `js/world.js` | Collision, moving platforms, balloons, level features |
+| `js/game.js` | Camera, HUD, menus, sounds, stats, and the rules for every mode |
 | `js/net.js` | Lobbies and join codes |
 | `style.css` | How the menus and HUD look |
 

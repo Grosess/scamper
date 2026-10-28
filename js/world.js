@@ -24,6 +24,8 @@ const World = {
     this.boxes = [];
     this.ramps = [];
     this.pads = [];
+    this.movers = [];
+    this.balloonSets = [];
     this._anim = [];
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -83,6 +85,8 @@ const World = {
         }
         mesh(g, mat(color, o), o);
       },
+      // invisible wall: collision only, nothing drawn (keeps people inside a map)
+      wall: (x, y, z, w, h, d) => { this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 } }); },
       // see-through net wall (solid, you can't pass it)
       net: (x, y, z, w, h, d, color = '#222222') => kit.box(x, y, z, w, h, d, color, { tex: 'net', uv: 0.6, noShadow: true, outline: false }),
       // decoration only (no collision)
@@ -136,6 +140,48 @@ const World = {
         m.renderOrder = 1;      // water first among see-through things
         this.group.add(m);
       },
+      // moving solid box. Same args as box, plus how it moves (driven by the shared game clock):
+      //   { type: 'slide', dx, dy, dz, period, phase }  glides to (x+dx, y+dy, z+dz) and back
+      //   { type: 'spin', speed, phase }                 turns around its own center (rad/s)
+      // You ride on top of it, and it shoves you when it hits you.
+      mover: (x, y, z, w, h, d, color, motion, o = {}) => {
+        const g = new THREE.BoxGeometry(w, h, d);
+        g.translate(0, h / 2, 0);
+        const m = new THREE.Mesh(g, mat(color, o));
+        m.receiveShadow = true;
+        if (map.outline !== false) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), lineMat));
+        this.group.add(m);
+        const box = { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 }, rot: 0, cx: x, cz: z, hw: w / 2, hd: d / 2 };
+        const mv = { x, y, z, w, h, d, rot0: o.rot || 0, motion, box, mesh: m, dx: 0, dy: 0, dz: 0, drot: 0, vx: 0, vz: 0, s: null };
+        box.mover = mv;
+        this.movers.push(mv);
+        this.boxes.push(box);
+        this._placeMover(mv, 0, true);
+      },
+      // a room of floating balloons (radius 0.45-1.45) that drift away from anyone who comes close.
+      // They're soft: they never block you, they just get out of the way.
+      balloons: (x, y, z, w, h, d, count, colors, o = {}) => {
+        let seed = o.seed || 11;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        // flat color (no shading) with a dark border, like every other outlined thing: the border is
+        // a slightly bigger copy drawn inside-out behind each balloon
+        const geo = new THREE.SphereGeometry(1, 24, 16);
+        const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial(), count);
+        const rim = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: map.outlineColor || '#0d0f14', side: THREE.BackSide }), count);
+        const set = { x, y, z, w, h, d, list: [], im, rim };
+        const c = new THREE.Color();
+        for (let i = 0; i < count; i++) {
+          const r = 0.45 + Math.pow(rnd(), 1.6) * 1.0;
+          const p = { x: x + (rnd() - 0.5) * (w - 2 * r), y: y + r + rnd() * (h - 2 * r), z: z + (rnd() - 0.5) * (d - 2 * r) };
+          set.list.push({ r, p, home: Object.assign({}, p), v: { x: 0, y: 0, z: 0 }, ph: rnd() * 6.28 });
+          im.setColorAt(i, c.set(colors[i % colors.length]));
+        }
+        im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        rim.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.group.add(im, rim);
+        this.balloonSets.push(set);
+        this._drawBalloons(set);
+      },
       // a pile of colorful balls (decoration, e.g. a ball pit)
       balls: (x, y, z, w, d, count, colors) => {
         const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshLambertMaterial(), count);
@@ -169,6 +215,136 @@ const World = {
 
   animate(t, dt) {
     for (const f of this._anim) f(t, dt);
+    for (const mv of this.movers) {
+      mv.mesh.position.set(mv.s.x, mv.s.y, mv.s.z);
+      mv.mesh.rotation.y = mv.s.rot;
+    }
+    for (const set of this.balloonSets) this._stepBalloons(set, t, dt);
+  },
+
+  // --- movers ---
+  // where a mover is at time t (seconds on the shared game clock)
+  _moverAt(mv, t) {
+    const mo = mv.motion, ph = mo.phase || 0;
+    if (mo.type === 'spin') return { x: mv.x, y: mv.y, z: mv.z, rot: mv.rot0 + ph + mo.speed * t };
+    const u = ((t / mo.period + ph) % 1 + 1) % 1, s = (1 - Math.cos(u * Math.PI * 2)) / 2;
+    return { x: mv.x + (mo.dx || 0) * s, y: mv.y + (mo.dy || 0) * s, z: mv.z + (mo.dz || 0) * s, rot: mv.rot0 };
+  },
+  _placeMover(mv, t, first) {
+    const s = this._moverAt(mv, t), b = mv.box;
+    if (!first && mv.s) {
+      mv.dx = s.x - mv.s.x; mv.dy = s.y - mv.s.y; mv.dz = s.z - mv.s.z; mv.drot = s.rot - mv.s.rot;
+    }
+    mv.s = s;
+    const c = Math.abs(Math.cos(s.rot)), sn = Math.abs(Math.sin(s.rot));
+    const ex = c * mv.w / 2 + sn * mv.d / 2, ez = sn * mv.w / 2 + c * mv.d / 2;
+    b.min.x = s.x - ex; b.max.x = s.x + ex;
+    b.min.z = s.z - ez; b.max.z = s.z + ez;
+    b.min.y = s.y; b.max.y = s.y + mv.h;
+    b.cx = s.x; b.cz = s.z;
+    b.rot = s.rot % (Math.PI * 2);
+  },
+  // call once per physics step, before the player moves
+  updateMovers(t) {
+    for (const mv of this.movers) this._placeMover(mv, t, false);
+  },
+  // carry a player standing on a mover, and shove them if one runs into them
+  _moverPush(p, wasGrounded) {
+    if (!this.movers.length) return;
+    const pos = p.pos, gb = p.groundBox;
+    if (gb && gb.mover && wasGrounded) {
+      const mv = gb.mover;
+      if (mv.drot) {
+        const dx = pos.x - mv.s.x, dz = pos.z - mv.s.z, c = Math.cos(mv.drot), s = Math.sin(mv.drot);
+        pos.x = mv.s.x + dx * c + dz * s;
+        pos.z = mv.s.z - dx * s + dz * c;
+        p.yaw += mv.drot;
+      }
+      pos.x += mv.dx; pos.y += mv.dy; pos.z += mv.dz;
+    }
+    for (const mv of this.movers) {
+      const b = mv.box;
+      if (!this.overlapBox(b, pos.x, pos.y, pos.z, p.h)) continue;
+      if (pos.y > b.max.y - 0.6) { pos.y = b.max.y; if (p.vel.y < 0) p.vel.y = 0; continue; }   // it came up under you
+      // shoved sideways: out of the box, plus the box's own speed at that spot
+      if (b.rot) this._pushOut(p, b);
+      else {
+        const r = CONFIG.move.radius;
+        const opts = [[b.min.x - r - pos.x, 'x'], [b.max.x + r - pos.x, 'x'], [b.min.z - r - pos.z, 'z'], [b.max.z + r - pos.z, 'z']];
+        opts.sort((a, c) => Math.abs(a[0]) - Math.abs(c[0]));
+        pos[opts[0][1]] += opts[0][0] + Math.sign(opts[0][0]) * 0.002;
+      }
+      const dt = 1 / 120;
+      let vx = mv.dx / dt, vz = mv.dz / dt;
+      if (mv.drot) { const w = mv.drot / dt; vx += (pos.z - mv.s.z) * w; vz -= (pos.x - mv.s.x) * w; }
+      if (Math.abs(p.vel.x) < Math.abs(vx)) p.vel.x = vx;
+      if (Math.abs(p.vel.z) < Math.abs(vz)) p.vel.z = vz;
+    }
+  },
+  overlapBox(b, px, py, pz, h) {
+    const r = CONFIG.move.radius, E = 1e-4;
+    return px + r > b.min.x + E && px - r < b.max.x - E && pz + r > b.min.z + E && pz - r < b.max.z - E &&
+      py + h > b.min.y + E && py < b.max.y - E && (!b.rot || this._rotHit(b, px, pz, r - E));
+  },
+
+  // --- balloons ---
+  // positions of everyone balloons should dodge (feet), set by the game every frame
+  actors: [],
+  _stepBalloons(set, t, dt) {
+    dt = Math.min(dt, 0.05);
+    const L = set.list;
+    for (let i = 0; i < L.length; i++) {
+      const b = L[i], p = b.p, v = b.v;
+      const hy = b.home.y + Math.sin(t * 0.6 + b.ph) * 0.35;
+      let ax = (b.home.x - p.x) * 0.5 - v.x * 0.9, ay = (hy - p.y) * 0.5 - v.y * 0.9, az = (b.home.z - p.z) * 0.5 - v.z * 0.9;
+      for (const q of this.actors) {
+        const qy = Math.max(q.y, Math.min(q.y + 1.8, p.y));
+        const dx = p.x - q.x, dy = p.y - qy, dz = p.z - q.z, dist = Math.hypot(dx, dy, dz) || 0.01;
+        const R = b.r + 2.4;
+        if (dist < R) {
+          const f = (R - dist) * 16 / dist;
+          ax += dx * f; ay += dy * f * 0.6; az += dz * f;
+        }
+      }
+      v.x += ax * dt; v.y += ay * dt; v.z += az * dt;
+      const sp = Math.hypot(v.x, v.y, v.z);
+      if (sp > 9) { v.x *= 9 / sp; v.y *= 9 / sp; v.z *= 9 / sp; }
+      p.x += v.x * dt; p.y += v.y * dt; p.z += v.z * dt;
+    }
+    // keep them apart and inside the room
+    for (let i = 0; i < L.length; i++) {
+      const a = L[i];
+      for (let j = i + 1; j < L.length; j++) {
+        const b = L[j], dx = b.p.x - a.p.x, dy = b.p.y - a.p.y, dz = b.p.z - a.p.z, d = Math.hypot(dx, dy, dz) || 0.01, o = a.r + b.r - d;
+        if (o > 0) {
+          const k = o / d / 2;
+          a.p.x -= dx * k; a.p.y -= dy * k; a.p.z -= dz * k;
+          b.p.x += dx * k; b.p.y += dy * k; b.p.z += dz * k;
+        }
+      }
+      const p = a.p, r = a.r;
+      for (const [ax, c, half] of [['x', set.x, set.w / 2], ['z', set.z, set.d / 2]]) {
+        if (p[ax] < c - half + r) { p[ax] = c - half + r; a.v[ax] = Math.abs(a.v[ax]) * 0.4; }
+        if (p[ax] > c + half - r) { p[ax] = c + half - r; a.v[ax] = -Math.abs(a.v[ax]) * 0.4; }
+      }
+      if (p.y < set.y + r) { p.y = set.y + r; a.v.y = Math.abs(a.v.y) * 0.4; }
+      if (p.y > set.y + set.h - r) { p.y = set.y + set.h - r; a.v.y = -Math.abs(a.v.y) * 0.4; }
+    }
+    this._drawBalloons(set);
+  },
+  _drawBalloons(set) {
+    const m4 = this._m4 || (this._m4 = new THREE.Matrix4());
+    set.list.forEach((b, i) => {
+      m4.makeScale(b.r, b.r * 1.08, b.r);
+      m4.setPosition(b.p.x, b.p.y, b.p.z);
+      set.im.setMatrixAt(i, m4);
+      const e = b.r * 1.02 + 0.012;
+      m4.makeScale(e, e * 1.08, e);
+      m4.setPosition(b.p.x, b.p.y, b.p.z);
+      set.rim.setMatrixAt(i, m4);
+    });
+    set.im.instanceMatrix.needsUpdate = true;
+    set.rim.instanceMatrix.needsUpdate = true;
   },
 
   // first box the player's body overlaps, or null
@@ -252,8 +428,10 @@ const World = {
   move(p, dt) {
     const v = p.vel, pos = p.pos;
     const wasGrounded = p.grounded;
+    this._moverPush(p, wasGrounded);
     p.grounded = false;
     p.groundRamp = null;
+    p.groundBox = null;
 
     this._moveH(p, 'x', v.x * dt, wasGrounded);
     this._moveH(p, 'z', v.z * dt, wasGrounded);
@@ -262,7 +440,7 @@ const World = {
     for (let i = 0; i < 3; i++) {
       const b = this.overlap(pos.x, pos.y, pos.z, p.h);
       if (!b) break;
-      if (v.y <= 0) { pos.y = b.max.y; p.grounded = true; }
+      if (v.y <= 0) { pos.y = b.max.y; p.grounded = true; p.groundBox = b; }
       else pos.y = b.min.y - p.h - 0.001;
       v.y = 0;
     }
@@ -276,6 +454,15 @@ const World = {
         if (v.y < 0) v.y = 0;
         p.grounded = true;
         p.groundRamp = r;
+      }
+    }
+    // a ramp that ends against a box (a plank onto a roof...): step up onto the box instead of into it
+    if (p.groundRamp) {
+      const b = this.overlap(pos.x, pos.y, pos.z, p.h);
+      if (b && b.max.y > pos.y && b.max.y - pos.y < 0.5 && !this.overlap(pos.x, b.max.y + 0.001, pos.z, p.h)) {
+        pos.y = b.max.y + 0.001;
+        p.groundRamp = null;
+        p.groundBox = b;
       }
     }
   },

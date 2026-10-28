@@ -15,6 +15,12 @@
 //    k.water(x, y, z, width, depth, color, opacity)       see-through water surface
 //    k.balls(x, y, z, width, depth, count, colors)        pile of balls
 //    k.net(x, y, z, width, height, depth, color)          see-through net wall
+//    k.wall(x, y, z, width, height, depth)                invisible wall (collision only)
+//    k.mover(x, y, z, width, height, depth, color, motion) moving solid box (rides you along, shoves you)
+//         motion = { type: 'slide', dx, dy, dz, period, phase }  glides out by (dx,dy,dz) and back
+//                  { type: 'spin', speed, phase }                 spins around its center (rad/s)
+//    k.balloons(x, y, z, width, height, depth, count, colors)  room of floating balloons that dodge players
+//         (x/z = center of the room, y = floor). Soft: never block anyone.
 //
 //  Box opts: { tex: 'kick' (wall-kick surface: always bright orange-red) | 'net' (see-through),
 //              noShadow: true, emissive: '#color', opacity: 0..1 }
@@ -24,9 +30,19 @@
 //  kickShaft(), pile(), container().
 //
 //  Environments (env in defineMap):
-//    'void'    black void, steel rafters + spotlights. Fall off during a round = you become a seeker
+//    'void'    black void, steel rafters + spotlights
 //    'indoor'  build walls + ceiling with enclose(); ceiling lights
 //    'sky'     daylight sky with sea at `sea` height
+//    'fog'     just the sky color + fog. fogDensity: 0.05 = real exponential fog, mist: N = N drifting fog banks
+//    'space'   black sky, stars and a planet
+//
+//  Other defineMap fields:
+//    move: { gravity: 13, ... }     override CONFIG.move values on this map (e.g. low gravity)
+//    centerSpot: [x, y, z]          where a dropped crown lands (King of the Tag). Default seekerSpawn
+//    kind: 'race'                   a race course instead of a tag map, with
+//    race: { yaw, finish: { x, y, z, w, h, d }, route: [[x, y, z], ...] }
+//         spawns = the start line, finish = the goal box (y = bottom), route = the course's path
+//         from start to finish (used for "meters to go" on the leaderboard)
 //
 //  Handy numbers for designing:
 //    - a jump clears ~1.6m; standing height 1.8 -> keep ceilings 3.6m+ above any floor
@@ -49,6 +65,7 @@ function defineMap(def) {
     size: 50,                   // half-size of the area that gets shadows
     killY: -15,                 // fall below this and the void gets you
     menuCam: { r: 40, y: 22 },  // orbit camera behind the main menu
+    kind: 'tag',
   }, def));
 }
 
@@ -83,7 +100,8 @@ function posts(k, list, y0, y1, color, size = 0.4) {
 }
 
 // staircase. (x, z) = center of the bottom edge, dir = direction it climbs.
-// The steps are just looks - you walk up a smooth hidden ramp, so it never feels bumpy.
+// The steps are just looks - you walk up a smooth hidden ramp, so it never feels bumpy. The ramp
+// runs along the step noses (starting one step before the stairs), so feet never sink into a step.
 function stairs(k, x, z, dir, width, y0, y1, color, o = {}) {
   const n = Math.ceil((y1 - y0) / 0.4), run = o.run || 0.7, sg = dir[0] === '+' ? 1 : -1, L = n * run;
   const vis = Object.assign({}, o, { ghost: true });
@@ -92,8 +110,14 @@ function stairs(k, x, z, dir, width, y0, y1, color, o = {}) {
     if (dir[1] === 'x') k.box(x + off, y0, z, run, top - y0, width - 0.04, color, vis);
     else k.box(x, y0, z + off, width - 0.04, top - y0, run, color, vis);
   }
-  if (dir[1] === 'x') k.ramp(x + sg * L / 2, z, L, width, y0, y1, dir, color, { hidden: true, base: y0 });
-  else k.ramp(x, z + sg * L / 2, width, L, y0, y1, dir, color, { hidden: true, base: y0 });
+  const mid = sg * (n - 2) * run / 2, top = sg * (n - 0.5) * run, H = { hidden: true, base: y0 };
+  if (dir[1] === 'x') {
+    k.ramp(x + mid, z, L, width, y0, y1, dir, color, H);
+    k.ramp(x + top, z, run, width, y1, y1, dir, color, H);
+  } else {
+    k.ramp(x, z + mid, width, L, y0, y1, dir, color, H);
+    k.ramp(x, z + top, width, run, y1, y1, dir, color, H);
+  }
 }
 
 // slab (top at `top`) covering x0..x1 / z0..z1 with an optional rectangular hole [hx0, hx1, hz0, hz1]
@@ -179,6 +203,12 @@ function pile(k, x, z, layers, o = {}) {
   }
 }
 
+// darken a '#rrggbb' color (k < 1) or lighten it (k > 1)
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16), c = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => c(v).toString(16).padStart(2, '0')).join('');
+}
+
 // one shipping container. bottom at y. hollow ones are open at both ends (run through them).
 // rot = extra turn (radians) for skewed containers
 function container(k, x, y, z, orient, L, hollow, color, rot = 0) {
@@ -189,10 +219,11 @@ function container(k, x, y, z, orient, L, hollow, color, rot = 0) {
   const part = (lx, ly, lz, w, h, d, c, o) => { const [px, pz] = at(lx, lz); return (o.ghost ? k.deco : k.box)(px, y + ly, pz, w, h, d, c, Object.assign({ rot }, o)); };
   if (!hollow) {
     part(0, 0, 0, sx, C, sz, color, R);
-    // door ends in the container's own color (texture stretched to one door panel)
+    // door panels on the ends: a slightly darker skin, only 2cm proud of the end
+    const dc = shade(color, 0.78);
     for (const e of [-1, 1]) {
-      if (along) part(e * (L / 2 + 0.05), 0.06, 0, 0.04, C - 0.12, W - 0.1, color, { ghost: true, tex: 'doors', uv: 'box' });
-      else part(0, 0.06, e * (L / 2 + 0.05), W - 0.1, C - 0.12, 0.04, color, { ghost: true, tex: 'doors', uv: 'box' });
+      if (along) part(e * (L / 2 + 0.01), 0.06, 0, 0.02, C - 0.12, W - 0.1, dc, { ghost: true });
+      else part(0, 0.06, e * (L / 2 + 0.01), W - 0.1, C - 0.12, 0.02, dc, { ghost: true });
     }
     return;
   }

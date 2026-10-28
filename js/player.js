@@ -11,6 +11,7 @@ class LocalPlayer {
     this.h = CONFIG.move.standHeight;
     this.grounded = false;
     this.groundRamp = null;
+    this.groundBox = null;
     this.sliding = false;
     this.crouching = false;
     this.coyote = 0;

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -20,9 +20,10 @@
       </div>
       <nav class="nav" data-group="menu">
         <button class="nav-btn active" data-view="play"><span class="nav-num">01</span>Play</button>
-        <button class="nav-btn" data-view="settings"><span class="nav-num">02</span>Settings</button>
-        <button class="nav-btn" data-view="controls"><span class="nav-num">03</span>Controls</button>
-        <button class="nav-btn" data-view="howto"><span class="nav-num">04</span>How to play</button>
+        <button class="nav-btn" data-view="stats"><span class="nav-num">02</span>Stats</button>
+        <button class="nav-btn" data-view="settings"><span class="nav-num">03</span>Settings</button>
+        <button class="nav-btn" data-view="controls"><span class="nav-num">04</span>Controls</button>
+        <button class="nav-btn" data-view="howto"><span class="nav-num">05</span>How to play</button>
       </nav>
     </aside>
 
@@ -73,6 +74,11 @@
         </div>
       </section>
 
+      <section class="view hidden" data-view="stats">
+        <header class="view-head"><h2>Stats</h2><p>Saved in this browser.</p></header>
+        <div id="statsBody" class="stats-body"></div>
+      </section>
+
       <section class="view hidden" data-view="settings">
         <header class="view-head"><h2>Settings</h2><p>Saved on this device.</p></header>
         <div class="slot" data-panel="settings"></div>
@@ -88,45 +94,37 @@
         <div class="howto">
           <div class="tile">
             <div class="tile-kicker">Mode</div>
-            <h3>Classic tag</h3>
-            <p>One player is IT. Tag someone to pass it on, and they can't tag you straight back. The player who spends the least time as IT wins.</p>
+            <h3>Bomb Tag</h3>
+            <p>One player gets the bomb. Run into someone to pass it on (no instant pass-backs). When the fuse runs out, whoever holds it is out and a new bomb drops. Last one standing wins. The bomb holder runs a little faster.</p>
           </div>
           <div class="tile">
             <div class="tile-kicker">Mode</div>
-            <h3>Infection</h3>
-            <p>Tagged players join the seekers. Runners win if anyone is still free when time runs out.</p>
+            <h3>King of the Tag</h3>
+            <p>Whoever wears the crown scores a point every second. Run into the king to steal it (a new king is safe for 2 seconds). Fall off and the crown drops in the middle. Most points wins.</p>
           </div>
-          <div class="tile wide">
+          <div class="tile">
             <div class="tile-kicker">Mode</div>
             <h3>Duel (1v1)</h3>
-            <p>Exactly two players. One chases, one evades, and each chase is on a short timer. Tag them and you score; survive and they score. Whoever wins a chase evades next. First to 10 (or whatever the host picks) wins.</p>
+            <p>Two players take turns chasing. Catch the runner before the timer ends to score; survive and the runner scores. The chaser sees the runner's outline through walls. First to the target wins.</p>
           </div>
-          <div class="tile wide">
-            <div class="tile-kicker">The void</div>
-            <p>Every map floats in a black void. Fall off during a round and you come back as a seeker: IT in Classic, infected in Infection, and in a Duel your opponent scores.</p>
+          <div class="tile">
+            <div class="tile-kicker">Mode</div>
+            <h3>Race</h3>
+            <p>Everyone starts together on a race course. Get to the finish first. There are no checkpoints: fall off and you're back at the start. The leaderboard shows how far everyone has to go.</p>
           </div>
           <div class="tile wide">
             <div class="tile-kicker">Maps</div>
             <ul id="mapList" class="tips"></ul>
           </div>
           <div class="tile wide">
-            <div class="tile-kicker">Level features</div>
-            <ul class="tips">
-              <li><b>Jump pads</b> (glowing rings) launch you up onto high spots.</li>
-              <li><b>Water slides</b> (striped ramps) make you slide no matter what.</li>
-              <li><b>Bouncy stuff</b>: ball pits, lifeboats and pool trampolines throw you back up.</li>
-            </ul>
-          </div>
-          <div class="tile wide">
             <div class="tile-kicker">Movement</div>
             <ul class="tips">
-              <li><b>Slide</b> while running for a burst of speed. Sliding downhill on a ramp builds even more.</li>
-              <li><b>Jump out of a slide</b> to keep your speed. Hold slide as you land to chain another one.</li>
-              <li><b>Wall kick:</b> jump next to a wall while in the air. You'll launch toward where you're looking.</li>
-              <li>Kick back and forth between two walls to climb. You can't kick the same wall twice in a row.</li>
+              <li><b>Slide</b> while running for a burst of speed. Jump out of a slide to keep it.</li>
+              <li><b>Wall kick:</b> jump next to a wall while in the air - you launch toward where you look. Kick back and forth between two walls to climb (not the same wall twice). <b>Orange walls</b> mark kick routes.</li>
               <li><b>Mantle:</b> push into a ledge in mid-air to pull yourself up.</li>
-              <li>To tag, just <b>run into</b> someone. When you become IT you get a short cooldown before you can tag, and in Classic you can't tag straight back.</li>
-              <li>Seekers run a little faster than runners.</li>
+              <li>Squeezing under something low doesn't slow you down.</li>
+              <li><b>Jump pads</b> launch you up. Some platforms move - ride them, and watch out for spinning bars.</li>
+              <li>To tag, just <b>run into</b> someone.</li>
             </ul>
           </div>
         </div>
@@ -145,6 +143,8 @@
     <div id="banner"></div>
     <div id="feed"></div>
     <div id="hint"></div>
+    <div id="board"></div>
+    <div id="fuse" class="hidden"><div class="fuse-head">FUSE</div><div id="fuseNum"></div><div class="fuse-track"><div id="fuseBar"></div></div></div>
     <div id="speed"></div>
     <div id="fps" class="hidden"></div>
     <div id="speedlines"></div>
@@ -185,19 +185,15 @@
         <header class="view-head"><h2>Lobby</h2><p id="lobbySub"></p></header>
         <div class="lobby-grid">
           <div class="tile setup">
-            <div class="setup-step"><span class="step-num">1</span>Map</div>
+            <div class="setup-step"><span class="step-num">1</span>Mode</div>
+            <div id="modeCards" class="mode-cards"></div>
+
+            <div class="setup-step"><span class="step-num">2</span>Map</div>
             <div id="mapCards" class="map-cards"></div>
             <p id="mapPickBlurb" class="map-pick-blurb"></p>
 
-            <div class="setup-step"><span class="step-num">2</span>Mode</div>
-            <div id="modeCards" class="mode-cards"></div>
-
-            <div class="setup-step"><span class="step-num">3</span><span id="lenLabel">Round length</span></div>
-            <div id="lenPills" class="pills"></div>
-            <div id="duelPills" class="duel-pills hidden">
-              <div class="pill-row"><span>Each chase</span><div id="chasePills" class="pills"></div></div>
-              <div class="pill-row"><span>First to</span><div id="targetPills" class="pills"></div></div>
-            </div>
+            <div class="setup-step"><span class="step-num">3</span>Options</div>
+            <div id="modeOpts" class="duel-pills"></div>
 
             <div class="start-row">
               <div id="startSummary" class="start-summary"></div>
@@ -208,14 +204,7 @@
               <p id="clientNote" class="note"></p>
             </div>
 
-            <!-- the real values live here; the cards above drive them -->
-            <div class="hidden">
-              <select id="mapSel"></select><p id="mapBlurb"></p>
-              <select id="modeSel"><option value="classic">Classic tag</option><option value="infection">Infection</option><option value="duel">Duel (1v1)</option></select>
-              <span id="lenField"><select id="lenSel"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></span>
-              <span id="duelOpts"><select id="chaseSel"><option value="20">20 sec</option><option value="30" selected>30 sec</option><option value="60">1 min</option><option value="90">1:30</option></select>
-              <select id="targetSel"><option value="5">5</option><option value="7">7</option><option value="10" selected>10</option></select></span>
-            </div>
+            <div class="hidden"><select id="mapSel"></select><p id="mapBlurb"></p></div>
           </div>
 
           <div class="tile">
@@ -256,7 +245,7 @@
         <label class="toggle"><input type="checkbox" id="autorun"><span></span>Always run</label>
         <label class="toggle"><input type="checkbox" id="invertY"><span></span>Invert mouse Y</label>
         <label class="toggle"><input type="checkbox" id="showSpeed"><span></span>Show speedometer</label>
-        <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, smoother)</label>
+        <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, a bit less sharp, smoother)</label>
         <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
       </div>
     </div>
@@ -264,7 +253,7 @@
     <div id="controlsPanel" class="tile">
       <table class="binds"><tbody id="bindRows"></tbody></table>
       <div class="binds-foot">
-        <span class="note">Tag: run into people · Esc also pauses</span>
+        <span class="note">Tag: run into people · Tab: big leaderboard · Esc also pauses</span>
         <button id="resetBinds" class="btn small">Reset to defaults</button>
       </div>
     </div>
@@ -281,21 +270,20 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/config.js?v=7"></script>
-  <script src="js/map.js?v=7"></script>
-  <script src="js/maps/court.js?v=7"></script>
-  <script src="js/maps/blocks.js?v=7"></script>
-  <script src="js/maps/corridors.js?v=7"></script>
-  <script src="js/maps/lobby.js?v=7"></script>
-  <script src="js/maps/shipyard.js?v=7"></script>
-  <script src="js/maps/poolrooms.js?v=7"></script>
-  <script src="js/maps/playplace.js?v=7"></script>
-  <script src="js/maps/liner.js?v=7"></script>
-  <script src="js/maps/rooftops.js?v=7"></script>
-  <script src="js/character.js?v=7"></script>
-  <script src="js/world.js?v=7"></script>
-  <script src="js/player.js?v=7"></script>
-  <script src="js/net.js?v=7"></script>
-  <script src="js/game.js?v=7"></script>
+  <script src="js/config.js?v=8"></script>
+  <script src="js/map.js?v=8"></script>
+  <script src="js/maps/rooftops.js?v=8"></script>
+  <script src="js/maps/shipyard.js?v=8"></script>
+  <script src="js/maps/corridors.js?v=8"></script>
+  <script src="js/maps/fog.js?v=8"></script>
+  <script src="js/maps/playhouse.js?v=8"></script>
+  <script src="js/maps/moon.js?v=8"></script>
+  <script src="js/maps/climb.js?v=8"></script>
+  <script src="js/maps/gauntlet.js?v=8"></script>
+  <script src="js/character.js?v=8"></script>
+  <script src="js/world.js?v=8"></script>
+  <script src="js/player.js?v=8"></script>
+  <script src="js/net.js?v=8"></script>
+  <script src="js/game.js?v=8"></script>
 </body>
 </html>

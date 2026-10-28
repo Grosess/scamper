@@ -4,7 +4,7 @@
 //  Units are meters and seconds.
 // ============================================================
 const CONFIG = {
-  version: 5,   // bump when a change makes old and new players unable to play together
+  version: 6,   // bump when a change makes old and new players unable to play together
   move: {
     walkSpeed: 6,
     runSpeed: 10,          // hold Shift (no stamina, run forever)
@@ -63,14 +63,16 @@ const CONFIG = {
   tag: {
     touchRange: 1.3,       // run into someone to tag them (contact only)
     lagSlack: 1.8,         // host accepts tags this much farther apart, for lag (same for everyone)
-    tagDelay: 1.5,         // after becoming IT you can't tag for this long
-    seekerSpeed: 1.05,     // seekers run this much faster than runners
-    noTagBack: 3,          // seconds before you can tag back whoever tagged you
-    releaseDelay: 5,       // seekers are frozen this long at round start
+    bombSpeed: 1.1,        // Bomb Tag: whoever holds the bomb runs this much faster
+    bombPassDelay: 0.6,    // ...and can't pass it on for this long after getting it
+    noPassBack: 1.0,       // seconds before you can pass the bomb straight back
+    kothSpeed: 1.06,       // King of the Tag: everyone chasing the king runs this much faster
+    crownProtect: 2.0,     // the new king can't be robbed for this long
     duelRelease: 3,        // both duelists are frozen this long before each chase
-    duelChaserSpeed: 1.08, // the duel chaser runs this much faster...
+    duelChaserSpeed: 1.12, // the duel chaser runs this much faster...
     duelReachBonus: 0.4,   // ...and tags from this much farther away
     duelSpawnSpread: 0.6,  // 0 = chase starts close, 1 = as far apart as the map allows
+    raceAfterFirst: 60,    // Race: after the first finish, everyone else has this long
     resultsTime: 9,
     maxPlayers: 12,
   },

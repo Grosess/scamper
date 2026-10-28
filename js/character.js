@@ -85,7 +85,50 @@ function buildScamp(color, eyeColor = '#ffffff') {
   };
   const arms = [arm(-1), arm(1)], legs = [leg(-1), leg(1)];
 
-  return { rig, torso, head, arms, legs, eyes, fur, phase: 0, blink: 2 + Math.random() * 3, squash: 0, wasAir: false, open: 0 };
+  const c = { rig, torso, head, arms, legs, eyes, fur, mats: [fur, eyeMat, mouthMat, outline], phase: 0, blink: 2 + Math.random() * 3, squash: 0, wasAir: false, open: 0 };
+  addXray(c);
+  return c;
+}
+
+// See-through silhouette: every part of the character gets a twin that's only drawn where something
+// is in FRONT of it (depthFunc Greater), so you see their real outline through walls, and nothing
+// extra when they're in plain view. setScampXray(c, color) turns it on, setScampXray(c, null) off.
+function addXray(c) {
+  const fill = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.32, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false });
+  const line = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false, depthFunc: THREE.GreaterDepth, fog: false });
+  const meshes = [];
+  c.rig.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  c.xray = [];
+  for (const m of meshes) {
+    const f = new THREE.Mesh(m.geometry, fill);
+    const l = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 40), line);
+    f.renderOrder = l.renderOrder = 30;
+    f.visible = l.visible = false;
+    m.add(f, l);
+    c.xray.push(f, l);
+  }
+  c.xrayFill = fill;
+  c.xrayLine = line;
+  c.xrayOn = null;
+}
+function setScampXray(c, color) {
+  if (c.xrayOn === color) return;
+  c.xrayOn = color;
+  for (const o of c.xray) o.visible = !!color;
+  if (color) { c.xrayFill.color.set(color); c.xrayLine.color.set(color); }
+}
+
+// knocked out (Bomb Tag): see-through and pale
+function setScampGhost(c, on) {
+  if (c.ghost === on) return;
+  c.ghost = on;
+  if (!c.stickGhost) c.stickGhost = new THREE.MeshLambertMaterial({ color: SCAMP_DARK, transparent: true, opacity: 0.25, depthWrite: false });
+  c.rig.traverse((o) => {
+    if (o.isMesh && c.xray.indexOf(o) < 0) {
+      if (o.material === STICK || o.material === c.stickGhost) o.material = on ? c.stickGhost : STICK;
+    }
+  });
+  for (const m of c.mats) { m.transparent = on; m.opacity = on ? 0.25 : 1; m.depthWrite = !on; m.needsUpdate = true; }
 }
 
 // speed = ground speed (m/s), mode 0 stand / 1 slide / 2 crouch, talking = flap the head open
