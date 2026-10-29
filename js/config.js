@@ -88,8 +88,8 @@ const CONFIG = {
     slide: ['KeyC', 'Mouse2'],      // Mouse2 = right mouse button
     scoreboard: ['Tab'],
     pause: [],              // Esc always pauses too
-    lookBack: ['KeyP'],     // hold to look behind you
-    taunt: ['KeyT'],
+    lookBack: ['KeyR'],     // hold to look behind you
+    taunt: ['KeyF'],
   },
 
   net: {

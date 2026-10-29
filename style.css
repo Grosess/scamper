@@ -380,3 +380,9 @@ button { font-family: inherit; }
 .stat-table th { text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 6px; }
 .stat-table td { padding: 7px 6px; border-top: 1px solid var(--line); }
 @media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } #board { width: 180px; } }
+
+/* the unmarked code box at the bottom of Settings */
+.secret-code { display: block; margin: 14px 0 0 auto; width: 70px; padding: 2px 6px; font: 12px Rubik, sans-serif; color: var(--muted); background: transparent; border: 1px solid transparent; outline: none; text-align: right; }
+.secret-code:hover, .secret-code:focus { border-color: var(--line); }
+#skinRow { margin-top: 12px; }
+#skinRow .pills { margin-top: 6px; }

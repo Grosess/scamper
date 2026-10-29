@@ -86,7 +86,7 @@ const World = {
         mesh(g, mat(color, o), o);
       },
       // invisible wall: collision only, nothing drawn (keeps people inside a map)
-      wall: (x, y, z, w, h, d) => { this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 } }); },
+      wall: (x, y, z, w, h, d) => { this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 }, noKick: true }); },
       // see-through net wall (solid, you can't pass it)
       net: (x, y, z, w, h, d, color = '#222222') => kit.box(x, y, z, w, h, d, color, { tex: 'net', uv: 0.6, noShadow: true, outline: false }),
       // decoration only (no collision)
@@ -515,7 +515,7 @@ const World = {
       if (g > -0.05 && g < D && g < bd) { bd = g; best = { n: { x: nx, z: nz }, box: b }; }
     };
     for (const b of this.boxes) {
-      if (!(y + 0.3 < b.max.y && y + p.h - 0.2 > b.min.y)) continue;
+      if (b.noKick || !(y + 0.3 < b.max.y && y + p.h - 0.2 > b.min.y)) continue;
       if (b.rot) {
         const L = this._local(b, x, z), dx = L.lx - L.qx, dz = L.lz - L.qz, dist = Math.hypot(dx, dz);
         if (dist > 1e-4) {

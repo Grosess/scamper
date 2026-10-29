@@ -16,7 +16,7 @@ if (typeof THREE === 'undefined' || typeof Peer === 'undefined') {
 
 // ---------- settings ----------
 const settings = Object.assign(
-  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false },
+  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false, skin: '', unlocked: false },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 // P used to be pause - it's look-behind now
@@ -490,6 +490,9 @@ function makeAvatar(p) {
   return { root, rig: c.rig, scamp: c, bodyMat: c.fur, label, marker, bomb, crown, blob, spd: 0, vy: 0 };
 }
 
+// rainbow skin: the body slowly cycles through the colors
+function rainbow(c, t) { c.fur.color.setHSL((t * 0.12) % 1, 0.75, 0.62); }
+
 // --- props: the bomb (blinks red faster and faster, fuse burns down) and the crown ---
 function makeBomb(scale) {
   const g = new THREE.Group();
@@ -643,10 +646,15 @@ function removeAvatar(p) {
 const players = new Map();  // id -> { id, name, color, tp (latest position), yaw, pitch, mode, avatar }
 let myId = null;
 
-function ensurePlayer(id, name, color, eye = '#ffffff') {
+// cosmetic skins (unlocked with a secret code): '' normal, 'rainbow', 'ghost'
+const SKINS = ['', 'rainbow', 'ghost'];
+const pickSkin = (s) => (SKINS.includes(s) ? s : '');
+const mySkin = () => (settings.unlocked ? pickSkin(settings.skin) : '');
+function ensurePlayer(id, name, color, eye = '#ffffff', skin = '') {
   let p = players.get(id);
+  if (p) p.skin = skin;
   if (!p) {
-    p = { id, name, color, eye, talk: false, tp: new THREE.Vector3(0, -100, 0), yaw: 0, pitch: 0, mode: 0, snapNext: true, avatar: null };
+    p = { id, name, color, eye, skin, talk: false, tp: new THREE.Vector3(0, -100, 0), yaw: 0, pitch: 0, mode: 0, snapNext: true, avatar: null };
     players.set(id, p);
     if (id !== myId) p.avatar = makeAvatar(p);
   } else if (p.name !== name || p.color !== color || p.eye !== eye) {
@@ -751,7 +759,7 @@ function applyState(s) {
   const oldChase = seen.chase, wasOut = seen.out;
   const ids = new Set(s.roster.map((r) => r.id));
   for (const id of [...players.keys()]) if (!ids.has(id)) removePlayer(id);
-  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye));
+  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickSkin(r.skin));
 
   if (s.map && (!World.map || s.map !== World.map.id)) loadMap(s.map);
   game.phase = s.phase;
@@ -868,7 +876,7 @@ function buildState() {
     duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
     scores: game.scores, result: game.result,
-    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye })),
+    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye, skin: p.skin || '' })),
   };
 }
 function pushState() {
@@ -1183,7 +1191,7 @@ function hostHandle(from, m) {
       return;
     }
     const name = uniqueName(cleanName(m.name));
-    ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye));
+    ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye), pickSkin(m.skin));
     game.scores[from] = { tags: 0 };
     if (isPlaying() && game.mode === 'koth') game.koth.pts[from] = 0;
     hostFeed(`${name} joined`);
@@ -1987,7 +1995,9 @@ function updateGame(dt) {
     a.bomb.visible = it && game.mode === 'bomb';
     if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
     a.crown.visible = it && game.mode === 'koth';
-    setScampGhost(a.scamp, isOut(p.id));
+    setScampGhost(a.scamp, isOut(p.id) ? 0.25 : p.skin === 'ghost' ? 0.45 : 1);
+    if (p.skin === 'rainbow') { rainbow(a.scamp, now); a.rainbow = true; }
+    else if (a.rainbow) { a.bodyMat.color.set(p.color); a.rainbow = false; }
     a.label.material.opacity = isOut(p.id) ? 0.4 : 1;
     // see-through outline of whoever matters to you right now
     let xr = null;
@@ -2357,6 +2367,8 @@ const preview = (() => {
       chat -= dt;
       if (chat < -4 - Math.random() * 3) chat = 0.9;
       animateScamp(c, dt, t, 0, 0, false, chat > 0);
+      setScampGhost(c, mySkin() === 'ghost' ? 0.45 : 1);
+      if (mySkin() === 'rainbow') rainbow(c, t); else if (c.fur.color.getHexString() !== new THREE.Color(settings.color).getHexString()) c.fur.color.set(settings.color);
       r.render(sc, cam);
     },
   };
@@ -2383,6 +2395,36 @@ const setColors = (body, eye) => {
 $('bodyColor').addEventListener('input', (e) => setColors(e.target.value, null));
 $('eyeColor').addEventListener('input', (e) => setColors(null, e.target.value));
 markColors();
+
+// --- the secret code: only its SHA-256 is stored here, so the code itself isn't in the source ---
+const SECRET = '36b7c813e30a3c4aae7a1a04ff35c32125eb0836f1fed7b5b77df06e8f229d7a';
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+$('secretCode').addEventListener('input', async (e) => {
+  const v = e.target.value.trim();
+  if (!v || !window.crypto || !crypto.subtle) return;
+  if (await sha256(v) !== SECRET) return;
+  e.target.value = '';
+  settings.unlocked = true;
+  saveSettings();
+  renderSkins();
+  e.target.placeholder = 'unlocked!';
+  tone(660, 990, 0.12, 'triangle', 0.08); tone(990, 1480, 0.18, 'triangle', 0.08, 0.1);
+});
+function renderSkins() {
+  $('skinRow').classList.toggle('hidden', !settings.unlocked);
+  $('skinPills').querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === (settings.skin || '')));
+}
+$('skinPills').onclick = (e) => {
+  const b = e.target.closest('.pill');
+  if (!b) return;
+  settings.skin = pickSkin(b.dataset.v);
+  saveSettings();
+  renderSkins();
+};
+renderSkins();
 
 function getName() {
   const n = cleanName($('name').value);
@@ -2418,7 +2460,7 @@ $('hostBtn').onclick = () => {
   Net.host((err) => {
     if (err) { setStatus(err, true); menuBusy(false); return; }
     myId = Net.id;
-    ensurePlayer(myId, name, pickColor(settings.color), pickEye(settings.eye));
+    ensurePlayer(myId, name, pickColor(settings.color), pickEye(settings.eye), mySkin());
     game.scores[myId] = { it: 0, tags: 0 };
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
@@ -2447,7 +2489,7 @@ function join() {
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
     enterGame();
-    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye });
+    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, skin: mySkin() });
   });
 }
 $('joinBtn').onclick = join;

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -35,7 +35,7 @@
 
         <div class="play-layout">
           <div class="tile char-card">
-            <div class="char-top"><span class="char-hint">drag to spin · T to talk</span></div>
+            <div class="char-top"><span class="char-hint">drag to spin · F to talk</span></div>
             <div class="stage">
               <canvas id="preview" aria-label="Your character"></canvas>
               <div class="stage-floor"></div>
@@ -47,6 +47,10 @@
             <div class="color-split">
               <label class="half" id="bodySwatch"><span>Body</span><input type="color" id="bodyColor" aria-label="Body color"></label>
               <label class="half" id="eyeSwatch"><span>Eyes</span><input type="color" id="eyeColor" aria-label="Eye color"></label>
+            </div>
+            <div id="skinRow" class="hidden">
+              <div class="field">Cosmetics</div>
+              <div id="skinPills" class="pills"><button class="pill" data-v="">Normal</button><button class="pill" data-v="rainbow">Rainbow</button><button class="pill" data-v="ghost">Ghost</button></div>
             </div>
           </div>
 
@@ -177,7 +181,7 @@
         <button class="nav-btn" data-view="controls">Controls</button>
         <button id="leaveBtn" class="nav-btn danger">Leave game</button>
       </nav>
-      <div class="side-foot">Press Esc anytime to pause · hold P to look behind</div>
+      <div class="side-foot">Press Esc anytime to pause · hold R to look behind</div>
     </aside>
 
     <main class="content">
@@ -248,6 +252,7 @@
         <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, a bit less sharp, smoother)</label>
         <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
       </div>
+      <input id="secretCode" class="secret-code" maxlength="32" autocomplete="off" spellcheck="false" placeholder="·" aria-label="Code">
     </div>
 
     <div id="controlsPanel" class="tile">
@@ -270,20 +275,20 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/config.js?v=10"></script>
-  <script src="js/map.js?v=10"></script>
-  <script src="js/maps/rooftops.js?v=10"></script>
-  <script src="js/maps/shipyard.js?v=10"></script>
-  <script src="js/maps/corridors.js?v=10"></script>
-  <script src="js/maps/fog.js?v=10"></script>
-  <script src="js/maps/playhouse.js?v=10"></script>
-  <script src="js/maps/moon.js?v=10"></script>
-  <script src="js/maps/climb.js?v=10"></script>
-  <script src="js/maps/gauntlet.js?v=10"></script>
-  <script src="js/character.js?v=10"></script>
-  <script src="js/world.js?v=10"></script>
-  <script src="js/player.js?v=10"></script>
-  <script src="js/net.js?v=10"></script>
-  <script src="js/game.js?v=10"></script>
+  <script src="js/config.js?v=11"></script>
+  <script src="js/map.js?v=11"></script>
+  <script src="js/maps/rooftops.js?v=11"></script>
+  <script src="js/maps/shipyard.js?v=11"></script>
+  <script src="js/maps/corridors.js?v=11"></script>
+  <script src="js/maps/fog.js?v=11"></script>
+  <script src="js/maps/playhouse.js?v=11"></script>
+  <script src="js/maps/moon.js?v=11"></script>
+  <script src="js/maps/climb.js?v=11"></script>
+  <script src="js/maps/gauntlet.js?v=11"></script>
+  <script src="js/character.js?v=11"></script>
+  <script src="js/world.js?v=11"></script>
+  <script src="js/player.js?v=11"></script>
+  <script src="js/net.js?v=11"></script>
+  <script src="js/game.js?v=11"></script>
 </body>
 </html>

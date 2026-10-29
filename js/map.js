@@ -15,7 +15,7 @@
 //    k.water(x, y, z, width, depth, color, opacity)       see-through water surface
 //    k.balls(x, y, z, width, depth, count, colors)        pile of balls
 //    k.net(x, y, z, width, height, depth, color)          see-through net wall
-//    k.wall(x, y, z, width, height, depth)                invisible wall (collision only)
+//    k.wall(x, y, z, width, height, depth)                invisible wall (collision only, can't be wall-kicked)
 //    k.mover(x, y, z, width, height, depth, color, motion) moving solid box (rides you along, shoves you)
 //         motion = { type: 'slide', dx, dy, dz, period, phase }  glides out by (dx,dy,dz) and back
 //                  { type: 'spin', speed, phase }                 spins around its center (rad/s)

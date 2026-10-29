@@ -23,9 +23,9 @@ Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on 
 | Space | Jump. In the air next to a wall, it's a wall kick toward where you're looking |
 | C / Right click | Slide (when running fast) or crouch |
 | (contact) | Run into someone to tag them (pass the bomb, steal the crown, catch the runner) |
-| T | Talk (your head flaps open; everyone sees it) |
+| F | Talk (your head flaps open; everyone sees it) |
 | Tab | Big leaderboard (a small one is always on the right) |
-| P (hold) | Look behind you |
+| R (hold) | Look behind you |
 | Esc | Pause menu |
 
 ### Modes

@@ -118,17 +118,19 @@ function setScampXray(c, color) {
   if (color) { c.xrayFill.color.set(color); c.xrayLine.color.set(color); }
 }
 
-// knocked out (Bomb Tag): see-through and pale
-function setScampGhost(c, on) {
-  if (c.ghost === on) return;
-  c.ghost = on;
-  if (!c.stickGhost) c.stickGhost = new THREE.MeshLambertMaterial({ color: SCAMP_DARK, transparent: true, opacity: 0.25, depthWrite: false });
+// see-through: op = opacity (1 = solid). Knocked-out players in Bomb Tag, and the ghost skin
+function setScampGhost(c, op) {
+  if (c.ghost === op) return;
+  c.ghost = op;
+  const on = op < 1;
+  if (!c.stickGhost) c.stickGhost = new THREE.MeshLambertMaterial({ color: SCAMP_DARK, transparent: true, depthWrite: false });
+  c.stickGhost.opacity = op;
   c.rig.traverse((o) => {
     if (o.isMesh && c.xray.indexOf(o) < 0) {
       if (o.material === STICK || o.material === c.stickGhost) o.material = on ? c.stickGhost : STICK;
     }
   });
-  for (const m of c.mats) { m.transparent = on; m.opacity = on ? 0.25 : 1; m.depthWrite = !on; m.needsUpdate = true; }
+  for (const m of c.mats) { m.transparent = on; m.opacity = op; m.depthWrite = !on; m.needsUpdate = true; }
 }
 
 // speed = ground speed (m/s), mode 0 stand / 1 slide / 2 crouch, talking = flap the head open
