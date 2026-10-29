@@ -28,7 +28,8 @@ const Net = {
     // ?relay=1 forces everything through TURN relays (what happens on strict networks) - for testing
     const relayOnly = /[?&]relay=1/.test(location.search);
     const iceServers = CONFIG.net.iceServers.concat(CONFIG.net.turn ? [CONFIG.net.turn] : []);
-    const config = { iceServers, iceTransportPolicy: relayOnly ? 'relay' : 'all' };
+    // gather network routes up front, so connecting through proxies / strict networks is quicker
+    const config = { iceServers, iceTransportPolicy: relayOnly ? 'relay' : 'all', iceCandidatePoolSize: 6 };
     return Object.assign({ debug: 1, config }, CONFIG.net.peerServer || {});
   },
 
