@@ -27,6 +27,7 @@ const World = {
     this.pads = [];
     this.movers = [];
     this.balloonSets = [];
+    this.ropes = [];
     this._anim = [];
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -184,6 +185,20 @@ const World = {
         this.balloonSets.push(set);
         this._drawBalloons(set);
       },
+      // a bell rope hanging from (x, y, z), `len` long. Run into it: it swings and the bell rings.
+      bellRope: (x, y, z, len, color = '#b8323f') => {
+        const g = new THREE.Group();
+        g.position.set(x, y, z);
+        const geo = new THREE.BoxGeometry(0.1, len, 0.1);
+        geo.translate(0, -len / 2, 0);
+        const m = new THREE.Mesh(geo, mat(color, { tex: 'none' }));
+        m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat));
+        const knot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.3, 0.26), mat(color, { tex: 'none' }));
+        knot.position.y = -len + 0.15;
+        g.add(m, knot);
+        this.group.add(g);
+        this.ropes.push({ g, x, y, z, len, ax: 0, az: 0, vx: 0, vz: 0, cd: 0 });
+      },
       // a pile of colorful balls (decoration, e.g. a ball pit)
       balls: (x, y, z, w, d, count, colors) => {
         const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshLambertMaterial(), count);
@@ -274,6 +289,25 @@ const World = {
       mv.mesh.rotation.y = mv.s.rot;
     }
     for (const set of this.balloonSets) this._stepBalloons(set, t, dt);
+    for (const rp of this.ropes) this._stepRope(rp, Math.min(dt, 0.05));
+  },
+  // bell ropes: a little pendulum, pushed by anyone who walks into it
+  onBell: null,
+  _stepRope(rp, dt) {
+    rp.cd -= dt;
+    for (const q of this.actors) {
+      const dx = rp.x - q.x, dz = rp.z - q.z, d = Math.hypot(dx, dz);
+      if (d < 0.55 && q.y < rp.y && q.y + 1.8 > rp.y - rp.len) {
+        const k = 2.8 / Math.max(d, 0.1);
+        rp.vx += dx * k * dt * 8; rp.vz += dz * k * dt * 8;
+        if (rp.cd <= 0) { rp.cd = 1.2; if (this.onBell) this.onBell(rp.x, rp.y, rp.z); }
+      }
+    }
+    const w = 9.8 / Math.max(rp.len, 0.5);
+    rp.vx += (-w * rp.ax - rp.vx * 0.6) * dt; rp.vz += (-w * rp.az - rp.vz * 0.6) * dt;
+    rp.ax = Math.max(-0.9, Math.min(0.9, rp.ax + rp.vx * dt));
+    rp.az = Math.max(-0.9, Math.min(0.9, rp.az + rp.vz * dt));
+    rp.g.rotation.set(rp.az, 0, -rp.ax);
   },
 
   // --- movers ---
@@ -586,6 +620,25 @@ const World = {
       if (x + r > b.min.x && x - r < b.max.x) {
         test((z - r) - b.max.z, 0, 1, b);
         test(b.min.z - (z + r), 0, -1, b);
+      }
+    }
+    // the sides of ramps and stairs are walls too, below their surface
+    for (const rp of this.ramps) {
+      if (y + p.h - 0.2 < rp.base) continue;
+      const x0 = rp.x - rp.w / 2, x1 = rp.x + rp.w / 2, z0 = rp.z - rp.d / 2, z1 = rp.z + rp.d / 2;
+      const side = (g, nx, nz, fx, fz) => {
+        const h = rampHeight(rp, fx, fz);
+        if (y + 0.3 < h) test(g, nx, nz, { min: { y: rp.base }, max: { y: h } });
+      };
+      if (z + r > z0 && z - r < z1) {
+        const cz = clamp(z, z0, z1);
+        side((x - r) - x1, 1, 0, x1, cz);
+        side(x0 - (x + r), -1, 0, x0, cz);
+      }
+      if (x + r > x0 && x - r < x1) {
+        const cx = clamp(x, x0, x1);
+        side((z - r) - z1, 0, 1, cx, z1);
+        side(z0 - (z + r), 0, -1, cx, z0);
       }
     }
     return best;

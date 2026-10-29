@@ -9,11 +9,12 @@
 //              hard   - every move, rethinks 5x a second, leads its target, slides to close in,
 //                       and flees toward spots it can reach before the chaser can
 // ============================================================
-const NAV_WALK = 0, NAV_CRAWL = 1, NAV_DROP = 2, NAV_JUMP = 3, NAV_MANTLE = 4, NAV_GAP = 5, NAV_PAD = 6;
+const NAV_WALK = 0, NAV_CRAWL = 1, NAV_DROP = 2, NAV_JUMP = 3, NAV_MANTLE = 4, NAV_GAP = 5, NAV_PAD = 6, NAV_KICK = 7;
+// moves: walk crawl drop jump mantle gap pad kick. Everyone sprints all the time.
 const BOT_SKILL = {
-  easy:   { think: 1.0, turn: 5, moves: [1, 1, 1, 1, 0, 0, 0], wobble: 0.35, lead: 0, slide: false },
-  medium: { think: 0.5, turn: 10, moves: [1, 1, 1, 1, 1, 0, 1], wobble: 0.12, lead: 0.25, slide: false },
-  hard:   { think: 0.2, turn: 40, moves: [1, 1, 1, 1, 1, 1, 1], wobble: 0, lead: 0.55, slide: true },
+  easy:   { think: 0.6, turn: 8, moves: [1, 1, 1, 1, 1, 0, 1, 0], wobble: 0.25, lead: 0.1, slide: 0, charge: 4 },
+  medium: { think: 0.3, turn: 16, moves: [1, 1, 1, 1, 1, 1, 1, 1], wobble: 0.08, lead: 0.35, slide: 1, charge: 7 },
+  hard:   { think: 0.12, turn: 60, moves: [1, 1, 1, 1, 1, 1, 1, 1], wobble: 0, lead: 0.6, slide: 2, charge: 10 },
 };
 
 const Nav = {
@@ -87,7 +88,8 @@ const Nav = {
           last = y;
           let low = false;
           if (overlap(x, y + 0.02, z, M.standHeight)) { if (overlap(x, y + 0.02, z, M.crouchHeight)) continue; low = true; }
-          const pad = W.pads.some((p) => Math.abs(x - p.x) < p.w / 2 + 0.1 && Math.abs(z - p.z) < p.d / 2 + 0.1 && Math.abs(y - p.y) < 0.3);
+          // a margin around pads, so routes only go onto a pad when they mean to launch
+          const pad = W.pads.some((p) => Math.abs(x - p.x) < p.w / 2 + 0.6 && Math.abs(z - p.z) < p.d / 2 + 0.6 && Math.abs(y - p.y) < 0.3);
           const i = this.nodes.length;
           this.nodes.push({ x, y, z, low, pad, ramp: onRamp(x, y, z), e: [] });
           const k = this.key(x, z);
@@ -111,7 +113,9 @@ const Nav = {
         for (const j of at(n.x + dx, n.z + dz)) {
           const m = this.nodes[j], dy = m.y - n.y, d = Math.hypot(dx, dz);
           const h = n.low || m.low ? M.crouchHeight : M.standHeight;
-          if (Math.abs(dy) <= (n.ramp || m.ramp ? 0.85 * d : 0.45)) {
+          // walking: small steps, or along a slope (but a slope can't walk you up onto a box edge)
+          const hi = dy > 0 ? m : n;
+          if (Math.abs(dy) <= (hi.ramp ? 0.85 * d : 0.45)) {
             if (clear(n, m, Math.max(n.y, m.y) + 0.02, h)) n.e.push({ to: j, t: n.low || m.low ? NAV_CRAWL : NAV_WALK, c: d * (n.low || m.low ? 1.3 : 1) });
           } else if (dy < 0 && dy > -12) {
             // the whole fall has to be open, not just the step off the edge
@@ -126,7 +130,7 @@ const Nav = {
       // running jumps across gaps, along the 8 directions
       if (n.low) return;
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-        const maxK = dx && dz ? 4 : 5;
+        const maxK = dx && dz ? 3 : 4;
         if (hasFloorNear(n.x + dx, n.z + dz, n.y)) continue;   // not at an edge in this direction
         for (let k = 2; k <= maxK; k++) {
           const cx = n.x + dx * k, cz = n.z + dz * k;
@@ -140,16 +144,44 @@ const Nav = {
         }
       }
     });
+    // two-wall kick chimneys: a floor spot between two walls 2.3-3.6m apart that rise well above
+    // it -> edges to the spots you can climb out onto at the top
+    const wallDist = (n, dx, dz, maxD) => {
+      for (let t = 0.4; t <= maxD; t += 0.2) if (overlap(n.x + dx * (t - R), n.y + 1.0, n.z + dz * (t - R), 0.6)) return t;
+      return -1;
+    };
+    const wallTop = (x, z, y0) => { let y = y0; while (y < y0 + 16 && overlap(x, y, z, 0.8)) y += 0.8; return y; };
+    this.nodes.forEach((n) => {
+      if (n.low || n.pad || overlap(n.x, n.y + 0.02, n.z, 3.2)) return;   // needs open air above
+      for (const [dx, dz] of [[1, 0], [0, 1]]) {
+        const a = wallDist(n, dx, dz, 2.4), b = wallDist(n, -dx, -dz, 2.4);
+        if (a < 0 || b < 0 || a + b < 2.3 || a + b > 3.6) continue;
+        // the lower wall's top, but never above whatever roof is over the chimney itself
+        let top = Math.min(wallTop(n.x + dx * (a + 0.15), n.z + dz * (a + 0.15), n.y + 1.0), wallTop(n.x - dx * (b + 0.15), n.z - dz * (b + 0.15), n.y + 1.0));
+        if (top - n.y < 2.4) continue;
+        let ceil = n.y + 3.2;
+        while (ceil < top + M.standHeight && !overlap(n.x, ceil, n.z, 0.4)) ceil += 0.4;
+        top = Math.min(top, ceil - M.standHeight);
+        if (top - n.y < 2.4) continue;
+        for (let ox = -3; ox <= 3; ox++) for (let oz = -3; oz <= 3; oz++) {
+          for (const j of at(n.x + ox, n.z + oz)) {
+            const m = this.nodes[j];
+            if (m.low || m.y < n.y + 2.2 || m.y > top + 0.6) continue;
+            n.e.push({ to: j, t: NAV_KICK, c: 3 + (m.y - n.y) * 0.5 + Math.hypot(ox, oz) * 0.5, k: [dx, dz] });
+          }
+        }
+      }
+    });
     // jump pads: simulate one launch to see where it lands
     for (const pd of W.pads) {
-      const src = this.nodes.findIndex((n) => n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.1 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.1);
+      const src = this.nodes.findIndex((n) => n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.6 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.6);
       if (src < 0) continue;
       const p = new LocalPlayer();
       p.teleport([pd.x, pd.y + 0.05, pd.z]);
       const idle = { f: 0, r: 0, run: false, crouch: false };
       for (let s = 0; s < 360; s++) { p.step(1 / 120, idle); if (s > 30 && p.grounded) break; }
       const to = this.nearest(p.pos, 2);
-      for (const n of this.nodes) if (n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.1 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.1 && to >= 0) n.e.push({ to, t: NAV_PAD, c: 3 });
+      for (const n of this.nodes) if (n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.6 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.6 && to >= 0) n.e.push({ to, t: NAV_PAD, c: 3, pad: [pd.x, pd.z] });
     }
     this.ms = Math.round(performance.now() - t0);
   },
@@ -169,7 +201,7 @@ const Nav = {
   },
 
   // Dijkstra from one or more start nodes (all with cost 0), using only `moves`. Stops at maxCost.
-  search(starts, moves, maxCost = Infinity) {
+  search(starts, moves, maxCost = Infinity, ban = null) {
     const N = this.nodes.length, dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), via = new Int8Array(N).fill(-1);
     const heap = [];
     const push = (i, d) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
@@ -179,7 +211,7 @@ const Nav = {
       const [d, i] = pop();
       if (d > dist[i] || d > maxCost) continue;
       for (const e of this.nodes[i].e) {
-        if (!moves[e.t]) continue;
+        if (!moves[e.t] || (ban && ban.has(i * 65536 + e.to))) continue;
         const nd = d + e.c;
         if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = i; via[e.to] = e.t; push(e.to, nd); }
       }
@@ -191,6 +223,17 @@ const Nav = {
     const path = [], types = [];
     for (let i = goal; i >= 0; i = res.prev[i]) { path.push(i); types.push(res.via[i]); }
     return { path: path.reverse(), types: types.reverse() };
+  },
+  // the edge used between two consecutive path nodes (for kick directions)
+  edge(from, to, t) { return this.nodes[from].e.find((e) => e.to === to && e.t === t); },
+  // is the straight line between two points clear at body height? (for charging straight at someone)
+  lineClear(a, b) {
+    const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.ceil(d / 0.8);
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      if (this.overlap(a.x + (b.x - a.x) * t, Math.max(a.y, b.y) + 0.3, a.z + (b.z - a.z) * t, 1.4)) return false;
+    }
+    return true;
   },
 };
 
@@ -209,6 +252,7 @@ class Bot {
     this.wobble = 0;
     this.slideT = 0;
     this.goalKey = '';
+    this.bans = new Map();   // moves that got us stuck: edge key -> until when
   }
 
   // goal: { type: 'chase', pos, vel } | { type: 'flee', from: [pos...] } | { type: 'go', pos } | { type: 'wander' } | { type: 'idle' }
@@ -216,18 +260,21 @@ class Bot {
     this.thinkT -= dt;
     this.goal = goal;
     if (this.thinkT > 0 && this.route && this.pi < this.route.path.length) return;
+    if (!this.p.grounded && this.route && this.pi < this.route.path.length && this.thinkT > -1.5) return;   // finish the jump / climb first
     this.thinkT = this.skill.think * (0.8 + Math.random() * 0.4);
     if (!Nav.nodes.length || goal.type === 'idle') { this.route = null; return; }
     const here = Nav.nearest(this.p.pos);
     if (here < 0) { this.route = null; return; }
     const moves = this.skill.moves;
+    const now = performance.now(), ban = new Set();
+    for (const [k, t] of this.bans) { if (t < now) this.bans.delete(k); else ban.add(k); }
     if (goal.type === 'chase' || goal.type === 'go') {
       const tp = goal.pos, lead = goal.vel ? this.skill.lead : 0;
       const aim = { x: tp.x + (goal.vel ? goal.vel.x * lead : 0), y: tp.y, z: tp.z + (goal.vel ? goal.vel.z * lead : 0) };
       let to = Nav.nearest(aim, 4);
       if (to < 0) to = Nav.nearest(tp, 6);
       if (to < 0) { this.route = null; return; }
-      const res = Nav.search([here], moves, 400);
+      const res = Nav.search([here], moves, 400, ban);
       if (res.dist[to] === Infinity) {
         // can't get there: go to the reachable spot closest to it
         let best = -1, bd = Infinity;
@@ -244,7 +291,7 @@ class Bot {
       // the chaser's travel time to everywhere vs. ours: run to a spot we reach well before them,
       // as far from them as possible (hard bots look further and value spots with many exits)
       const threats = goal.from.map((q) => Nav.nearest(q, 4)).filter((i) => i >= 0);
-      const theirs = Nav.search(threats, BOT_SKILL.hard.moves, 120), mine = Nav.search([here], moves, this.diff === 'hard' ? 70 : 40);
+      const theirs = Nav.search(threats, BOT_SKILL.hard.moves, 120), mine = Nav.search([here], moves, this.diff === 'hard' ? 70 : 40, ban);
       let best = -1, bs = -Infinity;
       for (let i = 0; i < Nav.nodes.length; i++) {
         const m = mine.dist[i];
@@ -258,7 +305,7 @@ class Bot {
       if (best >= 0) this.setRoute(Nav.trace(mine, best));
     } else {
       // wander: somewhere reachable, not too far
-      const res = Nav.search([here], moves, 30);
+      const res = Nav.search([here], moves, 30, ban);
       const opts = [];
       for (let i = 0; i < Nav.nodes.length; i++) if (res.dist[i] > 8 && res.dist[i] < 30) opts.push(i);
       if (opts.length) this.setRoute(Nav.trace(res, opts[Math.floor(Math.random() * opts.length)]));
@@ -278,9 +325,13 @@ class Bot {
     if (frozen || !this.goal || this.goal.type === 'idle') return inp;
     let tx, tz, ty, type = NAV_WALK, next = null;
     const g = this.goal;
-    // close to the one we're chasing and roughly level: go straight at them
-    if (g.type === 'chase' && Math.hypot(g.pos.x - p.pos.x, g.pos.z - p.pos.z) < 3.2 && Math.abs(g.pos.y - p.pos.y) < 1.2) {
-      tx = g.pos.x; tz = g.pos.z; ty = g.pos.y;
+    // the one we're chasing is close, level and in the open: charge straight at them
+    const gd = g.type === 'chase' ? Math.hypot(g.pos.x - p.pos.x, g.pos.z - p.pos.z) : Infinity;
+    this.losT = (this.losT || 0) - dt;
+    if (gd < sk.charge && this.losT <= 0) { this.los = Math.abs(g.pos.y - p.pos.y) < 1.2 && Nav.lineClear(p.pos, g.pos); this.losT = 0.15; }
+    if (gd < 2.5 && Math.abs(g.pos.y - p.pos.y) < 1.4 || (gd < sk.charge && this.los)) {
+      const lead = g.vel ? sk.lead * Math.min(gd / 8, 1) : 0;
+      tx = g.pos.x + (g.vel ? g.vel.x * lead : 0); tz = g.pos.z + (g.vel ? g.vel.z * lead : 0); ty = g.pos.y;
     } else if (this.route) {
       const R = this.route;
       // advance along the path
@@ -291,9 +342,37 @@ class Bot {
         else break;
       }
       if (this.pi >= R.path.length) { this.route = null; this.thinkT = 0; return inp; }
+      // too long on one waypoint: skip it if we're basically there, otherwise give up on that move
+      if (this.wpI !== this.pi) { this.wpI = this.pi; this.wpT = 0; }
+      this.wpT += dt;
+      if (this.wpT > 3) {
+        const w = Nav.nodes[R.path[this.pi]];
+        if (Math.hypot(w.x - p.pos.x, w.z - p.pos.z) < 1.2 && Math.abs(w.y - p.pos.y) < 0.6) { this.pi++; this.wpT = 0; if (this.pi >= R.path.length) { this.route = null; return inp; } }
+        else { if (this.pi > 0) this.bans.set(R.path[this.pi - 1] * 65536 + R.path[this.pi], performance.now() + 15000); this.route = null; this.thinkT = 0; return inp; }
+      }
       next = Nav.nodes[R.path[this.pi]];
       type = R.types[this.pi];
       tx = next.x; tz = next.z; ty = next.y;
+      // kick chimney: face a wall, jump, then keep kicking off whichever wall we touch toward
+      // the other one until we're high enough to pull out onto the exit
+      if (type === NAV_KICK && p.pos.y < next.y - 0.9) {
+        const from = Nav.nodes[R.path[this.pi - 1]], e = from && Nav.edge(R.path[this.pi - 1], R.path[this.pi], NAV_KICK);
+        if (from && e) {
+          if (p.grounded) {
+            const fx = from.x - p.pos.x, fz = from.z - p.pos.z;
+            if (Math.hypot(fx, fz) > 0.7) { p.yaw = Math.atan2(-fx, -fz); inp.f = 1; return inp; }
+            p.yaw = Math.atan2(-e.k[0], -e.k[1]);
+            inp.f = 1;
+            p.queueJump();
+          } else if (p.wall) {
+            p.yaw = Math.atan2(-p.wall.n.x, -p.wall.n.z);
+            inp.f = 1;
+            if (p.kickCd <= 0 && p.vel.y < 3) p.queueJump();
+          } else inp.f = 1;
+          this.stuckT = 0;
+          return inp;
+        }
+      }
     } else return inp;
 
     // face the target (lazy turning for weaker bots, plus a little wobble)
@@ -307,6 +386,24 @@ class Bot {
     inp.f = d < 1.6 ? 1 : 0;
     if (dist < 0.25 && type !== NAV_MANTLE) inp.f = 0;
 
+    // in the air on a drop or gap: steer onto the landing and brake right over it
+    if ((type === NAV_DROP || type === NAV_GAP) && !p.grounded && next) {
+      const ahead = (p.vel.x * dx + p.vel.z * dz) / Math.max(dist, 0.1);
+      if (dist < 0.6 || (ahead > 0 && dist / Math.max(ahead, 0.1) < 0.12)) inp.f = -1;
+    }
+    if (type === NAV_DROP && next && this.pi > 0) {
+      const from = Nav.nodes[this.route.path[this.pi - 1]];
+      // big drop: come to a near stop at the edge, then step off, so we land where we meant to
+      if (from && from.y - next.y > 1.2 && p.grounded) { inp.run = false; if (dist < 2.2 && p.hspeed() > 2.5) inp.f = 0; }
+    }
+    // a pad: walk to its middle, then let it carry us (the landing was worked out without steering)
+    if (type === NAV_PAD) {
+      const e = Nav.edge(this.route.path[this.pi - 1], this.route.path[this.pi], NAV_PAD);
+      if (!p.grounded) inp.f = 0;
+      else if (e && e.pad) { p.yaw = Math.atan2(-(e.pad[0] - p.pos.x), -(e.pad[1] - p.pos.z)); inp.f = 1; inp.run = false; }
+    }
+    // mantles and hops: square up to the wall once we're touching it
+    if ((type === NAV_MANTLE || type === NAV_JUMP) && !p.grounded && p.wall) { p.yaw = Math.atan2(p.wall.n.x, p.wall.n.z); inp.f = 1; }
     // moves
     if (next && (next.low || type === NAV_CRAWL || (Nav.nearest(p.pos, 1) >= 0 && Nav.nodes[Nav.nearest(p.pos, 1)].low))) inp.crouch = true;
     if (p.grounded && d < 0.5) {
@@ -314,22 +411,32 @@ class Bot {
       if (type === NAV_GAP) {
         const from = Nav.nodes[this.route.path[this.pi - 1]];
         const L = from ? Math.hypot(next.x - from.x, next.z - from.z) : 2;
-        if (dist < L - 0.35) p.queueJump();
+        // need a running start: if we're slow, back up along the run-up first
+        if (p.hspeed() < 6.5 && L > 2.5 && from && Math.hypot(from.x - p.pos.x, from.z - p.pos.z) < 1.2) { p.yaw += Math.PI; inp.f = 1; this.backT = 0.35; }
+        else if (dist < L - 0.35) p.queueJump();
       }
     }
-    // hard bots slide to close the last few meters (and keep their speed)
+    // slides: for the speed boost on straight runs (and hard ones hop out of them to keep it)
     this.slideT -= dt;
-    if (sk.slide && g.type === 'chase' && p.grounded && !p.sliding && this.slideT <= 0 && p.hspeed() > 8.5 && dist > 2.5 && dist < 7 && Math.abs(ty - p.pos.y) < 0.5) {
+    const straight = this.route && this.pi + 3 < this.route.path.length && [0, 1, 2].every((k) => {
+      const a = Nav.nodes[this.route.path[this.pi + k]], b = Nav.nodes[this.route.path[this.pi + k + 1]];
+      return this.route.types[this.pi + k + 1] === NAV_WALK && Math.abs(b.y - a.y) < 0.2 && ((b.x - a.x) * dx + (b.z - a.z) * dz) / Math.max(dist, 0.1) > 0.6;
+    });
+    if (sk.slide && p.grounded && !p.sliding && this.slideT <= 0 && p.hspeed() > 8.5 && d < 0.3 && (straight || (g.type === 'chase' && gd > 2.5 && gd < 7))) {
       inp.crouch = true;
-      this.slideT = 1.6;
-    } else if (p.sliding && this.slideT > 1.0) inp.crouch = true;
+      this.slideT = 1.4;
+    } else if (p.sliding && this.slideT > 0.8) inp.crouch = true;
+    else if (p.sliding && sk.slide > 1 && p.grounded && this.slideT > 0.5 && this.slideT < 0.8) p.queueJump();
 
     // stuck? hop, then rethink
     const prog = dist;
     if (prog < this.lastProgress - 0.15) { this.lastProgress = prog; this.stuckT = 0; }
     else this.stuckT += dt;
     if (this.stuckT > 0.7 && p.grounded) p.queueJump();
-    if (this.stuckT > 1.6) { this.route = null; this.thinkT = 0; this.stuckT = 0; this.lastProgress = Infinity; }
+    if (this.stuckT > 1.6) {
+      if (this.route && this.pi > 0) this.bans.set(this.route.path[this.pi - 1] * 65536 + this.route.path[this.pi], performance.now() + 12000);
+      this.route = null; this.thinkT = 0; this.stuckT = 0; this.lastProgress = Infinity;
+    }
     return inp;
   }
 }

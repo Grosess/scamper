@@ -19,8 +19,6 @@ const settings = Object.assign(
   { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false, unlocked: false, cos: null },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
-// P used to be pause - it's look-behind now
-if (settings.keys && Array.isArray(settings.keys.pause)) settings.keys.pause = settings.keys.pause.filter((c) => c !== 'KeyP');
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
 function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} }
@@ -140,10 +138,7 @@ function buildSpots(m) {
   const indoor = m.env === 'indoor';
   for (const s of list) {
     const y = s.y || h, ang = s.angle || Math.atan(spacing * 0.85 / y), color = s.color || m.spotColor || '#fff2dc';
-    const L = new THREE.SpotLight(color, s.intensity || (indoor ? 1.5 : 1.9), y * 2.2, indoor ? Math.min(1.2, ang * 1.6) : ang, 0.7, 1);
-    L.position.set(s.x, y, s.z);
-    L.target.position.set(s.x, 0, s.z);
-    spotGroup.add(L, L.target);
+    // flat look: lamps are just looks - no real light pools (they'd shade floors unevenly)
     if (indoor) {
       // flush ceiling light panel instead of a hanging lamp
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ color: '#fffaf0', fog: false }));
@@ -304,6 +299,9 @@ function buildFinish(m) {
   World._anim.push((t) => { g.material.opacity = 0.16 + 0.1 * Math.sin(t * 3); });
 }
 
+// bell ropes ring louder the closer you are
+World.onBell = (x, y, z) => { const d = Math.hypot(me.pos.x - x, me.pos.y - y, me.pos.z - z); SFX.bell(Math.max(0.15, 1 - d / 40)); };
+
 // shared clock (seconds) for everything that moves on its own. The host's clock is the truth;
 // clients estimate it from snapshots (keeping the latest-arriving estimate, so lag doesn't drift it)
 const clock = { off: 0, have: false };
@@ -360,6 +358,8 @@ const SFX = {
   crown: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, f, i === 3 ? 0.25 : 0.09, 'triangle', 0.08, i * 0.09)),
   finish: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, i === 4 ? 0.45 : 0.12, 'square', 0.06, i * 0.1)),
   fall: () => tone(520, 70, 0.55, 'sine', 0.09),
+  // a bell: a few inharmonic partials ringing out
+  bell: (v) => [[1, 0.5], [2.01, 0.25], [2.76, 0.18], [5.4, 0.08]].forEach(([k, a]) => tone(392 * k, 392 * k * 0.995, 2.4 / Math.sqrt(k), 'sine', 0.12 * a * v)),
   beep: (v, hi) => tone(hi ? 1560 : 1180, hi ? 1560 : 1180, 0.07, 'square', 0.055 * v),
   // explosion: a burst of noise swept down through a low-pass, a deep thump, then crackle
   boom: (v) => {

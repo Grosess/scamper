@@ -16,6 +16,8 @@
 //    k.balls(x, y, z, width, depth, count, colors)        pile of balls
 //    k.net(x, y, z, width, height, depth, color)          see-through net wall
 //    k.wall(x, y, z, width, height, depth)                invisible wall (collision only, can't be wall-kicked)
+//    k.bellRope(x, y, z, length, color)                   rope hanging from (x, y, z): walk into it and it swings + rings
+//  No up/down or sliding platforms please (they feel clunky) - spinning ones (k.mover type 'spin') are fine.
 //    k.mover(x, y, z, width, height, depth, color, motion) moving solid box (rides you along, shoves you)
 //         motion = { type: 'slide', dx, dy, dz, period, phase }  glides out by (dx,dy,dz) and back
 //                  { type: 'spin', speed, phase }                 spins around its center (rad/s)

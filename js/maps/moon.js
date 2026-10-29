@@ -41,7 +41,7 @@ defineMap({
   seekerSpawn: [-9, 10, -2],
 
   build(k) {
-    const ROCK = '#7c808b', ROCK2 = '#686c77', ROCK3 = '#8f939d', DUST = '#9a9ea8';
+    const ROCK = '#7c808b', ROCK2 = '#686c77', ROCK3 = ROCK, DUST = '#9a9ea8';
     const HAB = '#f6f4ee', LILAC = '#c3a6ff', MINT = '#7ed6c8', PINK = '#ff8fa3', BLUE = '#8fb4ff', YEL = '#ffd166';
     const STEEL = '#59606e', PANEL = '#3c4f8c', DARK = '#2b2f38';
 
@@ -56,8 +56,8 @@ defineMap({
     // the underside: smaller and smaller chunks, so it reads as a floating rock
     k.deco(-18, -9, 0, 24, 3, 52, ROCK2);
     k.deco(18, -9, -3, 24, 3, 46, ROCK2);
-    k.deco(-17, -12, 3, 16, 3, 34, '#6f737d');
-    k.deco(17, -12, -6, 16, 3, 30, '#6f737d');
+    k.deco(-17, -12, 3, 16, 3, 34, ROCK2);
+    k.deco(17, -12, -6, 16, 3, 30, ROCK2);
 
     // ---------- helpers ----------
     // habitat module: walls 5 high with the roof set between them (ceiling 4.6), so the outside is
@@ -128,22 +128,22 @@ defineMap({
     // ---------- the deck (10) with its kick shaft, storage rack and gantry ----------
     kickShaft(k, -9, -8, 'z', 4, 0, 10, YEL, 3.0);                 // walls at x -10.75 / -7.25, z -10..-6
     slab(k, -8.5, 10, -3, 5, 6, '#d9dce3', { t: 0.5 });            // deck x -11..-6, z -6..0
-    k.box(-11.5, 0, -3, 1, 10, 6, '#c9ccd4');                      // its west end is a solid pier
+    k.box(-11.5, 0, -3, 1, 10, 6, '#d9dce3');                      // its west end is a solid pier
     posts(k, [[-6.3, -0.3]], 0, 9.5, STEEL, 0.4);
     k.box(-13, 0, -1, 2, 6.4, 4, STEEL);                           // storage rack x -14..-12, z -3..1
     k.box(-13, 0, 3, 2.4, 2.6, 2.4, MINT);                         // crate -> rack -> deck
     bridge(k, -6, -4, 5, -4, 10, 2, STEEL);                         // gantry over the rift
 
     // ---------- comm tower (14) ----------
-    k.box(8.8, 0, -4, 3.6, 14, 4, '#e3e6ec');                       // core x 7..10.6
+    k.box(8.8, 0, -4, 3.6, 14, 4, '#d9dce3');                       // core x 7..10.6
     k.box(10.8, 0, -4, 0.4, 12, 4, YEL, { tex: 'kick' });           // its east face (kick side)
-    k.box(10.8, 12, -4, 0.4, 2, 4, '#e3e6ec');
+    k.box(10.8, 12, -4, 0.4, 2, 4, '#d9dce3');
     k.box(14.25, 0, -4, 0.5, 12, 4, YEL, { tex: 'kick' });          // the other side of the shaft
     slab(k, 6, 10, -4, 2, 4, STEEL, { t: 0.5 });                    // gantry balcony x 5..7
     posts(k, [[5.3, -5.7], [5.3, -2.3]], 0, 9.5, STEEL, 0.3);
     // zig-zag ledges with a gap between them, so you never jump with one right over your head
     for (const [x, y] of [[7.7, 3.6], [10.3, 7.2], [7.7, 10.8]]) slab(k, x, y, -6.6, 1.4, 1.2, LILAC, { t: 0.4 });
-    k.deco(9, 14, -4, 0.2, 4, 0.2, '#cfd3da');                      // mast
+    k.deco(9, 14, -4, 0.2, 4, 0.2, '#d9dce3');                      // mast
     k.deco(9, 18, -4, 0.45, 0.45, 0.45, '#ff3b4f', { emissive: '#ff3b4f' });
 
     // ---------- the south catwalk over the rift ----------
@@ -151,14 +151,14 @@ defineMap({
     posts(k, [[-4.8, -23.1], [-4.8, -20.9], [4.8, -23.1], [4.8, -20.9]], 0, 1.1, STEEL, 0.2);
 
     // ---------- lander ----------
-    k.box(14, 3.2, -17, 6, 3.2, 6, '#e8e3d6');                      // body x 11..17, z -20..-14: run under it
+    k.box(14, 3.2, -17, 6, 3.2, 6, HAB);                      // body x 11..17, z -20..-14: run under it
     for (const [x, z] of [[11.3, -19.7], [16.7, -19.7], [11.3, -14.3], [16.7, -14.3]]) k.box(x, 0, z, 0.5, 3.2, 0.5, STEEL);
     k.box(14, 2.4, -17, 1.6, 0.8, 1.6, DARK);                       // engine bell
     k.box(14, 6.4, -17, 2, 1.2, 2, YEL);                            // hatch on top
     k.box(19, 0, -17, 2.4, 2.6, 2.4, BLUE);                         // crate: hop on, then onto the lander
 
     // ---------- hangar (roof 6): jump over from the lander or the cargo stack, or off the crate ----------
-    hab(26.5, -13, 9, 6, '#ffb37a', [['-x', -1], ['+z', 2], ['-z', -2]], 6, '#dfe2e8');
+    hab(26.5, -13, 9, 6, '#ffb37a', [['-x', -1], ['+z', 2], ['-z', -2]], 6, '#d9dce3');
     k.box(20.8, 0, -10.6, 2.4, 3, 2.4, MINT);
 
     // ---------- cargo stack ----------
@@ -187,17 +187,17 @@ defineMap({
     k.pad(18, -3, 18, 1.6, 1.6, 17.5, { push: { x: 4.6, z: 3.6 } });
     slab(k, 28, 6, 26, 6, 6, '#d9dce3', { t: 0.5 });                // dish platform x 25..31, z 23..29
     posts(k, [[25.4, 23.4], [30.6, 23.4], [25.4, 28.6], [30.6, 28.6]], 0, 5.5, STEEL, 0.4);
-    k.deco(28, 6, 26, 0.5, 2.2, 0.5, '#cfd3da');
-    k.deco(28.6, 7.6, 25.4, 3.4, 0.25, 3.4, '#eef0f4', { rot: 0.6 });
+    k.deco(28, 6, 26, 0.5, 2.2, 0.5, '#d9dce3');
+    k.deco(28.6, 7.6, 25.4, 3.4, 0.25, 3.4, HAB, { rot: 0.6 });
 
     // ---------- tall rocks, a shed and a relay mast: break up the long views ----------
     boulder(19, 7.5, 4, 4.5, 2.2, 0.15, ROCK2);
     boulder(28, 6.5, 3, 5.5, 2.4, -0.3, ROCK);
     boulder(-12.5, 10, 3, 4.2, 2.4, 0.25, ROCK2);
     boulder(-27.5, -25, 3.4, 4.8, 2.6, -0.2, ROCK);
-    hab(-7.5, -17, 4, 3, '#9be3a8', [['-x', 0], ['+x', 0]], 3, '#dfe2e8');   // shed: run through, or hop on (3m)
-    k.box(-9, 0, 25, 1.2, 8, 1.2, '#e3e6ec');                                   // relay mast
-    k.deco(-9, 8, 25, 0.25, 2.5, 0.25, '#cfd3da');
+    hab(-7.5, -17, 4, 3, '#9be3a8', [['-x', 0], ['+x', 0]], 3, '#d9dce3');   // shed: run through, or hop on (3m)
+    k.box(-9, 0, 25, 1.2, 8, 1.2, '#d9dce3');                                   // relay mast
+    k.deco(-9, 8, 25, 0.25, 2.5, 0.25, '#d9dce3');
     k.deco(-9, 10.5, 25, 0.4, 0.4, 0.4, '#7ed6c8', { emissive: '#3a8a80' });
 
     // ---------- rocks around the edges and in the open (cover, low hops) ----------
