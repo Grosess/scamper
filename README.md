@@ -32,9 +32,11 @@ Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on 
 - **Bomb Tag**: one player gets the bomb. Run into someone to pass it on (no instant pass-backs). When the fuse runs out, whoever holds it is out and spectates as a ghost; a new bomb drops on someone else. Last one standing wins. The fuse scales with the player count so a game takes 1.5-3.5 minutes; with 2 players each has 2 lives. The holder runs a little faster.
 - **King of the Tag**: the king scores a point every second. Run into the king to steal the crown (a new king is safe for 2s). If the king falls off, the crown drops in the middle for anyone to grab. Most points wins. Chasers run a little faster.
 - **Duel (1v1)**: exactly 2 players taking turns to chase. Catch the runner before the timer ends to score, survive to score; falling off scores for your opponent. First to 3/5/7 wins. The chaser sees the runner's outline through walls and runs a little faster.
-- **Race**: everyone starts together on a race course. Get to the finish first. No checkpoints - fall off and you're back at the start. The leaderboard shows meters to go. After the first finisher, everyone else has 60 seconds.
+- (Race mode is switched off for now.) **Race**: everyone starts together on a race course. Get to the finish first. No checkpoints - fall off and you're back at the start. The leaderboard shows meters to go. After the first finisher, everyone else has 60 seconds.
 
-Your stats (games, wins, tags, best race times...) are saved in your browser - see **Stats** in the main menu.
+**CPUs**: the host can add CPU players (Easy / Medium / Hard) in the Lobby tab of the pause menu, and remove them with the ×. They play every mode with the same movement as people. Easy CPUs only walk, hop and drop; Medium ones also mantle and use jump pads; Hard ones jump gaps, aim where you're heading, slide to close in, and flee toward spots they can reach before you.
+
+Your stats (games, wins, tags...) are saved in your browser - see **Stats** in the main menu.
 
 ### Maps
 
@@ -50,12 +52,10 @@ Orange walls are wall-kick routes.
 | The Playhouse | indoor | One big play hall: a castle, a balloon room, a spiral climb tower, a slide hill and a play deck on three heights |
 | Moon Base | space | Low gravity. Habitat modules and tubes on a floating rock split by a rift, a comm tower, a lander, a hangar |
 | The Kitchen | indoor | You're tiny in a giant kitchen: drawer staircases, chairs to slide under, a toaster launch onto the fridge |
+| The Test Lab | indoor | White test chambers around a frosted-glass atrium you can't wall-kick, crossed by bridges at two heights |
 | The Clocktower | indoor | Spinning gears you ride (they turn your view), a pendulum, lifts, bells and glowing clock faces |
-| Treetops | fog | A treehouse village in giant trees above misty ground: rope bridges, a cable car, a bucket lift |
+| The Skatepark | outdoor (walled) | A seaside skatepark: a big funbox with a slide tunnel, towers, corner platforms, ramps, containers |
 | The Loop | fog | Endless: the map repeats forever - walk off one edge and you come in the other side |
-| Cloud Spire | race | A 3-lap spiral climb in an empty sky with spinning platforms that turn your view |
-| The Chambers | race | Nine white test rooms: pistons, ferries, launch plates, kick chimneys, sweepers, laser gates, a lift |
-| The Volcano | race | Three laps up a mountain in a lava sea: stepping stones, a lava tube, rising columns, a geyser |
 
 Level features: **jump pads** (glowing squares), **moving platforms** you can ride, **spinning bars** that shove you, and **kick walls** (always bright orange-red).
 

@@ -391,3 +391,7 @@ button { font-family: inherit; }
 .cos-row input[type=range] { flex: 1; }
 .cos-row b { width: 38px; font-size: 12px; text-align: right; }
 .glint-color { width: 34px; height: 26px; padding: 0; border: 2px solid var(--ink); background: none; cursor: pointer; }
+.cpu-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.cpu-row .pill { padding: 5px 10px; font-size: 12px; }
+.player-list .tag.cpu { background: var(--lilac); }
+.cpu-x { margin-left: 6px; width: 22px; height: 22px; border: 2px solid var(--ink); background: #fff; font-weight: 800; cursor: pointer; line-height: 1; }

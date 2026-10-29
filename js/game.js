@@ -25,6 +25,9 @@ if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
 function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} }
 
+// CPU players (host only): id -> Bot (see bots.js)
+const bots = new Map();
+
 // ---------- stats (saved in this browser) ----------
 const stats = (() => {
   const KEY = 'scamper-stats';
@@ -252,6 +255,7 @@ function loadMap(id) {
   const m = getMap(id);
   Object.assign(CONFIG.move, DEFAULT_MOVE, m.move || {});   // per-map physics (low gravity...)
   World.load(scene, m);
+  if (bots.size) Nav.build();   // CPUs need the new map's routes
   if (m.kind === 'race') buildFinish(m);
   buildSpots(m);
   renderer.shadowMap.needsUpdate = true;
@@ -771,7 +775,7 @@ function applyState(s) {
   const oldChase = seen.chase, wasOut = seen.out;
   const ids = new Set(s.roster.map((r) => r.id));
   for (const id of [...players.keys()]) if (!ids.has(id)) removePlayer(id);
-  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickCos(r.cos));
+  for (const r of s.roster) { const p = ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickCos(r.cos)); p.cpu = BOT_SKILL[r.cpu] ? r.cpu : null; }
 
   if (s.map && (!World.map || s.map !== World.map.id)) loadMap(s.map);
   game.phase = s.phase;
@@ -891,7 +895,7 @@ function buildState() {
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
     exposed: Object.fromEntries(Object.entries(H.exposed).map(([id, t]) => [id, Math.max(0, (t - performance.now()) / 1000)]).filter(([, s]) => s > 0)),
     scores: game.scores, result: game.result,
-    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye, cos: p.cos || null })),
+    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye, cos: p.cos || null, cpu: p.cpu || null })),
   };
 }
 function pushState() {
@@ -914,6 +918,7 @@ function teleportPlayer(id, pos, yaw) {
   const y = yaw === undefined ? faceCenter(pos) : yaw;
   if (p) { p.tp.set(pos[0], pos[1], pos[2]); p.snapNext = true; }
   if (id === myId) me.teleport(pos, y);
+  else if (bots.has(id)) bots.get(id).p.teleport(pos, y);
   else Net.sendTo(id, { t: 'tp', p: pos, y });
 }
 // everyone to a different spawn
@@ -1619,10 +1624,119 @@ function updatePauseUI() {
   $('startBtn').textContent = why || 'Start round';
   $('playerCount').textContent = `Players · ${players.size} / ${CONFIG.tag.maxPlayers}`;
   $('playerList').innerHTML = [...players.values()].map((p) => {
-    const tag = p.id === hostId ? '<span class="tag">Host</span>' : '';
+    const tag = p.id === hostId ? '<span class="tag">Host</span>' : p.cpu ? `<span class="tag cpu">CPU · ${p.cpu}</span>` : '';
+    const kick = Net.isHost && p.cpu ? `<button class="cpu-x" data-id="${esc(p.id)}" title="Remove">×</button>` : '';
     return `<li><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.name)}` +
-      `${p.id === myId ? ' <span class="you">(you)</span>' : ''}${tag}</li>`;
+      `${p.id === myId ? ' <span class="you">(you)</span>' : ''}${tag}${kick}</li>`;
   }).join('');
+  $('cpuRow').classList.toggle('hidden', !Net.isHost);
+  $('cpuDiff').querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === cpuDiff));
+  $('addCpu').disabled = players.size >= CONFIG.tag.maxPlayers;
+}
+
+// ---------- CPU players (host) ----------
+let cpuDiff = 'medium', cpuN = 0;
+const CPU_NAMES = ['Pip', 'Nib', 'Zed', 'Moss', 'Kit', 'Dot', 'Rue', 'Bix', 'Tam', 'Fen', 'Jot', 'Lux', 'Vim', 'Oz'];
+function addBot(diff) {
+  if (!Net.isHost || players.size >= CONFIG.tag.maxPlayers) return;
+  const id = `cpu-${++cpuN}`;
+  const name = uniqueName(CPU_NAMES[(cpuN - 1) % CPU_NAMES.length]);
+  const p = ensurePlayer(id, name, COLORS[Math.floor(Math.random() * COLORS.length)], '#ffffff', null);
+  p.cpu = diff;
+  if (!bots.size || Nav.mapId !== World.map.id) Nav.build();
+  bots.set(id, new Bot(id, diff));
+  game.scores[id] = { tags: 0 };
+  if (isPlaying() && game.mode === 'koth') game.koth.pts[id] = 0;
+  hostFeed(`${name} (CPU, ${diff}) joined`);
+  teleportPlayer(id, randomSpawn());
+  pushState();
+  autoMode();
+}
+function removeBot(id) {
+  if (!bots.has(id)) return;
+  bots.delete(id);
+  hostOnLeave(id);
+}
+$('cpuDiff').onclick = (e) => { const b = e.target.closest('.pill'); if (b) { cpuDiff = b.dataset.v; updatePauseUI(); } };
+$('addCpu').onclick = () => addBot(cpuDiff);
+$('playerList').addEventListener('click', (e) => { const b = e.target.closest('.cpu-x'); if (b) removeBot(b.dataset.id); });
+
+// what each CPU wants right now
+const botLast = new Map();
+function botGoal(b) {
+  const id = b.id;
+  const others = [...players.values()].filter((q) => q.id !== id);
+  const posOfP = (q) => (q.id === myId ? me.pos : q.tp);
+  const velOf = (q) => { const l = botLast.get(q.id); return l ? l.v : null; };
+  const nearest = (list) => {
+    let best = null, bd = Infinity;
+    for (const q of list) { const d = wrapDist(posOfP(q), b.p.pos); if (d < bd) { bd = d; best = q; } }
+    return best;
+  };
+  if (!isPlaying()) return { type: 'wander' };
+  if (game.mode === 'bomb' && game.bomb) {
+    if (isOut(id)) return { type: 'wander' };
+    if (isIt(id)) {
+      const t = nearest(others.filter((q) => !isOut(q.id)));
+      return t ? { type: 'chase', pos: posOfP(t), vel: velOf(t) } : { type: 'wander' };
+    }
+    const h = others.find((q) => isIt(q.id));
+    return h ? { type: 'flee', from: [posOfP(h)] } : { type: 'wander' };
+  }
+  if (game.mode === 'duel' && game.duel) {
+    if (!inDuel(id)) return { type: 'wander' };
+    const o = players.get(game.duel.ids.find((x) => x !== id));
+    if (!o) return { type: 'idle' };
+    return isIt(id) ? { type: 'chase', pos: posOfP(o), vel: velOf(o) } : { type: 'flee', from: [posOfP(o)] };
+  }
+  if (game.mode === 'koth' && game.koth) {
+    if (isIt(id)) {
+      const near = others.map(posOfP).sort((a, c) => wrapDist(a, b.p.pos) - wrapDist(c, b.p.pos)).slice(0, 2);
+      return near.length ? { type: 'flee', from: near } : { type: 'wander' };
+    }
+    if (game.koth.loose) { const c = crownSpot(); return { type: 'go', pos: { x: c[0], y: c[1], z: c[2] } }; }
+    const k = others.find((q) => isIt(q.id));
+    return k ? { type: 'chase', pos: posOfP(k), vel: velOf(k) } : { type: 'wander' };
+  }
+  return { type: 'wander' };
+}
+// before the physics steps: decide, plan and press keys
+function botsThink(dt) {
+  for (const q of players.values()) {
+    const p = q.id === myId ? me.pos : q.tp, l = botLast.get(q.id);
+    if (l) { l.v = { x: (p.x - l.x) / Math.max(dt, 1e-3), z: (p.z - l.z) / Math.max(dt, 1e-3) }; l.x = p.x; l.z = p.z; }
+    else botLast.set(q.id, { x: p.x, z: p.z, v: { x: 0, z: 0 } });
+  }
+  const T = CONFIG.tag, go = isPlaying() && game.rl <= 0;
+  for (const b of bots.values()) {
+    const frozen = isPlaying() && game.rl > 0 && inDuel(b.id);
+    b.p.speedMul = !go ? 1 : game.mode === 'duel' && isIt(b.id) ? T.duelChaserSpeed
+      : game.mode === 'bomb' && isIt(b.id) ? T.bombSpeed : game.mode === 'koth' && !isIt(b.id) ? T.kothSpeed : 1;
+    b.think(botGoal(b), dt);
+    b.drive(dt, frozen);
+  }
+}
+// after the physics steps: share where they are, catch falls, tag people
+const botTagCd = {};
+function botsAfter() {
+  const now = performance.now();
+  for (const b of bots.values()) {
+    World.wrapPos(b.p.pos);
+    if (b.p.pos.y < World.map.killY) { b.p.teleport(randomSpawn()); hostFell(b.id); }
+    const p = players.get(b.id);
+    if (!p) continue;
+    p.tp.copy(b.p.pos);
+    p.yaw = b.p.yaw;
+    p.pitch = 0;
+    p.mode = b.p.mode();
+    if (!isPlaying() || game.rl > 0) continue;
+    const reach = CONFIG.tag.touchRange + (game.mode === 'duel' && isIt(b.id) ? CONFIG.tag.duelReachBonus : 0);
+    for (const q of players.values()) {
+      if (q.id === b.id || !canTagPair(b.id, q.id)) continue;
+      const qp = q.id === myId ? me.pos : q.tp;
+      if (wrapDist(qp, b.p.pos) < reach && (botTagCd[b.id] || 0) < now) { botTagCd[b.id] = now + 250; hostTryTag(b.id, q.id); }
+    }
+  }
 }
 
 $('resumeBtn').onclick = lock;
@@ -1911,9 +2025,18 @@ function updateGame(dt) {
   acc += dt;
   let n = 0;
   let wt = worldTime() - acc;
-  while (acc >= STEP && n < 10) { wt += STEP; World.updateMovers(wt); me.step(STEP, inp); acc -= STEP; n++; }
+  if (bots.size) botsThink(dt);
+  while (acc >= STEP && n < 10) {
+    wt += STEP;
+    World.updateMovers(wt);
+    me.step(STEP, inp);
+    for (const b of bots.values()) b.p.step(STEP, b.inp);
+    acc -= STEP;
+    n++;
+  }
   if (n >= 10) acc = 0;
   World.wrapPos(me.pos);   // endless maps: off one edge, in at the other
+  if (bots.size) botsAfter();
 
   // the void. On a race course: straight back to the start. Elsewhere: a random spawn
   // (and in a duel your opponent scores, in King of the Tag you drop the crown)

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -214,6 +214,10 @@
           <div class="tile">
             <div class="tile-kicker" id="playerCount"></div>
             <ul id="playerList" class="player-list"></ul>
+            <div id="cpuRow" class="cpu-row hidden">
+              <div class="pills" id="cpuDiff"><button class="pill" data-v="easy">Easy</button><button class="pill" data-v="medium">Medium</button><button class="pill" data-v="hard">Hard</button></div>
+              <button id="addCpu" class="btn small">Add CPU</button>
+            </div>
           </div>
         </div>
       </section>
@@ -275,22 +279,24 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/config.js?v=20"></script>
-  <script src="js/map.js?v=20"></script>
-  <script src="js/maps/rooftops.js?v=20"></script>
-  <script src="js/maps/shipyard.js?v=20"></script>
-  <script src="js/maps/corridors.js?v=20"></script>
-  <script src="js/maps/fog.js?v=20"></script>
-  <script src="js/maps/playhouse.js?v=20"></script>
-  <script src="js/maps/moon.js?v=20"></script>
-  <script src="js/maps/kitchen.js?v=20"></script>
-  <script src="js/maps/clocktower.js?v=20"></script>
-  <script src="js/maps/skatepark.js?v=20"></script>
-  <script src="js/maps/infinite.js?v=20"></script>
-  <script src="js/character.js?v=20"></script>
-  <script src="js/world.js?v=20"></script>
-  <script src="js/player.js?v=20"></script>
-  <script src="js/net.js?v=20"></script>
-  <script src="js/game.js?v=20"></script>
+  <script src="js/config.js?v=21"></script>
+  <script src="js/map.js?v=21"></script>
+  <script src="js/maps/rooftops.js?v=21"></script>
+  <script src="js/maps/shipyard.js?v=21"></script>
+  <script src="js/maps/corridors.js?v=21"></script>
+  <script src="js/maps/fog.js?v=21"></script>
+  <script src="js/maps/playhouse.js?v=21"></script>
+  <script src="js/maps/moon.js?v=21"></script>
+  <script src="js/maps/kitchen.js?v=21"></script>
+  <script src="js/maps/clocktower.js?v=21"></script>
+  <script src="js/maps/lab.js?v=21"></script>
+  <script src="js/maps/skatepark.js?v=21"></script>
+  <script src="js/maps/infinite.js?v=21"></script>
+  <script src="js/character.js?v=21"></script>
+  <script src="js/world.js?v=21"></script>
+  <script src="js/player.js?v=21"></script>
+  <script src="js/bots.js?v=21"></script>
+  <script src="js/net.js?v=21"></script>
+  <script src="js/game.js?v=21"></script>
 </body>
 </html>
