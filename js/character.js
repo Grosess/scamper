@@ -238,21 +238,21 @@ const GLINT_TEX = (() => {
   if (location.protocol !== 'file:') img.src = 'assets/glint.png';
   return t;
 })();
-// The glint is projected flat onto the head + body together (one image across both, tilted 45
-// degrees, sliding along) in the torso's own space - so it doesn't care about faces or UVs, and
-// running, bobbing or squashing doesn't smear it. Arms and legs don't get it.
+// The glint is projected onto the head + body from the camera's point of view: one image across
+// both, tilted 45 degrees on screen and sliding along, centered on the character. It always runs
+// the same way on your screen, whichever way they face. Arms and legs don't get it.
 const GLINT_U = { offset: { value: 0 } };
 function setGlint(c, color) {
   if (!c.glint) {
     if (!color) return;
     const m = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-    const inv = { value: new THREE.Matrix4() };
+    const inv = { value: new THREE.Vector3() };   // the character's center, in world space
     m.onBeforeCompile = (sh) => {
-      sh.uniforms.gInv = inv;
+      sh.uniforms.gCenter = inv;
       sh.uniforms.gOff = GLINT_U.offset;
-      sh.vertexShader = 'uniform mat4 gInv;\nvarying vec2 vGlint;\n' + sh.vertexShader.replace('#include <begin_vertex>',
-        '#include <begin_vertex>\nvGlint = (gInv * modelMatrix * vec4(transformed, 1.0)).xy;');
+      sh.vertexShader = 'uniform vec3 gCenter;\nvarying vec2 vGlint;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvGlint = (modelViewMatrix * vec4(transformed, 1.0)).xy - (viewMatrix * vec4(gCenter, 1.0)).xy;');
       sh.fragmentShader = 'uniform float gOff;\nvarying vec2 vGlint;\n' + sh.fragmentShader.replace('#include <map_fragment>',
         'vec2 gp = vec2(vGlint.x + vGlint.y, vGlint.y - vGlint.x) * 0.7071 * 0.22;\n' +
         'diffuseColor *= texture2D(map, vec2(gp.x + gOff, gp.y));');
@@ -269,7 +269,7 @@ function setGlint(c, color) {
   if (color) {
     c.glintMat.color.set(color);
     c.torso.updateMatrixWorld();
-    c.glintInv.value.copy(c.torso.matrixWorld).invert();
+    c.glintInv.value.setFromMatrixPosition(c.torso.matrixWorld);
   }
 }
 
