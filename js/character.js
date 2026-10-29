@@ -18,7 +18,7 @@ function buildScamp(color, eyeColor = '#ffffff') {
   const outline = new THREE.LineBasicMaterial({ color: base.clone().lerp(new THREE.Color(0x000000), 0.45) });
   const fur = new THREE.MeshLambertMaterial({ color: base });
   const eyeMat = new THREE.MeshBasicMaterial({ color: eyeColor });
-  const mouthMat = new THREE.MeshLambertMaterial({ color: base.clone().lerp(new THREE.Color(0x000000), 0.7) });
+  const mouthMat = new THREE.MeshLambertMaterial({ color: '#b8323f' });   // inside of the mouth: tongue red
 
   const box = (parent, w, h, d, mat, x, y, z, edges = true) => {
     const g = new THREE.BoxGeometry(w, h, d);
@@ -233,31 +233,49 @@ const GLINT_TEX = (() => {
   }
   const t = new THREE.CanvasTexture(cv);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.center.set(0.5, 0.5);
-  t.rotation = -Math.PI / 4;
-  t.repeat.set(0.14, 0.14);   // zoomed way in: only a few broad soft bands cross the character
   const img = new Image();
   img.onload = () => { t.image = img; t.needsUpdate = true; };
   if (location.protocol !== 'file:') img.src = 'assets/glint.png';
   return t;
 })();
+// The glint is projected flat onto the head + body together (one image across both, tilted 45
+// degrees, sliding along) in the torso's own space - so it doesn't care about faces or UVs, and
+// running, bobbing or squashing doesn't smear it. Arms and legs don't get it.
+const GLINT_U = { offset: { value: 0 } };
 function setGlint(c, color) {
   if (!c.glint) {
     if (!color) return;
-    c.glintMat = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
+    const m = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const inv = { value: new THREE.Matrix4() };
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.gInv = inv;
+      sh.uniforms.gOff = GLINT_U.offset;
+      sh.vertexShader = 'uniform mat4 gInv;\nvarying vec2 vGlint;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvGlint = (gInv * modelMatrix * vec4(transformed, 1.0)).xy;');
+      sh.fragmentShader = 'uniform float gOff;\nvarying vec2 vGlint;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+        'vec2 gp = vec2(vGlint.x + vGlint.y, vGlint.y - vGlint.x) * 0.7071 * 0.22;\n' +
+        'diffuseColor *= texture2D(map, vec2(gp.x + gOff, gp.y));');
+    };
+    m.customProgramCacheKey = () => 'glint';
+    c.glintMat = m;
+    c.glintInv = inv;
     c.glint = [];
     const meshes = [];
-    c.rig.traverse((o) => { if (o.isMesh && c.xray.indexOf(o) < 0 && o.material !== c.eyeMat) meshes.push(o); });
-    for (const m of meshes) { const g = new THREE.Mesh(m.geometry, c.glintMat); g.renderOrder = 2; m.add(g); c.glint.push(g); }
+    c.torso.traverse((o) => { if (o.isMesh && o.material === c.fur) meshes.push(o); });
+    for (const mesh of meshes) { const g = new THREE.Mesh(mesh.geometry, m); g.renderOrder = 2; mesh.add(g); c.glint.push(g); }
   }
   for (const g of c.glint) g.visible = !!color;
-  if (color) c.glintMat.color.set(color);
+  if (color) {
+    c.glintMat.color.set(color);
+    c.torso.updateMatrixWorld();
+    c.glintInv.value.copy(c.torso.matrixWorld).invert();
+  }
 }
 
 function applyCos(c, cos, t) {
   setGlint(c, cos && cos.glint ? cos.glintColor : null);
-  if (cos && cos.glint) GLINT_TEX.offset.x = -((performance.now() / 1000 * 0.07) % 1);   // one shared clock, all glints in step
+  if (cos && cos.glint) GLINT_U.offset.value = -((performance.now() / 1000 * 0.07) % 1);   // one shared clock, all glints in step
   const rb = cos && cos.rb !== 'off' ? cos.rb : null, style = cos && cos.rbStyle === 'pulse' ? 'pulse' : 'wave';
   paintScamp(c, c.fur, c.base.body, rb === 'body' || rb === 'both' ? style : null, t);
   paintScamp(c, c.eyeMat, c.base.eye, rb === 'eyes' || rb === 'both' ? style : null, t + 0.3);
