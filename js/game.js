@@ -763,7 +763,8 @@ const ord = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 
 
 // what the last applied state looked like (the host edits `game` before applying, so compare to this)
 const seen = { phase: 'lobby', it: [], chase: 0, out: false };
-let gotState = false;
+let gotState = false, exposedUntil = {};
+const isExposed = (id) => (exposedUntil[id] || 0) > performance.now();
 function applyState(s) {
   gotState = true;
   const wasIt = seen.it.includes(myId), oldPhase = seen.phase, oldIt = seen.it;
@@ -784,6 +785,8 @@ function applyState(s) {
   game.race = s.race || null;
   if (s.setup) game.setup = s.setup;
   game.lastTag = s.lastTag ? { from: s.lastTag.from, to: s.lastTag.to, at: performance.now() - s.lastTag.ago * 1000 } : null;
+  exposedUntil = {};
+  for (const id in s.exposed || {}) exposedUntil[id] = performance.now() + (+s.exposed[id] || 0) * 1000;
 
   const playing = isPlaying(), started = playing && oldPhase !== 'playing';
   if (started) { SFX.start(); stats.started(game.mode); }
@@ -867,7 +870,7 @@ function applySnap(m) {
 }
 
 // ---------- host: rules ----------
-const H = { itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
+const H = { exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
 // random starting colors for new players: bright, readable bodies
 const COLORS = ['#ff8fa3', '#ffd166', '#7ed6c8', '#8fb4ff', '#c3a6ff', '#ffb37a', '#9be3a8', '#ff6b6b', '#a8dcef', '#f4a6ff', '#2f3138', '#5b6cff', '#3ec98b', '#ff9f43'];
 
@@ -886,6 +889,7 @@ function buildState() {
     t: 'state', phase: game.phase, mode: game.mode, map: game.map, it: game.it.slice(), setup: game.setup,
     duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
+    exposed: Object.fromEntries(Object.entries(H.exposed).map(([id, t]) => [id, Math.max(0, (t - performance.now()) / 1000)]).filter(([, s]) => s > 0)),
     scores: game.scores, result: game.result,
     roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye, cos: p.cos || null })),
   };
@@ -1101,13 +1105,40 @@ function raceToGo(p) {
 }
 
 // someone fell into the void
+// Seekers come back as far from the runners as the map allows (the void is never a shortcut).
+// Runners come back away from the danger but EXPOSED for a few seconds: whoever hunts them sees
+// their outline through walls. (Duel: falling still scores for the other side; a king who
+// falls drops the crown.)
+const EXPOSE_SECS = 6;
+function farSpawn(from) {
+  let best = randomSpawn(), bd = -1;
+  for (const sp of World.map.spawns) {
+    let d = Infinity;
+    for (const q of from) d = Math.min(d, wrapDist({ x: sp[0], y: sp[1], z: sp[2] }, q));
+    if (d > bd) { bd = d; best = sp; }
+  }
+  return best;
+}
 function hostFell(id) {
-  if (!isPlaying()) return;
+  if (!isPlaying()) { teleportPlayer(id, randomSpawn()); return; }
+  const pos = (ids) => ids.filter((x) => x !== id && players.has(x)).map(posOf).filter(Boolean);
   if (game.mode === 'duel') {
     const d = game.duel;
-    if (!d.ids.includes(id) || H.releaseLeft > 0) return;
+    if (!d.ids.includes(id) || H.releaseLeft > 0) { teleportPlayer(id, randomSpawn()); return; }
     duelPoint(d.ids.find((i) => i !== id), id === game.it[0] ? 'the chaser fell' : 'fell into the void');
-  } else if (game.mode === 'koth' && isIt(id)) hostDropCrown();
+  } else if (game.mode === 'koth') {
+    if (isIt(id)) { hostDropCrown(); teleportPlayer(id, randomSpawn()); }
+    else teleportPlayer(id, farSpawn(pos(game.it)));   // a chaser: far from the king
+  } else if (game.mode === 'bomb') {
+    const alive = game.bomb ? game.bomb.alive : [];
+    if (isIt(id)) teleportPlayer(id, farSpawn(pos(alive)));
+    else if (alive.includes(id)) {
+      teleportPlayer(id, farSpawn(pos(game.it)));
+      H.exposed[id] = performance.now() + EXPOSE_SECS * 1000;
+      hostFeed(`${nameOf(id)} fell - exposed for ${EXPOSE_SECS}s!`);
+      pushState();
+    } else teleportPlayer(id, randomSpawn());
+  } else teleportPlayer(id, randomSpawn());
 }
 
 function hostEndRound(sub) {
@@ -1544,8 +1575,8 @@ function renderStats() {
     `${tile('tags', d.tags)}${tile('times blown up', d.exploded)}${tile('played', time)}</div></div>` +
     `<div class="tile"><div class="tile-kicker">Tag modes</div><table class="stat-table"><thead><tr><th></th><th>Games</th><th>Wins</th><th>Win rate</th><th>Tags</th></tr></thead><tbody>${modeRows}</tbody></table>` +
     `<p class="note">Best King of the Tag score: ${d.kothBest}</p></div>` +
-    `<div class="tile"><div class="tile-kicker">Racing</div><table class="stat-table"><thead><tr><th>Course</th><th>Best time</th></tr></thead><tbody>${best}</tbody></table>` +
-    `<p class="note">${race.games} races · ${race.wins} wins · ${d.race.finishes} finishes · ${d.race.falls} falls</p></div>`;
+    (!MAPS.some((m) => m.kind === 'race') ? '' : `<div class="tile"><div class="tile-kicker">Racing</div><table class="stat-table"><thead><tr><th>Course</th><th>Best time</th></tr></thead><tbody>${best}</tbody></table>` +
+    `<p class="note">${race.games} races · ${race.wins} wins · ${d.race.finishes} finishes · ${d.race.falls} falls</p></div>`);
 }
 
 // ---------- menus (main + escape share the Settings / Controls panels) ----------
@@ -1606,8 +1637,6 @@ const MODES = [
            { key: 'target', label: 'First to', vals: [[3, '3'], [5, '5'], [7, '7']], def: 5 }] },
   { id: 'koth', name: 'King of the Tag', kind: 'tag', min: 2, desc: 'Hold the crown to score a point every second. Run into the king to steal it. Most points wins.',
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
-  { id: 'race', name: 'Race', kind: 'race', min: 1, desc: 'Race to the finish. Fall off and you go back to the start - no checkpoints.',
-    opts: [{ key: 'len', label: 'Time limit', vals: [[240, '4 min'], [360, '6 min'], [480, '8 min']], def: 360 }] },
 ];
 const hostSetup = { mode: players.size === 2 ? 'duel' : 'bomb', opts: {} };
 for (const m of MODES) { hostSetup.opts[m.id] = {}; for (const o of m.opts) hostSetup.opts[m.id][o.key] = o.def; }
@@ -2038,9 +2067,10 @@ function updateGame(dt) {
       if (game.mode === 'duel' && isIt(myId) && inDuel(p.id)) xr = '#c6ff3d';
       else if (game.mode === 'koth' && it && !isIt(myId)) xr = '#ffd166';
       else if (game.mode === 'bomb' && !isOut(myId) && !isOut(p.id) && dist < 30) xr = it ? '#ff4d3d' : isIt(myId) ? '#ffffff' : null;
+      if (isExposed(p.id) && canTagPair(myId, p.id)) xr = '#ff4d3d';   // they fell: you can see them anywhere
     }
     setScampXray(a.scamp, xr);
-    a.marker.visible = !!xr && (game.mode !== 'bomb' || it);
+    a.marker.visible = !!xr && (game.mode !== 'bomb' || it || isExposed(p.id));
     if (a.marker.visible) { a.marker.material.color.set(xr); a.marker.scale.set(0.45, 0.45, 1).multiplyScalar(0.8 + Math.min(1.6, dist / 18)); }
     a.bodyMat.emissive.setHex(it && game.mode === 'bomb' ? 0x3a0806 : 0x000000);
     // how close is the danger (for the heartbeat + red vignette)
@@ -2220,17 +2250,6 @@ function twoPlayerFx(dt, nearestSeeker) {
       setText('pointerLabel', `${label} ${Math.round(d)}m`);
       show = true;
     }
-    // close calls in a duel
-    if (game.mode === 'duel') {
-      if (d < 2.2) nearFlag = true;
-      else if (nearFlag && d > 4.5) {
-        nearFlag = false;
-        if (now - closeCallAt > 4000) {
-          closeCallAt = now;
-          showBanner(isIt(myId) ? '<div class="big" style="color:#ff6bd6">SO CLOSE!</div>' : '<div class="big lime">CLOSE CALL!</div>', 1.1);
-        }
-      }
-    }
   }
   if (ptr.style.display !== (show ? 'block' : 'none')) ptr.style.display = show ? 'block' : 'none';
 
@@ -2303,6 +2322,7 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (playing && mode === 'bomb' && isIt(myId) && go && now < tagReadyAt) hint = 'Get ready to pass it…';
   if (playing && mode === 'race' && go && !raceDone) hint = `${Math.round(raceToGo(me.pos))}m to go`;
   if (playing && mode === 'bomb' && isOut(myId)) hint = 'You\'re out - spectating';
+  if (isExposed(myId)) hint = `EXPOSED - they can see you for ${((exposedUntil[myId] - now) / 1000).toFixed(1)}s`;
   if (now < tagHintUntil) hint = tagHint;
   if (frozen) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
   else if (game.phase === 'lobby') {

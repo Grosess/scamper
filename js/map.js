@@ -22,7 +22,8 @@
 //    k.balloons(x, y, z, width, height, depth, count, colors)  room of floating balloons that dodge players
 //         (x/z = center of the room, y = floor). Soft: never block anyone.
 //
-//  Box opts: { tex: 'kick' (wall-kick surface: always bright orange-red) | 'net' (see-through),
+//  Box opts: { tex: 'kick' (wall-kick surface: always bright orange-red) | 'net' (see-through)
+//              | 'nokick' (frosted cyan glass: can't be wall-kicked or hung on - always the same look),
 //              noShadow: true, emissive: '#color', opacity: 0..1 }
 //  Everything is flat color - other tex/uv values are left over from old textures and do nothing.
 //

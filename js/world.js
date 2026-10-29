@@ -3,6 +3,7 @@
 //  and level features (jump pads, speed strips, water slides).
 // ============================================================
 const KICK_COLOR = '#ff6a3d';   // every wall-kick surface
+const NOKICK_COLOR = '#8fdcec';  // every surface you CAN'T wall-kick (frosted glass)
 
 const World = {
   map: null,
@@ -35,14 +36,15 @@ const World = {
       // flat colors only - no textures. `tex` just picks a role:
       //   'kick' = wall-kick surface, always the same bright orange-red so you can spot kick routes
       //   'net'  = see-through wall
-      const tex = o.tex || 'grid', kick = tex === 'kick', net = tex === 'net';
+      const tex = o.tex || 'grid', kick = tex === 'kick', net = tex === 'net', nokick = tex === 'nokick';
       if (kick) color = KICK_COLOR;
-      const key = [color, kick ? 'k' : net ? 'n' : '', o.emissive || '', o.opacity || 1, o.ghost ? 'g' : ''].join('|');
+      if (nokick) color = NOKICK_COLOR;
+      const key = [color, kick ? 'k' : net ? 'n' : nokick ? 'x' : '', o.emissive || '', o.opacity || 1, o.ghost ? 'g' : ''].join('|');
       if (!mats[key]) {
         const opacity = net ? 0.35 : o.opacity || 1;
         mats[key] = new THREE.MeshLambertMaterial({
           color,
-          emissive: o.emissive || (kick ? '#3a1000' : 0x000000),
+          emissive: o.emissive || (kick ? '#3a1000' : nokick ? '#123a44' : 0x000000),
           transparent: opacity < 1, opacity, depthWrite: opacity >= 1,
           side: net ? THREE.DoubleSide : THREE.FrontSide,
           polygonOffset: true, polygonOffsetFactor: o.ghost ? -2 : 1, polygonOffsetUnits: o.ghost ? -2 : 1,
@@ -71,9 +73,9 @@ const World = {
           if (rot) {
             const ex = Math.abs(Math.cos(rot)) * w / 2 + Math.abs(Math.sin(rot)) * d / 2;
             const ez = Math.abs(Math.sin(rot)) * w / 2 + Math.abs(Math.cos(rot)) * d / 2;
-            this.boxes.push({ min: { x: x - ex, y, z: z - ez }, max: { x: x + ex, y: y + h, z: z + ez }, rot, cx: x, cz: z, hw: w / 2, hd: d / 2 });
+            this.boxes.push({ min: { x: x - ex, y, z: z - ez }, max: { x: x + ex, y: y + h, z: z + ez }, rot, cx: x, cz: z, hw: w / 2, hd: d / 2, noKick: o.tex === 'nokick' });
           } else {
-            this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 } });
+            this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 }, noKick: o.tex === 'nokick' });
           }
         }
         const g = new THREE.BoxGeometry(w, h, d);
@@ -86,7 +88,7 @@ const World = {
         mesh(g, mat(color, o), o);
       },
       // invisible wall: collision only, nothing drawn (keeps people inside a map)
-      wall: (x, y, z, w, h, d) => { this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 }, noKick: true }); },
+      wall: (x, y, z, w, h, d) => { this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 }, noKick: true, invisible: true }); },
       // see-through net wall (solid, you can't pass it)
       net: (x, y, z, w, h, d, color = '#222222') => kit.box(x, y, z, w, h, d, color, { tex: 'net', uv: 0.6, noShadow: true, outline: false }),
       // decoration only (no collision)
