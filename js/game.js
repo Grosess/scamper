@@ -19,6 +19,8 @@ const settings = Object.assign(
   { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
+// P used to be pause - it's look-behind now
+if (settings.keys && Array.isArray(settings.keys.pause)) settings.keys.pause = settings.keys.pause.filter((c) => c !== 'KeyP');
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
 function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} }
@@ -1442,8 +1444,14 @@ addEventListener('mousedown', (e) => {
 });
 addEventListener('mouseup', (e) => keys.delete('Mouse' + e.button));
 addEventListener('contextmenu', (e) => { if (inGame || rebinding) e.preventDefault(); });
+// Some browsers/mice occasionally report one huge bogus jump while the pointer is locked, which
+// snaps your view. Drop a single event that's wildly bigger than how you've been moving.
+let mouseAvg = 0;
 addEventListener('mousemove', (e) => {
   if (!locked) return;
+  const mag = Math.hypot(e.movementX, e.movementY);
+  if (mag > 250 && mag > mouseAvg * 10 + 40) { mouseAvg *= 0.5; return; }
+  mouseAvg += (Math.min(mag, 400) - mouseAvg) * 0.2;
   const k = 0.0022 * settings.sens;
   me.yaw -= e.movementX * k;
   me.pitch = Math.max(-1.55, Math.min(1.55, me.pitch - e.movementY * k * (settings.invertY ? -1 : 1)));
@@ -1461,10 +1469,13 @@ const NO_INPUT = { f: 0, r: 0, run: false, crouch: false };
 
 function lock() {
   audio();
+  // raw mouse input where the browser supports it (no OS acceleration, fewer jumps)
+  const plain = () => { try { const r = renderer.domElement.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} };
   try {
-    const r = renderer.domElement.requestPointerLock();
-    if (r && r.catch) r.catch(() => {});
-  } catch (e) {}
+    const r = renderer.domElement.requestPointerLock({ unadjustedMovement: true });
+    if (r && r.catch) r.catch(plain);
+  } catch (e) { plain(); }
+  mouseAvg = 0;
 }
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === renderer.domElement;
@@ -1677,7 +1688,7 @@ applySpeedVis();
 // key bindings
 const BIND_LABELS = {
   forward: 'Move forward', back: 'Move back', left: 'Move left', right: 'Move right',
-  jump: 'Jump / wall kick', run: 'Run', slide: 'Slide / crouch', scoreboard: 'Scoreboard', pause: 'Pause menu', taunt: 'Taunt (talk)',
+  jump: 'Jump / wall kick', run: 'Run', slide: 'Slide / crouch', scoreboard: 'Scoreboard', pause: 'Pause menu (Esc works too)', lookBack: 'Look behind (hold)', taunt: 'Taunt (talk)',
 };
 const KEY_NAMES = {
   Space: 'Space', ShiftLeft: 'L Shift', ShiftRight: 'R Shift', ControlLeft: 'L Ctrl', ControlRight: 'R Ctrl',
@@ -1926,7 +1937,10 @@ function updateGame(dt) {
   roll += (rollT - roll) * ease(8);
   rollKick *= Math.exp(-6 * dt);
   pitchKick *= Math.exp(-7 * dt);
-  camera.rotation.set(me.pitch + pitchKick + n3 * tr * 0.02, me.yaw + n1 * tr * 0.012, roll + rollKick + n2 * tr * 0.025);
+  // hold look-behind: the camera turns around, you keep running the way you were going
+  const back = locked && held('lookBack');
+  arms.forEach((a) => (a.visible = !back));
+  camera.rotation.set(me.pitch + pitchKick + n3 * tr * 0.02, me.yaw + (back ? Math.PI : 0) + n1 * tr * 0.012, (roll + rollKick) * (back ? -1 : 1) + n2 * tr * 0.025);
 
   const sp = Math.max(0, Math.min(1, (hs - M.walkSpeed) / (18 - M.walkSpeed)));
   fovPunch *= Math.exp(-5 * dt);

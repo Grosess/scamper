@@ -25,7 +25,8 @@ Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on 
 | (contact) | Run into someone to tag them (pass the bomb, steal the crown, catch the runner) |
 | T | Talk (your head flaps open; everyone sees it) |
 | Tab | Big leaderboard (a small one is always on the right) |
-| P / Esc | Pause menu |
+| P (hold) | Look behind you |
+| Esc | Pause menu |
 
 ### Modes
 - **Bomb Tag**: one player gets the bomb. Run into someone to pass it on (no instant pass-backs). When the fuse runs out, whoever holds it is out and spectates as a ghost; a new bomb drops on someone else. Last one standing wins. The fuse scales with the player count so a game takes 1.5-3.5 minutes; with 2 players each has 2 lives. The holder runs a little faster.

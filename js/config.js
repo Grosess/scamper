@@ -87,7 +87,8 @@ const CONFIG = {
     run: ['ShiftLeft', 'ShiftRight'],
     slide: ['KeyC', 'Mouse2'],      // Mouse2 = right mouse button
     scoreboard: ['Tab'],
-    pause: ['KeyP'],
+    pause: [],              // Esc always pauses too
+    lookBack: ['KeyP'],     // hold to look behind you
     taunt: ['KeyT'],
   },
 
