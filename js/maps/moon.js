@@ -210,5 +210,11 @@ defineMap({
       [30.5, 10, 1.8, 1.2, 1.8, -0.45, ROCK], [5.8, 8.5, 1.6, 2, 1.6, 0.3, ROCK2], [16.5, -10.5, 1.4, 1.2, 1.6, -0.3, ROCK3],
       [5.8, -11.5, 1.2, 1.4, 1.8, 0.15, ROCK],
     ]) boulder(x, z, w, h, d, r, c);
+
+    // --- for chases (kept light): a slide-under pipe arch on the west strip, two low crates ---
+    for (const x of [-31.2, -27.6]) k.box(x, 0, 10, 0.4, 1.6, 0.4, STEEL);
+    k.box(-29.4, 1.2, 10, 3.2, 0.4, 0.4, YEL);
+    k.box(-14, 0, 9, 1.3, 1.1, 1.3, STEEL);
+    k.box(-4, 0, 9, 1.3, 1.1, 1.3, STEEL);
   },
 });

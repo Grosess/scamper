@@ -89,5 +89,20 @@ defineMap({
     k.pad(4.5, 18.2, 3, 1.2, 1.2, 15, { push: { x: 0, z: -2.5 } });
     // kick towers just past each end of the beam: wall-kick up from the dock, step onto the beam
     for (const s of [-1, 1]) kickShaft(k, s * 23.5, 0, 'x', 3, 0, 21.8, Y);
+
+    // --- for chases on the dock: pipe racks across the lanes (bottom 1.2m - slide under) and low
+    // crates to vault or circle round ---
+    const rack = (x, z, len, alongX) => {
+      const h = len / 2;
+      for (const e of [-1, 1]) k.box(alongX ? x + e * (h + 0.15) : x, 0, alongX ? z : z + e * (h + 0.15), 0.3, 1.5, 0.3, '#2b2f35', { tex: 'none' });
+      k.box(x, 1.2, z, alongX ? len : 0.3, 0.3, alongX ? 0.3 : len, '#f1c40f', { tex: 'none' });
+    };
+    rack(4.5, -9, 2.4, false);
+    rack(-4.5, 9, 2.4, false);
+    rack(-9, -4.5, 2.4, true);
+    rack(9, 4.5, 2.4, true);
+    for (const [x, z] of [[0, -4.5], [0, 4.5], [-4.5, 0], [4.5, 0], [-19, -17.5], [19, 17.5], [-17.5, 19], [17.5, -19]]) {
+      k.box(x, 0, z, 1.3, 1.0, 1.3, '#b49a7c', { tex: 'none' });
+    }
   },
 });

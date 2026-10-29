@@ -105,5 +105,14 @@ defineMap({
     const RUN = 7;
     stairs(k, X(1), Z(8) - S / 2 + RUN, '-z', S, 0, F1, '#c3a6ff', T);
     stairs(k, X(11), Z(4) + S / 2 - RUN, '+z', S, 0, F1, '#c3a6ff', T);
+
+    // --- for chases: slide bars (bottom 1.2m - slide under, you keep your speed) and posts to
+    // circle round in the long straight runs ---
+    const BAR = '#3a3f4b', POST = '#f2f4f7';
+    for (const [x, y, z, alongZ] of [[-6, 0, -9, true], [6, 0, 9, true], [-3, 0, 12, false], [3, 0, -12, false], [0, F1, -9, true], [0, F1, 9, true]]) {
+      k.box(x, y + 1.2, z, alongZ ? 0.3 : S, 0.3, alongZ ? S : 0.3, BAR, { tex: 'none' });
+    }
+    for (const [x, z] of [[3, -15], [-3, 15]]) k.box(x, 0, z, 0.8, F1 - 0.4, 0.8, POST);
+    for (const [x, z] of [[-6, 15], [6, -15]]) k.box(x, F1, z, 0.8, TOP - F1, 0.8, POST);
   },
 });

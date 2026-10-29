@@ -190,5 +190,18 @@ defineMap({
     for (const [x, y, z] of [[-3.5, 12, -18], [10, 4, -24], [-3, 16, 24]]) {
       k.box(x, y, z, 2.4, 0.5, 2.4, '#9fd6e8', { tex: 'none', opacity: 0.8 });
     }
+
+    // --- for chases on the open roofs: slide-under pipe runs (bottom 1.15m) and low vents to vault
+    // or circle round ---
+    const pipe = (x, z, top, len, alongX) => {
+      const h = len / 2;
+      for (const e of [-1, 1]) k.box(alongX ? x + e * (h + 0.15) : x, top, alongX ? z : z + e * (h + 0.15), 0.3, 1.45, 0.3, STEEL, NO);
+      k.box(x, top + 1.15, z, alongX ? len : 0.3, 0.3, alongX ? 0.3 : len, '#c8ccd2', NO);
+    };
+    const vent = (x, z, top) => k.box(x, top, z, 1.2, 1.0, 1.2, '#b8c0c8');
+    pipe(5.5, -20.5, 4, 4.5, true);   vent(9, -21, 4);           // C
+    pipe(-22, -4.5, 4, 4, false);      vent(-18, -4, 4);          // E
+    pipe(-19.5, 22, 4, 4, false);      vent(-18, 25, 4);          // M
+    pipe(18, 19, 4, 4, false);         vent(17, 25, 4);           // P
   },
 });

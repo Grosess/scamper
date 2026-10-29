@@ -234,5 +234,16 @@ defineMap({
       k.box(x, 1.0, z, 0.4, 0.3, 0.55, '#3f5a7a');
     }
     k.box(-0.9, 0.15, -4.0, 0.3, 0.6, 0.3, '#b5524b');            // hydrant
+
+    // --- for chases: flatbed trailers parked in the street (deck bottom 1.2m - slide under, or
+    // climb on top), and low garden walls to vault in the back yards ---
+    for (const [x, z] of [[18, -1.5], [-18.2, 1.5]]) {
+      k.box(x, 1.2, z, 4.4, 0.3, 1.9, '#c9c3b8');
+      k.box(x, 1.5, z - 0.8, 4.4, 0.6, 0.3, '#9aa0a8');
+      k.box(x, 1.5, z + 0.8, 4.4, 0.6, 0.3, '#9aa0a8');
+      for (const ex of [-1, 1]) for (const ez of [-1, 1]) k.box(x + ex * 2.05, 0, z + ez * 0.8, 0.3, 1.2, 0.3, '#2b2f35', { tex: 'none' });
+    }
+    k.box(18, 0, -18.5, 3.2, 1.0, 0.5, '#d8cbb2');
+    k.box(-20, 0, 17, 0.5, 1.0, 3.0, '#d8cbb2');
   },
 });
