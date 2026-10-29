@@ -43,14 +43,19 @@ Orange walls are wall-kick routes.
 
 | Map | Setting | What it is |
 | --- | --- | --- |
-| Rooftops | void | City roofs 4-24m over the void with 3m alleys you can kick up (even after falling in), fire escapes, orange kick signs, penthouses, sky bridges, pads |
-| Container Yard | sky + sea | Container piles up to 18m, container bridges you can run through or over, skewed containers, a solid crane with kick towers |
-| The Corridors | indoor | Two floors of looping 3m hallways drawn from ASCII grids in the map file: vents to slide through, vault walls, kick shafts and stairwells between floors |
-| Fog | fog | A suburban street lost in thick drifting fog: gable roofs, kick alleys, fences, a treehouse, a park with a merry-go-round |
-| The Playhouse | indoor | A three-storey padded play structure on a 3m grid: crawl tunnels, nets, rope bridges, trampolines, and a room full of balloons that dodge you |
+| Rooftops | void | City roofs 4-24m over the void with 3m alleys you can kick up, fire escapes, kick signs, penthouses, sky bridges, pipes to slide under |
+| Container Yard | sky + sea | Container piles up to 18m, container bridges, skewed containers, a solid crane with kick towers, pipe racks to slide under |
+| The Corridors | indoor | Two floors of looping 3m hallways drawn from ASCII grids in the map file: vents, slide bars, kick shafts and stairwells |
+| Fog | fog | A suburban street lost in thick fog: gable roofs, kick alleys, fences, trailers, a treehouse, a park with a merry-go-round |
+| The Playhouse | indoor | One big play hall: a castle, a balloon room, a spiral climb tower, a slide hill and a play deck on three heights |
 | Moon Base | space | Low gravity. Habitat modules and tubes on a floating rock split by a rift, a comm tower, a lander, a hangar |
-| Cloud Spire | race | A 3-lap spiral climb around a spire high over the sea: ferries, sweepers, pistons, chimneys, a cannon to the top |
-| The Gauntlet | race | A winding course over a violet haze: spinner plaza, slide tunnel, kick tower, crossing ferries, lifts and a kick-shaft shortcut |
+| The Kitchen | indoor | You're tiny in a giant kitchen: drawer staircases, chairs to slide under, a toaster launch onto the fridge |
+| The Clocktower | indoor | Spinning gears you ride (they turn your view), a pendulum, lifts, bells and glowing clock faces |
+| Treetops | fog | A treehouse village in giant trees above misty ground: rope bridges, a cable car, a bucket lift |
+| The Loop | fog | Endless: the map repeats forever - walk off one edge and you come in the other side |
+| Cloud Spire | race | A 3-lap spiral climb in an empty sky with spinning platforms that turn your view |
+| The Chambers | race | Nine white test rooms: pistons, ferries, launch plates, kick chimneys, sweepers, laser gates, a lift |
+| The Volcano | race | Three laps up a mountain in a lava sea: stepping stones, a lava tube, rising columns, a geyser |
 
 Level features: **jump pads** (glowing squares), **moving platforms** you can ride, **spinning bars** that shove you, and **kick walls** (always bright orange-red).
 
