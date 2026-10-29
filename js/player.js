@@ -238,7 +238,13 @@ class LocalPlayer {
     v.z = n.z * M.wallKickOut + lz * M.wallKickForward + tz * M.wallKickKeep;
     const hs = Math.hypot(v.x, v.z);
     if (hs > M.maxSpeed) { v.x *= M.maxSpeed / hs; v.z *= M.maxSpeed / hs; }
-    v.y = capJump(this, M.wallKickUp);
+    // kicking the same wall again can't take you higher than your last kick off it did (and you
+    // sink a little each time): you can run along a wall, not climb it. Two walls still climb.
+    const same = this.lastKickN && this.lastKickN.x * n.x + this.lastKickN.z * n.z > 0.5;
+    let up = M.wallKickUp;
+    if (same) up = Math.min(up, Math.sqrt(2 * M.gravity * Math.max(0, this.kickApex - 0.3 - this.pos.y)));
+    v.y = capJump(this, up);
+    this.kickApex = same ? Math.min(this.kickApex - 0.3, this.pos.y + v.y * v.y / (2 * M.gravity)) : this.pos.y + v.y * v.y / (2 * M.gravity);
 
     this.lastKickN = n;
     this.kickCd = M.wallKickCooldown;

@@ -85,7 +85,7 @@ function buildScamp(color, eyeColor = '#ffffff') {
   };
   const arms = [arm(-1), arm(1)], legs = [leg(-1), leg(1)];
 
-  const c = { rig, torso, head, arms, legs, eyes, fur, eyeMat, outline, mats: [fur, eyeMat, mouthMat, outline], phase: 0, blink: 2 + Math.random() * 3, squash: 0, wasAir: false, open: 0,
+  const c = { rig, torso, head, arms, legs, eyes, fur, eyeMat, mouthMat, outline, mats: [fur, eyeMat, mouthMat, outline], phase: 0, blink: 2 + Math.random() * 3, squash: 0, wasAir: false, open: 0,
     base: { body: base.clone(), eye: new THREE.Color(eyeColor), line: outline.color.clone() } };
   addXray(c);
   return c;
@@ -132,6 +132,8 @@ function setScampGhost(c, op) {
     }
   });
   for (const m of c.mats) { m.transparent = on; m.opacity = op; m.depthWrite = !on; m.needsUpdate = true; }
+  // the inside of the mouth would show through a see-through body - hide it while ghosted
+  c.rig.traverse((o) => { if (o.isMesh && o.material === c.mouthMat) o.visible = !on; });
 }
 
 // speed = ground speed (m/s), mode 0 stand / 1 slide / 2 crouch, talking = flap the head open
@@ -248,18 +250,23 @@ function setGlint(c, color) {
     const m = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     const inv = { value: new THREE.Vector3() };   // the character's center, in world space
+    const dark = { value: 0 };
     m.onBeforeCompile = (sh) => {
       sh.uniforms.gCenter = inv;
       sh.uniforms.gOff = GLINT_U.offset;
+      sh.uniforms.gDark = dark;
       sh.vertexShader = 'uniform vec3 gCenter;\nvarying vec2 vGlint;\n' + sh.vertexShader.replace('#include <begin_vertex>',
         '#include <begin_vertex>\nvGlint = (modelViewMatrix * vec4(transformed, 1.0)).xy - (viewMatrix * vec4(gCenter, 1.0)).xy;');
-      sh.fragmentShader = 'uniform float gOff;\nvarying vec2 vGlint;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+      sh.fragmentShader = 'uniform float gOff;\nuniform float gDark;\nvarying vec2 vGlint;\n' + sh.fragmentShader.replace('#include <map_fragment>',
         'vec2 gp = vec2(vGlint.x + vGlint.y, vGlint.y - vGlint.x) * 0.7071 * 0.22;\n' +
-        'diffuseColor *= texture2D(map, vec2(gp.x + gOff, gp.y));');
+        'float gl = texture2D(map, vec2(gp.x + gOff, gp.y)).r;\n' +
+        // light colors glow (added on top); dark colors paint dark streaks (blended over)
+        'diffuseColor = gDark > 0.5 ? vec4(diffuse, smoothstep(0.36, 0.78, gl) * 0.85) : vec4(diffuse * gl, opacity);');
     };
     m.customProgramCacheKey = () => 'glint';
     c.glintMat = m;
     c.glintInv = inv;
+    c.glintDark = dark;
     c.glint = [];
     const meshes = [];
     c.torso.traverse((o) => { if (o.isMesh && o.material === c.fur) meshes.push(o); });
@@ -268,6 +275,10 @@ function setGlint(c, color) {
   for (const g of c.glint) g.visible = !!color;
   if (color) {
     c.glintMat.color.set(color);
+    const col = c.glintMat.color, isDark = 0.299 * col.r + 0.587 * col.g + 0.114 * col.b < 0.3;
+    c.glintDark.value = isDark ? 1 : 0;
+    const blend = isDark ? THREE.NormalBlending : THREE.AdditiveBlending;
+    if (c.glintMat.blending !== blend) { c.glintMat.blending = blend; c.glintMat.needsUpdate = true; }
     c.torso.updateMatrixWorld();
     c.glintInv.value.setFromMatrixPosition(c.torso.matrixWorld);
   }

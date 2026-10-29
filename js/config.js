@@ -35,7 +35,7 @@ const CONFIG = {
     maxSpeed: 24,
 
     wallKickUp: 8.8,
-    wallKickOut: 5.5,      // push away from the wall
+    wallKickOut: 6.5,      // push away from the wall
     wallKickForward: 7.5,  // push toward where you're looking
     wallKickKeep: 0.35,    // how much sideways speed you keep through a kick
     wallKickCooldown: 0.15,

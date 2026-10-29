@@ -2249,7 +2249,7 @@ function lerpAngle(a, b, t) {
 
 function updateHud(hs, frozen, nearestSeeker) {
   const playing = isPlaying(), go = playing && game.rl <= 0, mode = game.mode;
-  setText('speed', `${hs.toFixed(1)} m/s`);
+  setText('speed', `${me.vel.length().toFixed(1)} m/s`);   // total speed, falling and rising included
   setText('codeText', Net.code);
 
   let phase = 'WARMUP', timer = `${players.size} player${players.size === 1 ? '' : 's'}`, urgent = false;
