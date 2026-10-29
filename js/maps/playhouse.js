@@ -1,44 +1,43 @@
-// THE PLAYHOUSE - one big indoor play hall with five bold structures you can always see and steer by.
-// Three heights everywhere: the floor (0), LOW walkways (4.4) and HIGH walkways (8.8).
-//   castle        (pink, west) walls you run along at 4.4, gates and a crawl hole to cut through, a
-//                 courtyard trampoline, corner towers at 8.8
-//   balloon room  (lilac, north-east) walls up to 8.8 full of balloons that dodge you. A rope bridge
-//                 runs straight through it at 4.4; its rim at 8.8 links to the castle
-//   climb tower   (blue, east) a spiral of blocks around a column - hop up block by block to 13.2
-//   slide hill    (yellow, south-west) a 8.8 hill with two long slides down into the middle
-//   the floor     soft blocks, pillars and bars to juke around, trampolines, net walls
-// Ways up: step blocks (2.2 each) for mantling, orange kick walls, trampolines, the tower spiral.
-// Everything above a floor is at least 3.6m over it - no head bumping.
+// THE PLAYHOUSE - a soft-play hall: a 3x3 grid of big padded play towers in four bold colors, with
+// 3m alleys between them. Every alley is a kick chimney; the orange panels mark the good ones.
+//   towers        hollow 10x10 rooms, 4.4 / 8.8 / 13.2 tall, a floor every 4.4. Doors on most sides
+//                 of every level, so the ground is a maze of rooms and alleys, and the upper doors
+//                 face each other across the alleys - jump door to door.
+//                 Inside, a step block under a hole in each floor: hop, pull up, keep climbing.
+//   balloon room  the middle cell, two floors tall and open on top, full of balloons that dodge
+//                 you. A rope bridge crosses it at 4.4 between two windows.
+//   alleys        vault walls, slide bars, and slide-under plugs that break the outer loop
+//   trampolines   at two alley crossings: up onto the blue roof (8.8) and the blue lookout (13.2)
+// Ceilings are 4.0 over every floor and 3.8 over the 13.2 lookouts - no head bumping.
 defineMap({
   id: 'playhouse',
-  accent: ['#ff8fa3', '#8fb4ff'],
+  accent: ['#e5484d', '#2f6fdb'],
   name: 'The Playhouse',
-  blurb: 'A giant play hall: a castle, a climbing tower, a slide hill and a room full of balloons that dodge you.',
+  blurb: 'A soft-play hall of big colored towers and kick alleys, with a room full of balloons in the middle.',
   env: 'indoor',
   sky: '#141824',
-  fog: [40, 110],
-  hemi: ['#ffffff', '#c4cbe0', 1.55],
-  sun: [0.45, 4, 60, 6],
-  size: 32,
+  fog: [45, 110],
+  hemi: ['#ffffff', '#c4cbe0', 1.5],
+  sun: [0.5, 4, 60, 6],
+  size: 24,
   spotHeight: 16.7,
-  spots: [-18, 0, 18].flatMap((x) => [-14, 6].map((z) => ({ x, z }))),
-  menuCam: { r: 19, y: 14 },
+  spots: [-13, 0, 13].flatMap((x) => [-13, 0, 13].map((z) => ({ x, z }))),
+  menuCam: { path: [[-19.5, 11, -6.5], [19.5, 11, -6.5]] },
   spawns: [
-    [-12.5, 0, -2.5], [-26, 0, 8], [-20, 0, 22.5], [2, 0, 21.5], [24, 0, 20], [25, 0, 2],
-    [2, 0, -20], [-6, 0, -21], [14, 0, -13], [8, 0, 3], [-3, 0, -6], [4, 0, 12],
-    [-16, 4.4, -13.2], [0, 4.4, -9.5], [-9, 8.8, 16], [16, 4.4, 7.3],
+    [-19.5, 0, -19.5], [19.5, 0, 19.5], [-19.5, 0, 0], [19.5, 0, 0], [10, 0, -19.5], [-10, 0, 19.5],
+    [3, 0, -6.5], [2, 0, 6.5], [-13, 0, -13], [13, 0, 13], [-13, 0, 0], [13, 0, 0],
+    [0, 4.4, -13], [-13, 4.4, 0], [13, 4.4, 13], [0, 8.8, 13],
   ],
-  seekerSpawn: [0, 0, 1],
+  seekerSpawn: [-6.5, 0, -6.5],
 
   build(k) {
-    const LOW = 4.4, HIGH = 8.8, TOP = 17;
-    const PINK = '#ff7a98', PINK2 = '#ffadc0', LILAC = '#b08cff', LILAC2 = '#d6c6ff', BLUE = '#6f9bff', BLUE2 = '#4f7fe0';
-    const YEL = '#ffca3a', YEL2 = '#ffdf85', MINT = '#5fd0be', PEACH = '#ff9f5e', SKY = '#8fd0ee', GREEN = '#7fd98e';
-    const BRIDGE = '#fff6e6', KICK = { tex: 'kick' };
+    const LV = 4.4, TOP = 17, T = 10, A = 3, C = [-13, 0, 13], t = 0.6, half = T / 2;
+    const RED = '#e5484d', BLUE = '#2f6fdb', YEL = '#f5c331', GREEN = '#2fb36b', CREAM = '#f2efe8', DARK = '#2b3038';
+    const KICK = { tex: 'kick' };
     const solid = (x0, x1, y0, y1, z0, z1, c, o) => k.box((x0 + x1) / 2, y0, (z0 + z1) / 2, x1 - x0, y1 - y0, z1 - z0, c, o);
-    // a straight wall from A to B (along x or z), 0..h high, with rectangular holes {a, b, y0, y1}
-    const segs = (A, B, h, holes, put) => {
-      const cuts = [A, B, ...holes.flatMap((o) => [o.a, o.b])].filter((v) => v >= A && v <= B).sort((p, q) => p - q);
+    // a straight wall from A to B with rectangular holes {a, b, y0, y1}
+    const PH_segs = (a0, b0, h, holes, put) => {
+      const cuts = [a0, b0, ...holes.flatMap((o) => [o.a, o.b])].filter((v) => v >= a0 && v <= b0).sort((p, q) => p - q);
       for (let i = 0; i < cuts.length - 1; i++) {
         const a = cuts[i], b = cuts[i + 1], m = (a + b) / 2;
         if (b - a < 0.01) continue;
@@ -50,115 +49,85 @@ defineMap({
         if (y < h) put(a, b, y, h);
       }
     };
-    const wallX = (xa, xb, z0, z1, h, holes, c) => segs(xa, xb, h, holes, (a, b, y0, y1) => solid(a, b, y0, y1, z0, z1, c));
-    const wallZ = (za, zb, x0, x1, h, holes, c) => segs(za, zb, h, holes, (a, b, y0, y1) => solid(x0, x1, y0, y1, a, b, c));
-    const gate = (c) => ({ a: c - 1.5, b: c + 1.5, y0: 0, y1: 3.6 });
-    const bridgeX = (x0, x1, z, top, w = 1.8) => slab(k, (x0 + x1) / 2, top, z, x1 - x0, w, BRIDGE, { t: 0.4 });
-    const bridgeZ = (z0, z1, x, top, w = 1.8) => slab(k, x, top, (z0 + z1) / 2, w, z1 - z0, BRIDGE, { t: 0.4 });
+    const door = (c, lvl) => ({ a: c - 1.5, b: c + 1.5, y0: lvl * LV, y1: lvl * LV + 3.6 });
+    const crawl = (c) => ({ a: c - 1, b: c + 1, y0: 0, y1: 1.2 });
+    const win = (c, lvl) => ({ a: c - 1.5, b: c + 1.5, y0: lvl * LV, y1: lvl * LV + 3.6 });
 
-    ground(k, 56, 48, '#dfe4ec');
-    enclose(k, 56, 48, TOP, '#cdd4e0', '#eef1f6');
-    // colored floor mats under each structure (so you can tell zones apart from anywhere)
-    k.deco(-16, 0.01, -6, 18, 0.02, 18, '#ffd0db');
-    k.deco(14, 0.01, -13, 18, 0.02, 16, '#e2d6ff');
-    k.deco(16, 0.01, 10, 12, 0.02, 12, '#cfdfff');
-    k.deco(-9, 0.01, 16, 12, 0.02, 11, '#ffe9b0');
-    k.deco(6, 0.01, 5, 8, 0.02, 8, '#c9f0e8');
+    ground(k, 42, 42, '#d6dbe2');
+    enclose(k, 42, 42, TOP, '#3a4260', '#2e3550');
 
-    // ---------- castle (pink): x -24..-8, z -14..2. Walls 1.6 thick, top 4.4; corner towers 8.8 ----------
-    const CX0 = -24, CX1 = -8, CZ0 = -14, CZ1 = 2, CT = 3.6, CW = 1.6;
-    for (const [x0, z0] of [[CX0, CZ0], [CX1 - CT, CZ0], [CX0, CZ1 - CT], [CX1 - CT, CZ1 - CT]]) solid(x0, x0 + CT, 0, HIGH, z0, z0 + CT, PINK2);
-    // north + south walls (between the towers), east + west walls; gates in the middle, crawl holes
-    wallX(CX0 + CT, CX1 - CT, CZ0, CZ0 + CW, LOW, [gate(-16)], PINK);
-    wallX(CX0 + CT, CX1 - CT, CZ1 - CW, CZ1, LOW, [gate(-16)], PINK);
-    wallZ(CZ0 + CT, CZ1 - CT, CX0, CX0 + CW, LOW, [gate(-6), { a: -2.7, b: -1.3, y0: 0, y1: 1.2 }], PINK);
-    wallZ(CZ0 + CT, CZ1 - CT, CX1 - CW, CX1, LOW, [gate(-6), { a: -10.3, b: -8.9, y0: 0, y1: 1.2 }], PINK);
-    // steps up onto the walls (2.2 each: jump + pull up) and up the towers (from the wall walk)
-    solid(-20.5, -18.5, 0, 2.2, 2, 4, PEACH);                  // outside, south wall
-    solid(-26.4, -24, 0, 2.2, -9.5, -7.5, PEACH);              // outside, west wall
-    solid(-14.5, -12.5, 0, 2.2, -12.4, -10.4, PEACH);          // inside the courtyard, north wall
-    solid(-19.5, -17.5, 0, 2.2, -1.6, 0.4, PEACH);             // inside, south wall
-    solid(-20.4, -18.8, LOW, 6.6, CZ0, CZ0 + CW, PINK2);       // on the walk, next to the NW tower
-    solid(CX1 - CW, CX1, LOW, 6.6, -3.2, CZ1 - CT, PINK2);     // next to the SE tower
-    // orange kick wall off the east wall: kick from the floor up onto the walk
-    solid(-5.2, -4.7, 0, LOW, -4.4, -1.8, YEL, KICK);
-    // courtyard trampoline: throws you onto the NW tower
-    k.pad(-17, 0, -7, 1.6, 1.6, 22, { look: 'tramp', color: PINK, push: { x: -3.6, z: -3.6 } });
+    // ---- a tower: hollow room stack. doors = { n: [levels], e: [...], s: [...], w: [...] } ----
+    let holeN = 0;
+    const tower = (cx, cz, H, color, doors, crawls = {}) => {
+      const x0 = cx - half, x1 = cx + half, z0 = cz - half, z1 = cz + half;
+      const holesFor = (side, c) => (doors[side] || []).map((l) => door(c, l)).concat(side in crawls ? [crawl(c + crawls[side])] : []);
+      // north/south walls span the full width, east/west walls sit between them
+      PH_segs(x0, x1, H, holesFor('n', cx), (a, b, y0, y1) => solid(a, b, y0, y1, z0, z0 + t, color));
+      PH_segs(x0, x1, H, holesFor('s', cx), (a, b, y0, y1) => solid(a, b, y0, y1, z1 - t, z1, color));
+      PH_segs(z0 + t, z1 - t, H, holesFor('w', cz), (a, b, y0, y1) => solid(x0, x0 + t, y0, y1, a, b, color));
+      PH_segs(z0 + t, z1 - t, H, holesFor('e', cz), (a, b, y0, y1) => solid(x1 - t, x1, y0, y1, a, b, color));
+      // a floor every 4.4 (the last one is the roof), each with a hole in a corner and a step block
+      // under it on the floor below
+      const n = Math.round(H / LV);
+      for (let l = 1; l <= n; l++) {
+        const q = (holeN++) % 4, sx = q % 2 ? 1 : -1, sz = q > 1 ? 1 : -1;
+        const hx = cx + sx * 2.6, hz = cz + sz * 2.6;   // the hole is 3.6 wide so you clear its edge when you hop on the block
+        slabHole(k, x0 + t, x1 - t, z0 + t, z1 - t, l * LV, [hx - 1.8, hx + 1.8, hz - 1.8, hz + 1.8], l === n ? color : CREAM, { t: 0.4 });
+        solid(hx - 1, hx + 1, (l - 1) * LV, (l - 1) * LV + 2.2, hz - 1, hz + 1, CREAM);
+      }
+    };
+    //            x      z     height  color   doors by side (levels)                      crawl holes
+    tower(C[0], C[0], 2 * LV, RED,   { e: [0, 1], s: [0, 1], w: [0] }, { n: 0 });
+    tower(C[1], C[0], LV,     YEL,   { e: [0], s: [0], w: [0] });
+    tower(C[2], C[0], 3 * LV, BLUE,  { w: [0, 1, 2], s: [0, 1, 2], n: [0] });
+    tower(C[0], C[1], LV,     GREEN, { n: [0], e: [0], s: [0] }, { w: 0 });
+    tower(C[2], C[1], 2 * LV, RED,   { w: [0, 1], n: [0, 1], s: [0] });
+    tower(C[0], C[2], 3 * LV, YEL,   { n: [0, 1], e: [0, 1, 2] }, { w: 0 });
+    tower(C[1], C[2], 2 * LV, BLUE,  { n: [0], w: [0, 1], e: [0, 1] });
+    tower(C[2], C[2], LV,     GREEN, { n: [0], w: [0], s: [0] }, { e: 0 });
 
-    // ---------- balloon room (lilac): x 6..22, z -20..-6, walls 1.2 thick up to 8.8 ----------
-    const BX0 = 6, BX1 = 22, BZ0 = -20, BZ1 = -6, BW = 1.2;
-    const win = (c) => ({ a: c - 1.5, b: c + 1.5, y0: LOW, y1: 8.0 });
-    wallZ(BZ0, BZ1, BX0, BX0 + BW, HIGH, [win(-9.5), gate(-17)], LILAC);                    // west: window for the bridge
-    wallZ(BZ0, BZ1, BX1 - BW, BX1, HIGH, [win(-9.5), gate(-8)], LILAC);                    // east
-    wallX(BX0 + BW, BX1 - BW, BZ1 - BW, BZ1, HIGH, [gate(10), gate(19), win(16)], LILAC); // south: two doors + the tower bridge
-    wallX(BX0 + BW, BX1 - BW, BZ0, BZ0 + BW, HIGH, [gate(14)], LILAC);                     // north
-    k.balloons((BX0 + BX1) / 2, 0, (BZ0 + BZ1) / 2, BX1 - BX0 - 2 * BW, HIGH, BZ1 - BZ0 - 2 * BW, 75,
-      ['#ff8fa3', '#ffd166', '#7ed6c8', '#8fb4ff', '#c3a6ff', '#ffb37a', '#9be3a8', '#ff6b6b', '#a8dcef'], { seed: 5 });
-    // a block inside to climb back up to the rope bridge
-    solid(9, 11, 0, 2.2, -12.8, -10.8, LILAC2);
-    // orange kick wall off the east wall: up to the rim
-    solid(24.8, 25.3, 0, HIGH, -18, -12, YEL, KICK);
-
-    // ---------- climb tower (blue): a column with a spiral of blocks around it ----------
-    const TX = 16, TZ = 10, R = 2.7, Bk = 2.4, STEP = LOW / 3;
-    solid(TX - 1.5, TX + 1.5, 0, 13.2, TZ - 1.5, TZ + 1.5, BLUE2);
-    // E 1, NE 2, N 3 (4.4, the bridge from the balloon room), NW 4, W 5, SW 6 (8.8, the bridge from
-    // the slide hill), S 7, SE 8 - then the column top at 13.2
-    [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]].forEach(([dx, dz], i) => {
-      const x = TX + dx * R, z = TZ + dz * R;
-      solid(x - Bk / 2, x + Bk / 2, 0, STEP * (i + 1), z - Bk / 2, z + Bk / 2, i % 2 ? BLUE : SKY);
-    });
-
-    // ---------- slide hill (yellow): top 8.8 at x -14..-4, z 11.5..20.5 ----------
-    solid(-14, -4, 0, HIGH, 11.5, 20.5, YEL);
-    solid(-14, -4, 0, LOW, 9.5, 11.5, YEL2);                   // ledge on its north side (4.4)
-    solid(-6, -4, LOW, 6.6, 9.5, 11.5, YEL);                   // step from the ledge to the top
-    solid(-10, -8, 0, 2.2, 7.5, 9.5, PEACH);                   // step from the floor onto the ledge
-    solid(-17.1, -16.6, 0, HIGH, 13, 19, YEL, KICK);           // orange kick wall off its west face
-    // two long slides down to the east, with a narrow alley between them
-    k.ramp(3, 14.9, 14, 2.4, 0, HIGH, '-x', MINT, { slick: true });
-    k.ramp(3, 19.1, 14, 2.4, 0, HIGH, '-x', GREEN, { slick: true });
-
-    // ---------- play deck (mint) in the middle: 4.4 up on four posts, run under it ----------
-    slab(k, 6, LOW, 5, 6, 6, MINT, { t: 0.4 });              // x 3..9, z 2..8
-    posts(k, [[3.2, 2.2], [8.8, 2.2], [3.2, 7.8], [8.8, 7.8]], 0, LOW - 0.4, '#3b8f82', 0.4);
-    solid(9, 11, 0, 2.2, 4, 6, PEACH);                       // step up onto it
-    bridgeZ(-8.6, 2, 4, LOW, 1.6);                           // north to the low bridge (a T junction)
-    bridgeX(9, TX - R - Bk / 2, 7.3, LOW, 1.6);              // east to the tower's N block
-
-    // ---------- walkways ----------
-    bridgeX(CX1, BX0, -9.5, LOW);               // castle east wall -> balloon room west window
-    bridgeX(BX0 + BW, BX1 - BW, -9.5, LOW, 1.6); // rope bridge through the balloon room
-    bridgeX(CX1 - CT + 3.6, BX0, -12.9, HIGH, 1.6);   // castle NE tower -> balloon room rim (above the low one)
-    bridgeZ(CZ1, 9.5, -13.5, LOW);              // castle south wall -> slide hill ledge
-    bridgeZ(CZ1, 11.5, -9.8, HIGH, 1.6);        // castle SE tower -> slide hill top
-    bridgeZ(BZ1, TZ - R - Bk / 2, TX, LOW);     // balloon room south wall -> tower block N (4.4)
-    bridgeX(-4, TX - R - Bk / 2, TZ + R, HIGH); // slide hill top -> tower block SW (8.8)
-
-    // ---------- the floor: soft blocks, pillars, bars, nets, trampolines ----------
-    const soft = (x, z, w, h, d, c) => k.box(x, 0, z, w, h, d, c);
-    soft(-1, -3, 1.6, 1.0, 1.6, MINT);
-    soft(3, -1, 1.2, 3.0, 1.2, PEACH);
-    soft(-4, 2, 1.2, 3.0, 1.2, SKY);
-    soft(5, 6, 2, 1.0, 1, PINK2);
-    soft(-1, 9, 1.4, 1.4, 1.4, LILAC2);
-    soft(10, 0, 1.2, 3.0, 1.2, YEL2);
-    soft(-27, 4, 1.6, 1.0, 1.6, MINT);
-    soft(-20, 9, 1.2, 3.0, 1.2, LILAC);
-    soft(-1, -17, 1.6, 1.0, 3, PEACH);
-    soft(-12, -19, 1.2, 3.0, 1.2, SKY);
-    soft(24, -3, 1.4, 1.4, 1.4, PINK2);
-    soft(13, 21, 1.2, 3.0, 1.2, BLUE);
-    soft(22, 16, 1.6, 1.0, 1.6, MINT);
-    // slide-under bars between pillars (bottom 1.25)
-    for (const [x, z, alongX] of [[12, -3, true], [-16, 21, true], [3, -20, false]]) {
-      const L = 4;
-      if (alongX) { soft(x - L / 2 - 0.3, z, 0.6, 3.0, 0.6, BLUE2); soft(x + L / 2 + 0.3, z, 0.6, 3.0, 0.6, BLUE2); k.box(x, 1.25, z, L, 0.3, 0.3, '#2b3038'); }
-      else { soft(x, z - L / 2 - 0.3, 0.6, 3.0, 0.6, BLUE2); soft(x, z + L / 2 + 0.3, 0.6, 3.0, 0.6, BLUE2); k.box(x, 1.25, z, 0.3, 0.3, L, '#2b3038'); }
+    // ---- the balloon room: the middle cell, two floors of walls, open on top ----
+    {
+      const H = 2 * LV, x0 = -half, x1 = half, z0 = -half, z1 = half, W = '#f2efe8';
+      PH_segs(x0, x1, H, [door(0, 0)], (a, b, y0, y1) => solid(a, b, y0, y1, z0, z0 + t, W));
+      PH_segs(x0, x1, H, [door(0, 0)], (a, b, y0, y1) => solid(a, b, y0, y1, z1 - t, z1, W));
+      PH_segs(z0 + t, z1 - t, H, [door(-2.5, 0), win(0, 1)], (a, b, y0, y1) => solid(x0, x0 + t, y0, y1, a, b, W));
+      PH_segs(z0 + t, z1 - t, H, [door(2.5, 0), win(0, 1)], (a, b, y0, y1) => solid(x1 - t, x1, y0, y1, a, b, W));
+      slab(k, 0, LV, 0, T - 2 * t, 2.4, DARK, { t: 0.4 });                      // rope bridge, window to window
+      solid(1.5, 3.5, 0, 2.2, 2.4, 4.2, CREAM);                                 // step back up to it
+      k.balloons(0, 0, 0, T - 2 * t, H, T - 2 * t, 75,
+        ['#e5484d', '#2f6fdb', '#f5c331', '#2fb36b', '#ff8a3d', '#8f5bff', '#ffffff'], { seed: 5 });
     }
-    k.net(-6, 0, -9, 6, 3, 0.1, '#3b4250');
-    k.net(19, 0, 1, 0.1, 3, 6, '#3b4250');
-    // trampoline in the middle: up onto the slide hill
-    k.pad(-1, 0, 5, 1.6, 1.6, 22, { look: 'tramp', color: YEL, push: { x: -6, z: 7.5 } });
+
+    // ---- orange kick panels: two-wall chimneys in the alleys (both walls of each) ----
+    const pair = (axis, mid, a, b, h) => {
+      // axis 'x': the alley runs along z at x = mid; panels on both walls from z = a..b
+      if (axis === 'x') { solid(mid - 1.5, mid - 1.3, 0, h, a, b, '', KICK); solid(mid + 1.3, mid + 1.5, 0, h, a, b, '', KICK); }
+      else { solid(a, b, 0, h, mid - 1.5, mid - 1.3, '', KICK); solid(a, b, 0, h, mid + 1.3, mid + 1.5, '', KICK); }
+    };
+    pair('x', -6.5, -17.5, -14.6, LV);      // red NW / yellow N -> the yellow roof
+    pair('z', -6.5, 8.2, 11.3, 2 * LV);     // blue NE / red E -> the red roof
+    pair('z', 6.5, 8.2, 11.3, LV);          // red E / green SE -> the green roof
+    pair('z', -6.5, -17.5, -14.6, LV);      // red NW / green W -> the green roof
+    pair('x', -6.5, 14.6, 17.5, 2 * LV);    // yellow SW / blue S -> the blue roof
+    pair('x', 6.5, 14.6, 17.5, LV);         // blue S / green SE -> the green roof
+
+    // ---- the alleys: vaults, slide bars, and plugs you slide under (they break the outer loop) ----
+    const vaultX = (x, z) => solid(x - 0.3, x + 0.3, 0, 1.0, z - 1.5, z + 1.5, CREAM);
+    const vaultZ = (x, z) => solid(x - 1.5, x + 1.5, 0, 1.0, z - 0.3, z + 0.3, CREAM);
+    vaultZ(-6.5, 0); vaultZ(6.5, 13); vaultX(0, -6.5); vaultX(-13, 6.5);
+    const barX = (x, z) => solid(x - 0.2, x + 0.2, 1.25, 1.6, z - 1.5, z + 1.5, DARK);
+    const barZ = (x, z) => solid(x - 1.5, x + 1.5, 1.25, 1.6, z - 0.2, z + 0.2, DARK);
+    barZ(6.5, -2); barX(13, -6.5); barX(-2, 6.5); barZ(-6.5, 11);
+    // outer alley plugs: solid 1.2..4.4 across the alley - slide under, or run over the top
+    const plug = (x0, x1, z0, z1, c) => solid(x0, x1, 1.2, LV, z0, z1, c);
+    plug(-21, -18, 4.5, 8.5, GREEN);
+    plug(18, 21, -8.5, -4.5, RED);
+    plug(-8.5, -4.5, 18, 21, YEL);
+    plug(4.5, 8.5, -21, -18, BLUE);
+
+    // ---- trampolines at two alley crossings ----
+    k.pad(5.8, 0, -5.8, 1.6, 1.6, 27.5, { look: 'tramp', color: BLUE, push: { x: 2.4, z: -2.4 } });  // -> the blue lookout (13.2)
+    k.pad(-6.5, 0, 6.5, 1.6, 1.6, 24, { look: 'tramp', color: RED, push: { x: 1.9, z: 1.9 } });     // -> the blue tower roof (8.8)
   },
 });
