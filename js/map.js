@@ -39,6 +39,9 @@
 //  Other defineMap fields:
 //    move: { gravity: 13, ... }     override CONFIG.move values on this map (e.g. low gravity)
 //    centerSpot: [x, y, z]          where a dropped crown lands (King of the Tag). Default seekerSpawn
+//    wrap: 40                       endless map: the 40x40 tile (centered on 0,0) repeats forever -
+//                                   walk off an edge and you come in the other side. wrapRings = how
+//                                   many copies to draw around it (default 1). Pair it with fog.
 //    kind: 'race'                   a race course instead of a tag map, with
 //    race: { yaw, finish: { x, y, z, w, h, d }, route: [[x, y, z], ...] }
 //         spawns = the start line, finish = the goal box (y = bottom), route = the course's path

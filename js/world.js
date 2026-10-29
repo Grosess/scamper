@@ -211,6 +211,58 @@ const World = {
       l.matrixAutoUpdate = false;
       this.group.add(l);
     }
+    if (map.wrap) {
+      this._wrapCopies();
+      // draw the tile again all around (copies share geometry + materials, so they're cheap)
+      const W = map.wrap, n = map.wrapRings || 1, base = this.group.children.slice();
+      for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+        if (!i && !j) continue;
+        for (const o of base) {
+          if (o.isInstancedMesh || this.movers.some((mv) => mv.mesh === o)) continue;
+          const c = o.clone();
+          c.position.x += i * W;
+          c.position.z += j * W;
+          c.updateMatrix();
+          this.group.add(c);
+        }
+      }
+    }
+  },
+
+  // --- endless (wrap-around) maps: map.wrap = tile size, the tile spans -W/2..W/2 on x and z ---
+  // Walking off one edge brings you in at the other. Collision copies of everything near the
+  // edges are added so nothing has a seam, and positions are kept inside the tile.
+  _wrapCopies() {
+    const W = this.map.wrap, M = 8, lo = -W / 2 - M, hi = W / 2 + M;
+    const near = (x0, x1, z0, z1) => x1 > lo && x0 < hi && z1 > lo && z0 < hi;
+    const boxes = this.boxes.filter((b) => !b.mover), ramps = this.ramps.slice(), pads = this.pads.slice();
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      if (!i && !j) continue;
+      const dx = i * W, dz = j * W;
+      for (const b of boxes) {
+        if (!near(b.min.x + dx, b.max.x + dx, b.min.z + dz, b.max.z + dz)) continue;
+        const c = Object.assign({}, b, { min: { x: b.min.x + dx, y: b.min.y, z: b.min.z + dz }, max: { x: b.max.x + dx, y: b.max.y, z: b.max.z + dz } });
+        if (b.rot) { c.cx = b.cx + dx; c.cz = b.cz + dz; }
+        this.boxes.push(c);
+      }
+      for (const r of ramps) if (near(r.x - r.w / 2 + dx, r.x + r.w / 2 + dx, r.z - r.d / 2 + dz, r.z + r.d / 2 + dz)) this.ramps.push(Object.assign({}, r, { x: r.x + dx, z: r.z + dz }));
+      for (const p of pads) if (near(p.x + dx, p.x + dx, p.z + dz, p.z + dz)) this.pads.push(Object.assign({}, p, { x: p.x + dx, z: p.z + dz }));
+    }
+  },
+  // put a position back inside the tile
+  wrapPos(v) {
+    const W = this.map && this.map.wrap;
+    if (!W) return;
+    v.x -= W * Math.floor((v.x + W / 2) / W);
+    v.z -= W * Math.floor((v.z + W / 2) / W);
+  },
+  // shift q (any {x, z}) to its copy closest to `to`
+  nearestCopy(q, to) {
+    const W = this.map && this.map.wrap;
+    if (!W) return q;
+    q.x += W * Math.round((to.x - q.x) / W);
+    q.z += W * Math.round((to.z - q.z) / W);
+    return q;
   },
 
   animate(t, dt) {
@@ -392,6 +444,7 @@ const World = {
 
   // height of the highest surface under (x, z) at or below y (-Infinity over the void)
   floorBelow(x, y, z) {
+    if (this.map && this.map.wrap) { const v = { x, z }; this.wrapPos(v); x = v.x; z = v.z; }
     let best = -Infinity;
     for (const b of this.boxes) {
       const t = b.max.y;
