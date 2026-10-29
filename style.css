@@ -390,3 +390,4 @@ button { font-family: inherit; }
 .cos-row .pill { padding: 4px 9px; font-size: 12px; }
 .cos-row input[type=range] { flex: 1; }
 .cos-row b { width: 38px; font-size: 12px; text-align: right; }
+.glint-color { width: 34px; height: 26px; padding: 0; border: 2px solid var(--ink); background: none; cursor: pointer; }

@@ -215,7 +215,48 @@ function paintScamp(c, mat, baseColor, style, t) {
     col.needsUpdate = true;
   }
 }
+// glint: a streaky shimmer tilted 45 degrees that slides diagonally (toward the bottom left) over
+// the whole character, in the player's chosen color. It uses assets/glint.png; a drawn stand-in is
+// used until it loads (or if it can't, e.g. opening the game straight from a file).
+const GLINT_TEX = (() => {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const g = cv.getContext('2d');
+  let seed = 21;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let x = 0; x < 64; x++) {
+    // vertical streaks: noisy brightness with two soft bright bands
+    const band = Math.max(Math.exp(-(((x - 19) / 5) ** 2)), Math.exp(-(((x - 44) / 4) ** 2)));
+    const v = Math.min(255, Math.round(70 + rnd() * 70 + band * 140));
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.fillRect(x, 0, 1, 64);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.center.set(0.5, 0.5);
+  t.rotation = -Math.PI / 4;
+  const img = new Image();
+  img.onload = () => { t.image = img; t.needsUpdate = true; };
+  if (location.protocol !== 'file:') img.src = 'assets/glint.png';
+  return t;
+})();
+function setGlint(c, color) {
+  if (!c.glint) {
+    if (!color) return;
+    c.glintMat = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    c.glint = [];
+    const meshes = [];
+    c.rig.traverse((o) => { if (o.isMesh && c.xray.indexOf(o) < 0 && o.material !== c.eyeMat) meshes.push(o); });
+    for (const m of meshes) { const g = new THREE.Mesh(m.geometry, c.glintMat); g.renderOrder = 2; m.add(g); c.glint.push(g); }
+  }
+  for (const g of c.glint) g.visible = !!color;
+  if (color) c.glintMat.color.set(color);
+}
+
 function applyCos(c, cos, t) {
+  setGlint(c, cos && cos.glint ? cos.glintColor : null);
+  if (cos && cos.glint) GLINT_TEX.offset.x = -((performance.now() / 1000 * 0.35) % 1);   // one shared clock, all glints in step
   const rb = cos && cos.rb !== 'off' ? cos.rb : null, style = cos && cos.rbStyle === 'pulse' ? 'pulse' : 'wave';
   paintScamp(c, c.fur, c.base.body, rb === 'body' || rb === 'both' ? style : null, t);
   paintScamp(c, c.eyeMat, c.base.eye, rb === 'eyes' || rb === 'both' ? style : null, t + 0.3);

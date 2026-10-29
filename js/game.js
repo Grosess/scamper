@@ -582,7 +582,8 @@ function stepFx(dt) {
   }
 }
 function onBoom(id, p, out) {
-  const [x, y, z] = p, cy = y + 1.4;
+  const at = World.nearestCopy({ x: p[0], z: p[2] }, me.pos);
+  const x = at.x, y = p[1], z = at.z, cy = y + 1.4;
   const fire = new THREE.Mesh(FX_SPHERE, new THREE.MeshBasicMaterial({ color: '#fff3b0', transparent: true, depthWrite: false, fog: false }));
   fire.position.set(x, cy, z);
   addFx(fire, 0.6, (o, u) => {
@@ -644,7 +645,7 @@ const players = new Map();  // id -> { id, name, color, tp (latest position), ya
 let myId = null;
 
 // cosmetics (see applyCos in character.js) - cleaned up, since they come over the network
-const COS_DEFAULT = { rb: 'off', rbStyle: 'wave', ghost: false, ghostOp: 0.45, neon: false };
+const COS_DEFAULT = { rb: 'off', rbStyle: 'wave', ghost: false, ghostOp: 0.45, neon: false, glint: false, glintColor: '#8f5bff' };
 function pickCos(c) {
   if (!c || typeof c !== 'object') return null;
   return {
@@ -653,6 +654,8 @@ function pickCos(c) {
     ghost: !!c.ghost,
     ghostOp: Math.max(0.2, Math.min(0.9, +c.ghostOp || 0.45)),
     neon: !!c.neon,
+    glint: !!c.glint,
+    glintColor: isHex(c.glintColor) ? c.glintColor : '#8f5bff',
   };
 }
 const myCos = () => (settings.unlocked ? pickCos(Object.assign({}, COS_DEFAULT, settings.cos || {})) : null);
@@ -1147,6 +1150,15 @@ function computeResult(sub) {
   return { mode: game.mode, winners: [], title: 'Round over', sub: sub || '', lines: [] };
 }
 
+// distance the short way round (endless maps wrap at the edges)
+const wrapTmp = new THREE.Vector3();
+function wrapDist(a, b) {
+  const W = World.map.wrap;
+  let dx = a.x - b.x, dz = a.z - b.z;
+  if (W) { dx -= W * Math.round(dx / W); dz -= W * Math.round(dz / W); }
+  return Math.hypot(dx, a.y - b.y, dz);
+}
+
 function posOf(id) {
   if (id === myId) return me.pos;
   const p = players.get(id);
@@ -1161,7 +1173,7 @@ function hostTryTag(tagger, target) {
   // same allowance for every player, host included: contact range + room for lag
   const a = posOf(tagger), b = posOf(target);
   const reach = CONFIG.tag.touchRange + (game.mode === 'duel' ? CONFIG.tag.duelReachBonus : 0) + CONFIG.tag.lagSlack;
-  if (!a || !b || a.distanceTo(b) > reach) return;
+  if (!a || !b || wrapDist(a, b) > reach) return;
   if (game.scores[tagger]) game.scores[tagger].tags++;
   if (game.mode === 'duel') {
     Net.broadcast({ t: 'tagev', from: tagger, to: target });
@@ -1275,7 +1287,7 @@ function hostTick(dt) {
           const c = crownSpot();
           for (const id of players.keys()) {
             const p = posOf(id);
-            if (p && Math.hypot(p.x - c[0], p.y + 0.9 - (c[1] + 1.2), p.z - c[2]) < 1.8) { hostCrown(id, `${nameOf(id)} grabbed the crown!`); break; }
+            if (p && wrapDist(p, { x: c[0], y: c[1] + 0.3, z: c[2] }) < 1.8) { hostCrown(id, `${nameOf(id)} grabbed the crown!`); break; }
           }
         }
       }
@@ -1872,6 +1884,7 @@ function updateGame(dt) {
   let wt = worldTime() - acc;
   while (acc >= STEP && n < 10) { wt += STEP; World.updateMovers(wt); me.step(STEP, inp); acc -= STEP; n++; }
   if (n >= 10) acc = 0;
+  World.wrapPos(me.pos);   // endless maps: off one edge, in at the other
 
   // the void. On a race course: straight back to the start. Elsewhere: a random spawn
   // (and in a duel your opponent scores, in King of the Tag you drop the crown)
@@ -1992,13 +2005,18 @@ function updateGame(dt) {
 
   // other players
   const k = ease(14);
-  let nearestSeeker = Infinity;
+  let nearestSeeker = Infinity, oppDist = Infinity;
   for (const p of players.values()) {
     const a = p.avatar;
     if (!a) continue;
     const px = a.root.position.x, py = a.root.position.y, pz = a.root.position.z;
+    // endless maps: chase their copy nearest to where we last drew them (no lerping across the
+    // whole tile when they wrap), then draw them at the copy nearest to me
+    wrapTmp.copy(p.tp);
+    World.nearestCopy(wrapTmp, a.root.position);
     if (p.snapNext) { a.root.position.copy(p.tp); p.snapNext = false; }
-    else a.root.position.lerp(p.tp, k);
+    else a.root.position.lerp(wrapTmp, k);
+    World.nearestCopy(a.root.position, me.pos);
     const sp = Math.min(30, Math.hypot(a.root.position.x - px, a.root.position.z - pz) / dt);
     a.spd += (sp - a.spd) * ease(8);
     a.vy += (Math.max(-30, Math.min(30, (a.root.position.y - py) / dt)) - a.vy) * ease(8);
@@ -2026,6 +2044,7 @@ function updateGame(dt) {
     if (a.marker.visible) { a.marker.material.color.set(xr); a.marker.scale.set(0.45, 0.45, 1).multiplyScalar(0.8 + Math.min(1.6, dist / 18)); }
     a.bodyMat.emissive.setHex(it && game.mode === 'bomb' ? 0x3a0806 : 0x000000);
     // how close is the danger (for the heartbeat + red vignette)
+    if (go && !isOut(myId) && (canTagPair(myId, p.id) || canTagPair(p.id, myId))) oppDist = Math.min(oppDist, dist);
     if (go && !isOut(myId) && ((game.mode === 'bomb' && it && !isIt(myId)) || (game.mode === 'duel' && it && !isIt(myId) && inDuel(myId))
       || (game.mode === 'koth' && isIt(myId)))) nearestSeeker = Math.min(nearestSeeker, dist);
     // blob shadow on whatever is under them, fading as they get higher
@@ -2043,6 +2062,7 @@ function updateGame(dt) {
   if (looseCrown.visible) {
     const c = crownSpot(), t = performance.now() / 1000;
     looseCrown.position.set(c[0], c[1] + 1.2 + Math.sin(t * 2) * 0.15, c[2]);
+    World.nearestCopy(looseCrown.position, me.pos);
     looseCrown.userData.crown.rotation.y = t * 1.5;
   }
   const holding = playing && game.mode === 'bomb' && isIt(myId);
@@ -2055,6 +2075,7 @@ function updateGame(dt) {
   bombAudio(dt, fuseFrac);
   stepFx(dt);
 
+  autoTaunt(dt, oppDist);
   talkT = Math.max(0, talkT - dt);
   updateHud(hs, frozen, nearestSeeker);
   twoPlayerFx(dt, nearestSeeker);
@@ -2062,6 +2083,19 @@ function updateGame(dt) {
   if (sbTimer > 0.25 || boardDirty) { sbTimer = 0; boardDirty = false; renderBoard(); }
 }
 let finishSentAt = 0, boardDirty = true, beepT = 0;
+
+// you chatter by yourself after a near miss, and now and then during a close chase
+let chaseT = 0, autoTauntAt = 0, nearMiss = false;
+function autoTaunt(dt, d) {
+  const now = performance.now();
+  if (d < 2.4) nearMiss = true;
+  else if (nearMiss && d > 4.5) {
+    nearMiss = false;
+    if (now - autoTauntAt > 2000) { autoTauntAt = now; taunt(1.0); }
+  }
+  chaseT = d < 7 ? chaseT + dt : 0;
+  if (chaseT > 1.5 && now - autoTauntAt > 3500 + Math.random() * 4000) { autoTauntAt = now; taunt(0.8); }
+}
 
 // fuse hiss + beeps: loud for whoever holds it, quieter the farther you are; beeps speed up at the end
 function bombAudio(dt, frac) {
@@ -2437,15 +2471,18 @@ function renderCos() {
   $('ghostOpVal').textContent = `${Math.round(c.ghostOp * 100)}%`;
   $('ghostOpRow').classList.toggle('hidden', !c.ghost);
   $('rbStyleRow').classList.toggle('hidden', c.rb === 'off');
+  $('glintColor').value = c.glintColor;
+  $('glintColor').classList.toggle('hidden', !c.glint);
 }
 const setCos = (k, v) => { settings.cos = Object.assign({}, COS_DEFAULT, settings.cos || {}, { [k]: v }); saveSettings(); renderCos(); };
 $('cosPanel').addEventListener('click', (e) => {
   const b = e.target.closest('.pill'), g = b && b.closest('.pills[data-k]');
   if (!g) return;
   const k = g.dataset.k, v = b.dataset.v;
-  setCos(k, k === 'ghost' || k === 'neon' ? v === 'true' : v);
+  setCos(k, k === 'ghost' || k === 'neon' || k === 'glint' ? v === 'true' : v);
 });
 $('ghostOp').addEventListener('input', (e) => setCos('ghostOp', Math.max(0.2, +e.target.value / 100)));
+$('glintColor').addEventListener('input', (e) => setCos('glintColor', e.target.value));
 renderCos();
 
 function getName() {
