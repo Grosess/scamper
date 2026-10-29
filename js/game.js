@@ -16,7 +16,7 @@ if (typeof THREE === 'undefined' || typeof Peer === 'undefined') {
 
 // ---------- settings ----------
 const settings = Object.assign(
-  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false, skin: '', unlocked: false },
+  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false, unlocked: false, cos: null },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 // P used to be pause - it's look-behind now
@@ -490,9 +490,6 @@ function makeAvatar(p) {
   return { root, rig: c.rig, scamp: c, bodyMat: c.fur, label, marker, bomb, crown, blob, spd: 0, vy: 0 };
 }
 
-// rainbow skin: the body slowly cycles through the colors
-function rainbow(c, t) { c.fur.color.setHSL((t * 0.12) % 1, 0.75, 0.62); }
-
 // --- props: the bomb (blinks red faster and faster, fuse burns down) and the crown ---
 function makeBomb(scale) {
   const g = new THREE.Group();
@@ -646,15 +643,24 @@ function removeAvatar(p) {
 const players = new Map();  // id -> { id, name, color, tp (latest position), yaw, pitch, mode, avatar }
 let myId = null;
 
-// cosmetic skins (unlocked with a secret code): '' normal, 'rainbow', 'ghost'
-const SKINS = ['', 'rainbow', 'ghost'];
-const pickSkin = (s) => (SKINS.includes(s) ? s : '');
-const mySkin = () => (settings.unlocked ? pickSkin(settings.skin) : '');
-function ensurePlayer(id, name, color, eye = '#ffffff', skin = '') {
+// cosmetics (see applyCos in character.js) - cleaned up, since they come over the network
+const COS_DEFAULT = { rb: 'off', rbStyle: 'wave', ghost: false, ghostOp: 0.45, neon: false };
+function pickCos(c) {
+  if (!c || typeof c !== 'object') return null;
+  return {
+    rb: ['off', 'body', 'eyes', 'both'].includes(c.rb) ? c.rb : 'off',
+    rbStyle: c.rbStyle === 'pulse' ? 'pulse' : 'wave',
+    ghost: !!c.ghost,
+    ghostOp: Math.max(0.2, Math.min(0.9, +c.ghostOp || 0.45)),
+    neon: !!c.neon,
+  };
+}
+const myCos = () => (settings.unlocked ? pickCos(Object.assign({}, COS_DEFAULT, settings.cos || {})) : null);
+function ensurePlayer(id, name, color, eye = '#ffffff', cos = null) {
   let p = players.get(id);
-  if (p) p.skin = skin;
+  if (p) p.cos = cos;
   if (!p) {
-    p = { id, name, color, eye, skin, talk: false, tp: new THREE.Vector3(0, -100, 0), yaw: 0, pitch: 0, mode: 0, snapNext: true, avatar: null };
+    p = { id, name, color, eye, cos, talk: false, tp: new THREE.Vector3(0, -100, 0), yaw: 0, pitch: 0, mode: 0, snapNext: true, avatar: null };
     players.set(id, p);
     if (id !== myId) p.avatar = makeAvatar(p);
   } else if (p.name !== name || p.color !== color || p.eye !== eye) {
@@ -754,12 +760,14 @@ const ord = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 
 
 // what the last applied state looked like (the host edits `game` before applying, so compare to this)
 const seen = { phase: 'lobby', it: [], chase: 0, out: false };
+let gotState = false;
 function applyState(s) {
+  gotState = true;
   const wasIt = seen.it.includes(myId), oldPhase = seen.phase, oldIt = seen.it;
   const oldChase = seen.chase, wasOut = seen.out;
   const ids = new Set(s.roster.map((r) => r.id));
   for (const id of [...players.keys()]) if (!ids.has(id)) removePlayer(id);
-  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickSkin(r.skin));
+  for (const r of s.roster) ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickCos(r.cos));
 
   if (s.map && (!World.map || s.map !== World.map.id)) loadMap(s.map);
   game.phase = s.phase;
@@ -876,7 +884,7 @@ function buildState() {
     duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
     scores: game.scores, result: game.result,
-    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye, skin: p.skin || '' })),
+    roster: [...players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color, eye: p.eye, cos: p.cos || null })),
   };
 }
 function pushState() {
@@ -1178,7 +1186,7 @@ function hostTryTag(tagger, target) {
 
 function hostHandle(from, m) {
   if (m.t === 'hello') {
-    if (players.has(from)) return;
+    if (players.has(from)) { Net.sendTo(from, buildState()); return; }
     if (m.v !== CONFIG.version) {
       // different versions can't play together - tell them exactly what to do
       Net.sendTo(from, { t: 'oldver', v: CONFIG.version });
@@ -1191,7 +1199,7 @@ function hostHandle(from, m) {
       return;
     }
     const name = uniqueName(cleanName(m.name));
-    ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye), pickSkin(m.skin));
+    ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye), pickCos(m.cos));
     game.scores[from] = { tags: 0 };
     if (isPlaying() && game.mode === 'koth') game.koth.pts[from] = 0;
     hostFeed(`${name} joined`);
@@ -1351,6 +1359,14 @@ Net.onMessage = (from, m) => {
   else if (from === 'host') clientHandle(m);
 };
 Net.onLeave = (id) => { if (Net.isHost) hostOnLeave(id); };
+// the joiner's connection finished opening on our side: if they already said hello, send them
+// everything again (anything sent before this point was dropped)
+Net.onOpen = (id) => {
+  if (!Net.isHost || !players.has(id)) return;
+  Net.sendTo(id, buildState());
+  const p = players.get(id);
+  Net.sendTo(id, { t: 'tp', p: [p.tp.x, p.tp.y, p.tp.z] });
+};
 Net.onLost = () => {
   if (!inGame) return;
   inGame = false;
@@ -1995,9 +2011,8 @@ function updateGame(dt) {
     a.bomb.visible = it && game.mode === 'bomb';
     if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
     a.crown.visible = it && game.mode === 'koth';
-    setScampGhost(a.scamp, isOut(p.id) ? 0.25 : p.skin === 'ghost' ? 0.45 : 1);
-    if (p.skin === 'rainbow') { rainbow(a.scamp, now); a.rainbow = true; }
-    else if (a.rainbow) { a.bodyMat.color.set(p.color); a.rainbow = false; }
+    setScampGhost(a.scamp, isOut(p.id) ? 0.25 : p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
+    applyCos(a.scamp, p.cos, now);
     a.label.material.opacity = isOut(p.id) ? 0.4 : 1;
     // see-through outline of whoever matters to you right now
     let xr = null;
@@ -2367,8 +2382,9 @@ const preview = (() => {
       chat -= dt;
       if (chat < -4 - Math.random() * 3) chat = 0.9;
       animateScamp(c, dt, t, 0, 0, false, chat > 0);
-      setScampGhost(c, mySkin() === 'ghost' ? 0.45 : 1);
-      if (mySkin() === 'rainbow') rainbow(c, t); else if (c.fur.color.getHexString() !== new THREE.Color(settings.color).getHexString()) c.fur.color.set(settings.color);
+      const cos = myCos();
+      setScampGhost(c, cos && cos.ghost ? cos.ghostOp : 1);
+      applyCos(c, cos, t);
       r.render(sc, cam);
     },
   };
@@ -2402,29 +2418,35 @@ async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
+// the box is invisible and gives no feedback: type the code into it and the Cosmetics panel appears
 $('secretCode').addEventListener('input', async (e) => {
   const v = e.target.value.trim();
+  if (v.length > 40) e.target.value = '';
   if (!v || !window.crypto || !crypto.subtle) return;
   if (await sha256(v) !== SECRET) return;
   e.target.value = '';
   settings.unlocked = true;
   saveSettings();
-  renderSkins();
-  e.target.placeholder = 'unlocked!';
-  tone(660, 990, 0.12, 'triangle', 0.08); tone(990, 1480, 0.18, 'triangle', 0.08, 0.1);
+  renderCos();
 });
-function renderSkins() {
-  $('skinRow').classList.toggle('hidden', !settings.unlocked);
-  $('skinPills').querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === (settings.skin || '')));
+function renderCos() {
+  $('cosPanel').classList.toggle('hidden', !settings.unlocked);
+  const c = Object.assign({}, COS_DEFAULT, settings.cos || {});
+  $('cosPanel').querySelectorAll('.pills[data-k]').forEach((g) => g.querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === String(c[g.dataset.k]))));
+  $('ghostOp').value = Math.round(c.ghostOp * 100);
+  $('ghostOpVal').textContent = `${Math.round(c.ghostOp * 100)}%`;
+  $('ghostOpRow').classList.toggle('hidden', !c.ghost);
+  $('rbStyleRow').classList.toggle('hidden', c.rb === 'off');
 }
-$('skinPills').onclick = (e) => {
-  const b = e.target.closest('.pill');
-  if (!b) return;
-  settings.skin = pickSkin(b.dataset.v);
-  saveSettings();
-  renderSkins();
-};
-renderSkins();
+const setCos = (k, v) => { settings.cos = Object.assign({}, COS_DEFAULT, settings.cos || {}, { [k]: v }); saveSettings(); renderCos(); };
+$('cosPanel').addEventListener('click', (e) => {
+  const b = e.target.closest('.pill'), g = b && b.closest('.pills[data-k]');
+  if (!g) return;
+  const k = g.dataset.k, v = b.dataset.v;
+  setCos(k, k === 'ghost' || k === 'neon' ? v === 'true' : v);
+});
+$('ghostOp').addEventListener('input', (e) => setCos('ghostOp', Math.max(0.2, +e.target.value / 100)));
+renderCos();
 
 function getName() {
   const n = cleanName($('name').value);
@@ -2460,7 +2482,7 @@ $('hostBtn').onclick = () => {
   Net.host((err) => {
     if (err) { setStatus(err, true); menuBusy(false); return; }
     myId = Net.id;
-    ensurePlayer(myId, name, pickColor(settings.color), pickEye(settings.eye), mySkin());
+    ensurePlayer(myId, name, pickColor(settings.color), pickEye(settings.eye), myCos());
     game.scores[myId] = { it: 0, tags: 0 };
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
@@ -2489,7 +2511,11 @@ function join() {
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
     enterGame();
-    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, skin: mySkin() });
+    const hello = { t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, cos: myCos() };
+    Net.send(hello);
+    // say hello again until the host answers (a hello sent too early can get lost)
+    let tries = 0;
+    const again = setInterval(() => { if (gotState || ++tries > 10 || !inGame) clearInterval(again); else Net.send(hello); }, 1000);
   });
 }
 $('joinBtn').onclick = join;

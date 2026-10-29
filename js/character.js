@@ -85,7 +85,8 @@ function buildScamp(color, eyeColor = '#ffffff') {
   };
   const arms = [arm(-1), arm(1)], legs = [leg(-1), leg(1)];
 
-  const c = { rig, torso, head, arms, legs, eyes, fur, mats: [fur, eyeMat, mouthMat, outline], phase: 0, blink: 2 + Math.random() * 3, squash: 0, wasAir: false, open: 0 };
+  const c = { rig, torso, head, arms, legs, eyes, fur, eyeMat, outline, mats: [fur, eyeMat, mouthMat, outline], phase: 0, blink: 2 + Math.random() * 3, squash: 0, wasAir: false, open: 0,
+    base: { body: base.clone(), eye: new THREE.Color(eyeColor), line: outline.color.clone() } };
   addXray(c);
   return c;
 }
@@ -176,4 +177,55 @@ function animateScamp(c, dt, t, speed, mode, airborne, talking) {
   const shut = c.blink < 0.12;
   if (c.blink < 0) c.blink = 2 + Math.random() * 3.5;
   for (const e of c.eyes) e.scale.y = shut ? 0.15 : 1;
+}
+
+// --- cosmetics (unlocked with a secret code; everyone in the lobby sees them) ---
+//   cos = { rb: 'off'|'body'|'eyes'|'both', rbStyle: 'wave'|'pulse', ghost: bool, ghostOp: 0.2-0.9, neon: bool }
+// rainbow 'pulse' cycles the whole color; 'wave' runs bands of color up across the block, like an
+// enchanted item's shimmer. ghost = see-through. neon = glowing outlines that cycle through colors.
+const _hsl = new THREE.Color();
+function scampParts(c, mat) {
+  const key = mat === c.fur ? '_body' : '_eyes';
+  if (c[key]) return c[key];
+  const list = [];
+  c.rig.traverse((o) => {
+    if (!o.isMesh || o.material !== mat) return;
+    // a rough "height on the body" per vertex, so the wave climbs up the whole character
+    let oy = 0, ox = 0;
+    for (let q = o; q && q !== c.rig; q = q.parent) { oy += q.position.y; ox += q.position.x; }
+    const pos = o.geometry.attributes.position, phase = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) phase[i] = (pos.getY(i) + oy) * 1.6 + (pos.getX(i) + ox) * 0.9;
+    if (!o.geometry.attributes.color) o.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(pos.count * 3).fill(1), 3));
+    list.push({ geo: o.geometry, phase });
+  });
+  return (c[key] = list);
+}
+function paintScamp(c, mat, baseColor, style, t) {
+  const wave = style === 'wave';
+  if (mat.vertexColors !== wave) { mat.vertexColors = wave; mat.needsUpdate = true; }
+  if (!style) { mat.color.copy(baseColor); return; }
+  if (!wave) { mat.color.setHSL((t * 0.15) % 1, 0.75, 0.62); return; }
+  mat.color.set(0xffffff);
+  for (const { geo, phase } of scampParts(c, mat)) {
+    const col = geo.attributes.color;
+    for (let i = 0; i < phase.length; i++) {
+      _hsl.setHSL((((t * 0.45 - phase[i] * 0.35) % 1) + 1) % 1, 0.8, 0.62);
+      col.setXYZ(i, _hsl.r, _hsl.g, _hsl.b);
+    }
+    col.needsUpdate = true;
+  }
+}
+function applyCos(c, cos, t) {
+  const rb = cos && cos.rb !== 'off' ? cos.rb : null, style = cos && cos.rbStyle === 'pulse' ? 'pulse' : 'wave';
+  paintScamp(c, c.fur, c.base.body, rb === 'body' || rb === 'both' ? style : null, t);
+  paintScamp(c, c.eyeMat, c.base.eye, rb === 'eyes' || rb === 'both' ? style : null, t + 0.3);
+  if (cos && cos.neon) {
+    c.outline.color.setHSL((t * 0.3) % 1, 1, 0.6);
+    c.fur.emissive.setHSL((t * 0.3) % 1, 1, 0.12);
+    c.neonOn = true;
+  } else if (c.neonOn) {
+    c.outline.color.copy(c.base.line);
+    c.fur.emissive.set(0x000000);
+    c.neonOn = false;
+  }
 }

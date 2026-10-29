@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -48,9 +48,13 @@
               <label class="half" id="bodySwatch"><span>Body</span><input type="color" id="bodyColor" aria-label="Body color"></label>
               <label class="half" id="eyeSwatch"><span>Eyes</span><input type="color" id="eyeColor" aria-label="Eye color"></label>
             </div>
-            <div id="skinRow" class="hidden">
+            <div id="cosPanel" class="cos-panel hidden">
               <div class="field">Cosmetics</div>
-              <div id="skinPills" class="pills"><button class="pill" data-v="">Normal</button><button class="pill" data-v="rainbow">Rainbow</button><button class="pill" data-v="ghost">Ghost</button></div>
+              <div class="cos-row"><span>Rainbow</span><div class="pills" data-k="rb"><button class="pill" data-v="off">Off</button><button class="pill" data-v="body">Body</button><button class="pill" data-v="eyes">Eyes</button><button class="pill" data-v="both">Both</button></div></div>
+              <div class="cos-row" id="rbStyleRow"><span>Style</span><div class="pills" data-k="rbStyle"><button class="pill" data-v="wave">Wave</button><button class="pill" data-v="pulse">Pulse</button></div></div>
+              <div class="cos-row"><span>Ghost</span><div class="pills" data-k="ghost"><button class="pill" data-v="false">Off</button><button class="pill" data-v="true">On</button></div></div>
+              <div class="cos-row" id="ghostOpRow"><span>Visibility</span><input type="range" id="ghostOp" min="20" max="90" step="5"><b id="ghostOpVal"></b></div>
+              <div class="cos-row"><span>Neon</span><div class="pills" data-k="neon"><button class="pill" data-v="false">Off</button><button class="pill" data-v="true">On</button></div></div>
             </div>
           </div>
 
@@ -252,7 +256,7 @@
         <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, a bit less sharp, smoother)</label>
         <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
       </div>
-      <input id="secretCode" class="secret-code" maxlength="32" autocomplete="off" spellcheck="false" placeholder="·" aria-label="Code">
+      <input id="secretCode" class="secret-code" maxlength="64" autocomplete="off" spellcheck="false" aria-hidden="true" tabindex="-1">
     </div>
 
     <div id="controlsPanel" class="tile">
@@ -275,20 +279,20 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/config.js?v=11"></script>
-  <script src="js/map.js?v=11"></script>
-  <script src="js/maps/rooftops.js?v=11"></script>
-  <script src="js/maps/shipyard.js?v=11"></script>
-  <script src="js/maps/corridors.js?v=11"></script>
-  <script src="js/maps/fog.js?v=11"></script>
-  <script src="js/maps/playhouse.js?v=11"></script>
-  <script src="js/maps/moon.js?v=11"></script>
-  <script src="js/maps/climb.js?v=11"></script>
-  <script src="js/maps/gauntlet.js?v=11"></script>
-  <script src="js/character.js?v=11"></script>
-  <script src="js/world.js?v=11"></script>
-  <script src="js/player.js?v=11"></script>
-  <script src="js/net.js?v=11"></script>
-  <script src="js/game.js?v=11"></script>
+  <script src="js/config.js?v=12"></script>
+  <script src="js/map.js?v=12"></script>
+  <script src="js/maps/rooftops.js?v=12"></script>
+  <script src="js/maps/shipyard.js?v=12"></script>
+  <script src="js/maps/corridors.js?v=12"></script>
+  <script src="js/maps/fog.js?v=12"></script>
+  <script src="js/maps/playhouse.js?v=12"></script>
+  <script src="js/maps/moon.js?v=12"></script>
+  <script src="js/maps/climb.js?v=12"></script>
+  <script src="js/maps/gauntlet.js?v=12"></script>
+  <script src="js/character.js?v=12"></script>
+  <script src="js/world.js?v=12"></script>
+  <script src="js/player.js?v=12"></script>
+  <script src="js/net.js?v=12"></script>
+  <script src="js/game.js?v=12"></script>
 </body>
 </html>
