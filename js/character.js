@@ -235,6 +235,7 @@ const GLINT_TEX = (() => {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.center.set(0.5, 0.5);
   t.rotation = -Math.PI / 4;
+  t.repeat.set(0.14, 0.14);   // zoomed way in: only a few broad soft bands cross the character
   const img = new Image();
   img.onload = () => { t.image = img; t.needsUpdate = true; };
   if (location.protocol !== 'file:') img.src = 'assets/glint.png';
@@ -243,7 +244,7 @@ const GLINT_TEX = (() => {
 function setGlint(c, color) {
   if (!c.glint) {
     if (!color) return;
-    c.glintMat = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending,
+    c.glintMat = new THREE.MeshBasicMaterial({ map: GLINT_TEX, color, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     c.glint = [];
     const meshes = [];
@@ -256,7 +257,7 @@ function setGlint(c, color) {
 
 function applyCos(c, cos, t) {
   setGlint(c, cos && cos.glint ? cos.glintColor : null);
-  if (cos && cos.glint) GLINT_TEX.offset.x = -((performance.now() / 1000 * 0.35) % 1);   // one shared clock, all glints in step
+  if (cos && cos.glint) GLINT_TEX.offset.x = -((performance.now() / 1000 * 0.07) % 1);   // one shared clock, all glints in step
   const rb = cos && cos.rb !== 'off' ? cos.rb : null, style = cos && cos.rbStyle === 'pulse' ? 'pulse' : 'wave';
   paintScamp(c, c.fur, c.base.body, rb === 'body' || rb === 'both' ? style : null, t);
   paintScamp(c, c.eyeMat, c.base.eye, rb === 'eyes' || rb === 'both' ? style : null, t + 0.3);
