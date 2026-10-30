@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=36">
+  <link rel="stylesheet" href="style.css?v=37">
 </head>
 <body>
 
@@ -111,8 +111,8 @@
               <a href="#" id="accDelete" class="acc-delete">Delete my account</a>
             </div>
             <p id="accStatus" class="note"></p>
+            <a href="#" id="privacyLink" class="privacy-link">Privacy policy</a>
           </div>
-          <a href="#" id="privacyLink" class="privacy-link">privacy</a>
         </div>
       </section>
 
@@ -351,43 +351,74 @@
   <!-- privacy policy (Account page, bottom corner) -->
   <div id="privacy" class="screen center hidden">
     <div class="tile privacy">
-      <h2>Privacy</h2>
-      <p><b>Without an account</b>, Scamper keeps your settings and stats only in this browser (local storage). Nothing about you is sent anywhere except what other players in your game need to see: your guest name, your look and where you are.</p>
-      <p><b>With an account</b>, we store your name, a scrambled (salted scrypt hash) version of your password - never the password itself - your settings, stats, and the colors you've won. That's it: no email, no real name, no age, no location, no ads, no tracking, and nothing is sold or shared.</p>
-      <p><b>Playing online</b>: games connect players' browsers directly (WebRTC, through the free PeerJS matchmaking server), so the people in your game can see your network address the way any direct connection does. The host's game checks your account name and colors with our server.</p>
-      <p><b>Where it lives</b>: the site is hosted on Vercel and GitHub Pages; account data is in an Upstash database. They keep normal server logs.</p>
-      <p><b>Deleting</b>: Account → "Delete my account" removes your account and everything stored with it, right away. Logging out removes it from this computer.</p>
-      <p class="note">Last updated October 2026.</p>
+      <h2>Privacy policy</h2>
+      <p class="note">Last updated October 30, 2026</p>
+      <p>Scamper is a free browser game. We collect as little as possible, and we never sell or share it.</p>
+
+      <h3>Playing as a guest</h3>
+      <p>No account, nothing stored by us. Your settings and stats stay in this browser (local storage). You get a random guest name like "bobo".</p>
+
+      <h3>If you make an account</h3>
+      <p>We store only:</p>
+      <ul>
+        <li>your username (pick one that isn't your real name)</li>
+        <li>your password as a salted scrypt hash - never the password itself, and nobody, including us, can read it</li>
+        <li>your game settings and stats</li>
+        <li>the colors you've won</li>
+        <li>when the account was made and last saved</li>
+      </ul>
+      <p>We don't ask for or keep an email, real name, age, birthday, school, location, photos or contacts. No ads, no analytics, no tracking cookies.</p>
+
+      <h3>How it's used</h3>
+      <p>Only to run the game: log you in, keep your stuff on any computer, hand out prize colors, and let the host of your game check that your name and colors are really yours (they get your username and colors, nothing else).</p>
+
+      <h3>Playing online</h3>
+      <p>Games connect players' browsers directly (WebRTC, matched up through the free PeerJS server). Like any direct connection, the other players' browsers can see your network (IP) address. Other players see your username, look and movements while you play.</p>
+
+      <h3>Who stores it</h3>
+      <p>The game is hosted on Vercel and GitHub Pages, and account data is kept in an Upstash database. These services keep their own normal server logs (for example IP addresses) for security.</p>
+
+      <h3>Keeping it safe</h3>
+      <p>Everything travels over HTTPS. Logins are rate-limited against guessing. A login lasts 60 days on a device, or until you log out.</p>
+
+      <h3>Deleting it</h3>
+      <p>Account &rarr; "Delete my account" removes your account and everything stored with it, right away and for good. Logging out removes it from this computer. Clearing your browser data removes guest settings and stats.</p>
+
+      <h3>Kids</h3>
+      <p>Scamper is made for students. Because we don't collect personal information, please don't put your real name or anything personal in your username.</p>
+
+      <h3>Questions or changes</h3>
+      <p>Questions: open an issue at github.com/Grosess/scamper. If this policy changes, the date at the top changes too.</p>
       <button id="privacyClose" class="btn">Close</button>
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=36"></script>
-  <script src="js/config.js?v=36"></script>
-  <script src="js/map.js?v=36"></script>
-  <script src="js/maps/rooftops.js?v=36"></script>
-  <script src="js/maps/shipyard.js?v=36"></script>
-  <script src="js/maps/corridors.js?v=36"></script>
-  <script src="js/maps/fog.js?v=36"></script>
-  <script src="js/maps/playhouse.js?v=36"></script>
-  <script src="js/maps/moon.js?v=36"></script>
-  <script src="js/maps/kitchen.js?v=36"></script>
-  <script src="js/maps/clocktower.js?v=36"></script>
-  <script src="js/maps/lab.js?v=36"></script>
-  <script src="js/maps/skatepark.js?v=36"></script>
-  <script src="js/maps/bounce.js?v=36"></script>
-  <script src="js/maps/infinite.js?v=36"></script>
-  <script src="js/maps/climb.js?v=36"></script>
-  <script src="js/maps/chambers.js?v=36"></script>
-  <script src="js/maps/volcano.js?v=36"></script>
-  <script src="js/character.js?v=36"></script>
-  <script src="js/world.js?v=36"></script>
-  <script src="js/player.js?v=36"></script>
-  <script src="js/bots.js?v=36"></script>
-  <script src="js/net.js?v=36"></script>
-  <script src="js/items.js?v=36"></script>
-  <script src="js/account.js?v=36"></script>
-  <script src="js/game.js?v=36"></script>
+  <script src="js/look.js?v=37"></script>
+  <script src="js/config.js?v=37"></script>
+  <script src="js/map.js?v=37"></script>
+  <script src="js/maps/rooftops.js?v=37"></script>
+  <script src="js/maps/shipyard.js?v=37"></script>
+  <script src="js/maps/corridors.js?v=37"></script>
+  <script src="js/maps/fog.js?v=37"></script>
+  <script src="js/maps/playhouse.js?v=37"></script>
+  <script src="js/maps/moon.js?v=37"></script>
+  <script src="js/maps/kitchen.js?v=37"></script>
+  <script src="js/maps/clocktower.js?v=37"></script>
+  <script src="js/maps/lab.js?v=37"></script>
+  <script src="js/maps/skatepark.js?v=37"></script>
+  <script src="js/maps/bounce.js?v=37"></script>
+  <script src="js/maps/infinite.js?v=37"></script>
+  <script src="js/maps/climb.js?v=37"></script>
+  <script src="js/maps/chambers.js?v=37"></script>
+  <script src="js/maps/volcano.js?v=37"></script>
+  <script src="js/character.js?v=37"></script>
+  <script src="js/world.js?v=37"></script>
+  <script src="js/player.js?v=37"></script>
+  <script src="js/bots.js?v=37"></script>
+  <script src="js/net.js?v=37"></script>
+  <script src="js/items.js?v=37"></script>
+  <script src="js/account.js?v=37"></script>
+  <script src="js/game.js?v=37"></script>
 </body>
 </html>

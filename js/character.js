@@ -181,10 +181,10 @@ function animateScamp(c, dt, t, speed, mode, airborne, talking) {
   for (const e of c.eyes) e.scale.y = shut ? 0.15 : 1;
 }
 
-// --- cosmetics (unlocked with a secret code; everyone in the lobby sees them) ---
+// --- cosmetics (developer mode; everyone in the lobby sees them) ---
 //   cos = { rb: 'off'|'body'|'eyes'|'both', rbStyle: 'wave'|'pulse', ghost: bool, ghostOp: 0.2-0.9, neon: bool }
-// rainbow 'pulse' cycles the whole color; 'wave' runs bands of color up across the block, like an
-// enchanted item's shimmer. ghost = see-through. neon = glowing outlines that cycle through colors.
+// rainbow 'pulse' cycles the whole color; 'wave' rolls bands of color up the body like sea swells.
+// ghost = see-through. neon = a neon sign: dark body, glowing tube edges + eyes, a soft aura, a buzz.
 const _hsl = new THREE.Color();
 function scampParts(c, mat) {
   const key = mat === c.fur ? '_body' : '_eyes';
@@ -193,12 +193,13 @@ function scampParts(c, mat) {
   c.rig.traverse((o) => {
     if (!o.isMesh || o.material !== mat) return;
     // a rough "height on the body" per vertex, so the wave climbs up the whole character
-    let oy = 0, ox = 0;
-    for (let q = o; q && q !== c.rig; q = q.parent) { oy += q.position.y; ox += q.position.x; }
-    const pos = o.geometry.attributes.position, phase = new Float32Array(pos.count);
-    for (let i = 0; i < pos.count; i++) phase[i] = (pos.getY(i) + oy) * 1.6 + (pos.getX(i) + ox) * 0.9;
+    let oy = 0;
+    for (let q = o; q && q !== c.rig; q = q.parent) oy += q.position.y;
+    // height on the body: what the waves climb
+    const pos = o.geometry.attributes.position, ys = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) ys[i] = pos.getY(i) + oy;
     if (!o.geometry.attributes.color) o.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(pos.count * 3).fill(1), 3));
-    list.push({ geo: o.geometry, phase });
+    list.push({ geo: o.geometry, ys });
   });
   return (c[key] = list);
 }
@@ -208,10 +209,15 @@ function paintScamp(c, mat, baseColor, style, t) {
   if (!style) { mat.color.copy(baseColor); return; }
   if (!wave) { mat.color.setHSL((t * 0.15) % 1, 0.75, 0.62); return; }
   mat.color.set(0xffffff);
-  for (const { geo, phase } of scampParts(c, mat)) {
+  // the bands roll upward like swells: a steady climb plus a surge that changes size over time, so
+  // they rush up, slosh back down a little, and roll on. Purely vertical: every band is level.
+  const amp = 0.16 + 0.09 * Math.sin(t * 0.41) + 0.04 * Math.sin(t * 0.93 + 2);
+  const surge = t * 0.32 + amp * Math.sin(t * 1.9) + 0.05 * Math.sin(t * 3.3 + 1.2);
+  for (const { geo, ys } of scampParts(c, mat)) {
     const col = geo.attributes.color;
-    for (let i = 0; i < phase.length; i++) {
-      _hsl.setHSL((((t * 0.45 - phase[i] * 0.35) % 1) + 1) % 1, 0.8, 0.62);
+    for (let i = 0; i < ys.length; i++) {
+      const h = (((ys[i] * 0.55 - surge) % 1) + 1) % 1;
+      _hsl.setHSL(h, 0.8, 0.6 + 0.07 * Math.sin(h * Math.PI * 6));   // a lighter "foam" line in each band
       col.setXYZ(i, _hsl.r, _hsl.g, _hsl.b);
     }
     col.needsUpdate = true;
@@ -293,13 +299,44 @@ function applyCos(c, cos, t) {
   const rb = cos && cos.rb !== 'off' ? cos.rb : null, style = cos && cos.rbStyle === 'pulse' ? 'pulse' : 'wave';
   paintScamp(c, c.fur, c.base.body, rb === 'body' || rb === 'both' ? style : null, t);
   paintScamp(c, c.eyeMat, c.base.eye, rb === 'eyes' || rb === 'both' ? style : null, t + 0.3);
-  if (cos && cos.neon) {
-    c.outline.color.setHSL((t * 0.3) % 1, 1, 0.6);
-    c.fur.emissive.setHSL((t * 0.3) % 1, 1, 0.12);
-    c.neonOn = true;
-  } else if (c.neonOn) {
+  if (cos && cos.neon) neonScamp(c, t, rb);
+  else if (c.neonOn) {
     c.outline.color.copy(c.base.line);
     c.fur.emissive.set(0x000000);
+    for (const h of c.halos) h.visible = false;
     c.neonOn = false;
   }
+}
+// neon: like a neon sign. The body goes dark (a hint of its own color), the edges and eyes glow in a
+// color drifting between cyan and hot pink, a soft aura hangs around the blocks, and now and then
+// the tubes buzz and flicker.
+const NEON_A = new THREE.Color('#14f1ff'), NEON_B = new THREE.Color('#ff2fd0'), NEON_DARK = new THREE.Color('#0b0c16');
+const _neon = new THREE.Color();
+function neonScamp(c, t, rb) {
+  if (!c.halos) {
+    c.halos = [];
+    c.rig.traverse((o) => {
+      if (!o.isMesh || o.material !== c.fur) return;
+      for (const [s, op] of [[1.1, 0.3], [1.28, 0.1]]) {   // two shells: a bright rim and a wide soft glow
+        const h = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: op, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+        h.scale.setScalar(s);
+        h.userData.op = op;
+        o.add(h);
+        c.halos.push(h);
+      }
+    });
+  }
+  const dt = Math.max(0, Math.min(0.1, t - (c.neonT || t)));
+  c.neonT = t;
+  // the buzz: a short dim flicker every few seconds (sometimes two in a row)
+  c.flick = Math.max(0, (c.flick || 0) - dt);
+  if (!c.flick && Math.random() < dt * 0.35) c.flick = 0.06 + Math.random() * 0.12;
+  const on = c.flick ? (Math.sin(t * 90) > 0 ? 0.25 : 0.6) : 1;
+  _neon.copy(NEON_A).lerp(NEON_B, 0.5 + 0.5 * Math.sin(t * 0.8));
+  c.outline.color.copy(_neon).multiplyScalar(on * 1.6);
+  if (rb !== 'body' && rb !== 'both') c.fur.color.copy(c.base.body).lerp(NEON_DARK, 0.84);
+  c.fur.emissive.copy(_neon).multiplyScalar(0.07 * on);
+  if (rb !== 'eyes' && rb !== 'both') c.eyeMat.color.copy(_neon).lerp(new THREE.Color(0xffffff), 0.35).multiplyScalar(on);
+  for (const h of c.halos) { h.visible = true; h.material.color.copy(_neon); h.material.opacity = h.userData.op * on; }
+  c.neonOn = true;
 }
