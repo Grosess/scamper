@@ -431,8 +431,9 @@ button { font-family: inherit; }
 .palette .tier-row { grid-column: 1 / -1; font: 800 10px Rubik, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 0 0 6px; border-left: 5px solid var(--tc); color: var(--ink); }
 .palette .sw.locked { background: var(--panel-2) !important; border: 2px dashed var(--tc); cursor: default; position: relative; }
 .palette .sw.locked::after { content: '?'; position: absolute; inset: 0; display: grid; place-items: center; font: 800 12px Rubik, sans-serif; color: var(--line-2); }
-.palette .sw.taken { opacity: 0.35; cursor: not-allowed; }
-.palette .sw.locked:hover, .palette .sw.taken:hover { transform: none; box-shadow: none; }
+.palette .sw.taken { position: relative; opacity: 0.75; }
+.palette .sw.taken::after { content: '\21C4'; position: absolute; inset: 0; display: grid; place-items: center; font: 800 13px Rubik, sans-serif; color: var(--ink); text-shadow: 0 0 3px #fff; }
+.palette .sw.locked:hover { transform: none; box-shadow: none; }
 .palette .pal-msg { grid-column: 1 / -1; font-size: 13px; color: var(--muted); padding: 4px; }
 .palette .pal-msg a { color: var(--ink); font-weight: 700; cursor: pointer; text-decoration: underline; }
 .palette { max-height: 300px; overflow-y: auto; }

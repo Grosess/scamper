@@ -1992,7 +1992,7 @@ function paletteHTML(part) {
   return ITEMS.TIERS.map((t) => {
     const list = ITEMS.COLORS.filter((c) => c.tier === t.id);
     return `<div class="tier-row" style="--tc:${t.color}">${t.name}</div>` + list.map((c) => (own.has(c.hex)
-      ? `<button type="button" class="sw${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (already your ${part === 'eye' ? 'body' : 'eyes'})` : ''}"></button>`
+      ? `<button type="button" class="sw${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (your ${part === 'eye' ? 'body' : 'eyes'} - click to swap)` : ''}"></button>`
       : `<button type="button" class="sw locked" style="--tc:${t.color}" title="${t.name} - win games to unlock" disabled></button>`)).join('');
   }).join('');
 }
@@ -2007,12 +2007,13 @@ function sendMe() {
   const m = { t: 'upd', name: myName(), color: settings.color, eye: settings.eye, cos: myCos(), ticket: Account.me ? Account.me.ticket : null };
   if (Net.isHost) hostUpdatePlayer(myId, m); else Net.send(m);
 }
-// pick a color (ignores locked ones and the color your other half already has)
+// pick a color. Picking the color your other half has swaps body and eyes (they can't match)
 function pickSwatch(e, part) {
   const b = e.target.closest('.sw');
   if (e.target.dataset.go) showView($('menu'), e.target.dataset.go);
-  if (!b || b.disabled || b.classList.contains('locked') || b.classList.contains('taken')) return false;
-  if (part === 'eye') setColors(null, b.dataset.c); else setColors(b.dataset.c, null);
+  if (!b || b.disabled || b.classList.contains('locked')) return false;
+  if (b.classList.contains('taken')) setColors(settings.eye, settings.color);
+  else if (part === 'eye') setColors(null, b.dataset.c); else setColors(b.dataset.c, null);
   renderMeEdit();
   sendMe();
   return true;
