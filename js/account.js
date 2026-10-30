@@ -93,7 +93,7 @@ const Account = (() => {
       $('accPass').value = $('accPass2').value = '';
       // logging in on another computer: bring your settings + stats along
       if (j.data && j.data.settings && Object.keys(j.data.settings).length) { write(KEYS.settings, j.data.settings); if (j.data.stats) write(KEYS.stats, j.data.stats); write(KEYS.me, me); location.reload(); return; }
-      status(tab === 'new' ? 'Welcome! You got two colors to start with.' : '');
+      status(tab === 'new' ? 'Welcome! You have two crates to open.' : '');
       changed();
     } catch (e) { status(e.message, true); }
     $('accGo').disabled = false;
@@ -207,6 +207,17 @@ const Account = (() => {
     // host: the round ended -> which account names earned a prize
     async matchEnd(match, winners, play, together) {
       try { return (await call({ action: 'matchEnd', match: match.id, key: match.key, winners, play, together })).eligible || []; } catch (e) { return []; }
+    },
+    // open one of a new account's welcome crates
+    async openStarter() {
+      if (!me) return null;
+      try {
+        const j = await call({ action: 'starter', token: me.token });
+        me.inv = j.inv;
+        me.ticket = j.ticket;
+        changed();
+        return j.prize;
+      } catch (e) { return null; }
     },
     async claim(match) {
       if (!me) return null;

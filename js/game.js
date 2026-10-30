@@ -2855,15 +2855,19 @@ function updateGame(dt) {
 // ---------- prize crate: it shakes, pops open, and a reel of items spins and slows down on your prize ----------
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let crateBusy = false;
-async function openCrate(match) {
+// starter = one of a new account's two welcome crates (title shows which one).
+// preview = the developer panel's test run: plays everything, but nothing is won or saved
+async function openCrate(match, starter, preview) {
   if (crateBusy) return;
   crateBusy = true;
   try {
-    const id = await Account.claim(match), prize = id && ITEMS.byId[id];
+    const toOpen = starter && Account.me ? Account.me.inv.starter : 2;
+    const id = preview ? preview : starter ? await Account.openStarter() : await Account.claim(match), prize = id && ITEMS.byId[id];
     if (!prize) return;
     const box = $('prize'), crate = $('crate'), wrap = $('reelWrap'), reel = $('reel'), reveal = $('reveal'), fl = $('prizeFlash');
     const tierOf = (it) => ITEMS.tier(it.tier), t = tierOf(prize), rank = ITEMS.TIERS.indexOf(t);
     const flash = (c) => { fl.style.setProperty('--fc', c); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); };
+    $('prizeTitle').textContent = preview ? 'PREVIEW CRATE' : starter ? `WELCOME CRATE ${3 - toOpen} OF 2` : 'YOU WON A CRATE';
     box.className = 'prize';
     crate.className = 'crate';
     crate.style.display = '';
@@ -3537,8 +3541,46 @@ $('ghostOp').addEventListener('input', (e) => setCos('ghostOp', Math.max(0.2, +e
 $('glintColor').addEventListener('input', (e) => setCos('glintColor', e.target.value));
 renderCos();
 
+// ---------- developer debug panel (Settings, developer mode only) ----------
+$('devCrate').innerHTML = ['random'].concat(ITEMS.TIERS.map((t) => t.id)).map((k) => `<button class="pill" type="button" data-t="${k}">${k === 'random' ? 'Random' : ITEMS.tier(k).name}</button>`).join('');
+$('devCrate').onclick = (e) => {
+  const b = e.target.closest('.pill');
+  if (!b || !devOn()) return;
+  const list = ITEMS.COLORS.filter((c) => b.dataset.t === 'random' || c.tier === b.dataset.t);
+  const pick = b.dataset.t === 'random' ? ITEMS.roll([], Math.random) : list[Math.floor(Math.random() * list.length)];
+  openCrate(null, false, pick.id);   // preview: nothing is won
+};
+$('devEvent').innerHTML = Object.keys(RANDOM_EVENTS).map((k) => `<option value="${k}">${RANDOM_EVENTS[k].name}</option>`).join('');
+$('devEventGo').onclick = () => {
+  if (!devOn() || !Net.isHost || !isPlaying()) { $('devEventNote').textContent = 'Host a game and start a round first.'; return; }
+  const k = $('devEvent').value;
+  game.rnd = { evs: [k], left: RANDOM_EVENTS[k].secs, seed: Math.random() };
+  if (k === 'swap') hostSwap();
+  if (k === 'shuffle') for (const id of players.keys()) if (!isOut(id) && !sitsOut(id)) teleportPlayer(id, randomSpawn());
+  hostFeed(`Randomizer: ${RANDOM_EVENTS[k].name}`);
+  pushState();
+  $('devEventNote').textContent = `Triggered ${RANDOM_EVENTS[k].name}.`;
+};
+const renderDev = () => $('devPanel').classList.toggle('hidden', !devOn());
+
+// a new account opens its two welcome crates, one after the other
+let starterRunning = false;
+async function openStarters() {
+  if (starterRunning) return;
+  starterRunning = true;
+  try {
+    while (Account.me && Account.me.inv.starter > 0) {
+      while (crateBusy) await wait(500);
+      const before = Account.me.inv.starter;
+      await openCrate(null, true);
+      if (!Account.me || Account.me.inv.starter >= before) break;   // couldn't open (offline): try again next time
+      await wait(600);
+    }
+  } finally { starterRunning = false; }
+}
 // your account loaded / changed (logged in or out, won something, developer mode)
 function onAccount() {
+  if (Account.me && Account.me.inv.starter > 0) setTimeout(openStarters, 400);
   fixLook();
   saveSettings();
   preview.set();
@@ -3547,11 +3589,14 @@ function onAccount() {
   renderName();
   renderMeEdit();
   $('devModeRow').classList.toggle('hidden', !(Account.me && Account.me.dev));
+  renderDev();
   sendMe();
   sendSkin();
 }
 Account.onChange(onAccount);
 renderName();
+renderDev();
+if (Account.me && Account.me.inv.starter > 0) setTimeout(openStarters, 1500);
 $('devModeRow').classList.toggle('hidden', !(Account.me && Account.me.dev));
 
 function getName() { return myName(); }

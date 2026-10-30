@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=42">
+  <link rel="stylesheet" href="style.css?v=43">
 </head>
 <body>
 
@@ -113,7 +113,7 @@
               <label class="field">Password<input id="accPass" type="password" maxlength="72" autocomplete="new-password"></label>
               <label class="field" id="accConfirmRow">Password again<input id="accPass2" type="password" maxlength="72" autocomplete="new-password"></label>
               <button id="accGo" class="btn primary">Create account</button>
-              <p class="note">Without an account you play as a guest: a random name like bobo or kiki, and the guest blue. An account gets you your own name (one per account, forever), two starting colors, and a prize crate every time you win a game against other people. There's no password reset, so don't forget it.</p>
+              <p class="note">Without an account you play as a guest: a random name like bobo or kiki, and the guest blue. An account gets you your own name (one per account, forever), two welcome crates to open, and a prize crate every time you win a game against other people. There's no password reset, so don't forget it.</p>
             </div>
             <div id="accIn" class="hidden">
               <p class="acc-who">You're <b id="accName"></b> <span id="accDev" class="acc-dev hidden">DEV</span></p>
@@ -328,6 +328,13 @@
         <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
         <label class="toggle"><input type="checkbox" id="thirdPerson"><span></span>Third person camera</label>
         <label class="toggle hidden" id="devModeRow"><input type="checkbox" id="devMode"><span></span>Developer mode</label>
+        <div id="devPanel" class="dev-panel hidden">
+          <div class="tile-kicker">Debug</div>
+          <div class="dev-row"><span>Crate preview</span><div class="pills" id="devCrate"></div></div>
+          <p class="note">Plays the whole unboxing. Nothing is won or saved.</p>
+          <div class="dev-row"><span>Randomizer</span><select id="devEvent"></select><button class="pill" id="devEventGo" type="button">Trigger</button></div>
+          <p class="note" id="devEventNote">Host a game and start a round to trigger happenings.</p>
+        </div>
       </div>
     </div>
 
@@ -352,8 +359,10 @@
   <!-- prize crate: opens, then a reel of colors spins and stops on what you won -->
   <div id="prize" class="prize hidden">
     <div id="prizeFlash" class="prize-flash"></div>
-    <div class="prize-title">YOU WON A CRATE</div>
-    <div id="crate" class="crate"><div class="crate-glow"></div><div class="crate-lid"></div><div class="crate-box"><span>SCAMPER</span></div></div>
+    <div id="prizeTitle" class="prize-title">YOU WON A CRATE</div>
+    <div id="crate" class="crate"><div class="crate-glow"></div><div class="crate-shake"><div class="cube">
+      <div class="f fr">?</div><div class="f bk">?</div><div class="f rt">?</div><div class="f lf">?</div><div class="f tp"></div><div class="f bt"></div>
+    </div></div></div>
     <div id="reelWrap" class="reel-wrap hidden"><div class="reel-clip"><div id="reel" class="reel"></div></div><div class="reel-mark"></div></div>
     <div id="reveal" class="reveal hidden">
       <div class="rv-rays"></div>
@@ -407,32 +416,32 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=42"></script>
-  <script src="js/config.js?v=42"></script>
-  <script src="js/map.js?v=42"></script>
-  <script src="js/maps/rooftops.js?v=42"></script>
-  <script src="js/maps/shipyard.js?v=42"></script>
-  <script src="js/maps/corridors.js?v=42"></script>
-  <script src="js/maps/fog.js?v=42"></script>
-  <script src="js/maps/playhouse.js?v=42"></script>
-  <script src="js/maps/moon.js?v=42"></script>
-  <script src="js/maps/kitchen.js?v=42"></script>
-  <script src="js/maps/clocktower.js?v=42"></script>
-  <script src="js/maps/lab.js?v=42"></script>
-  <script src="js/maps/skatepark.js?v=42"></script>
-  <script src="js/maps/bounce.js?v=42"></script>
-  <script src="js/maps/infinite.js?v=42"></script>
-  <script src="js/maps/climb.js?v=42"></script>
-  <script src="js/maps/chambers.js?v=42"></script>
-  <script src="js/maps/volcano.js?v=42"></script>
-  <script src="js/character.js?v=42"></script>
-  <script src="js/world.js?v=42"></script>
-  <script src="js/player.js?v=42"></script>
-  <script src="js/bots.js?v=42"></script>
-  <script src="js/net.js?v=42"></script>
-  <script src="js/store.js?v=42"></script>
-  <script src="js/items.js?v=42"></script>
-  <script src="js/account.js?v=42"></script>
-  <script src="js/game.js?v=42"></script>
+  <script src="js/look.js?v=43"></script>
+  <script src="js/config.js?v=43"></script>
+  <script src="js/map.js?v=43"></script>
+  <script src="js/maps/rooftops.js?v=43"></script>
+  <script src="js/maps/shipyard.js?v=43"></script>
+  <script src="js/maps/corridors.js?v=43"></script>
+  <script src="js/maps/fog.js?v=43"></script>
+  <script src="js/maps/playhouse.js?v=43"></script>
+  <script src="js/maps/moon.js?v=43"></script>
+  <script src="js/maps/kitchen.js?v=43"></script>
+  <script src="js/maps/clocktower.js?v=43"></script>
+  <script src="js/maps/lab.js?v=43"></script>
+  <script src="js/maps/skatepark.js?v=43"></script>
+  <script src="js/maps/bounce.js?v=43"></script>
+  <script src="js/maps/infinite.js?v=43"></script>
+  <script src="js/maps/climb.js?v=43"></script>
+  <script src="js/maps/chambers.js?v=43"></script>
+  <script src="js/maps/volcano.js?v=43"></script>
+  <script src="js/character.js?v=43"></script>
+  <script src="js/world.js?v=43"></script>
+  <script src="js/player.js?v=43"></script>
+  <script src="js/bots.js?v=43"></script>
+  <script src="js/net.js?v=43"></script>
+  <script src="js/store.js?v=43"></script>
+  <script src="js/items.js?v=43"></script>
+  <script src="js/account.js?v=43"></script>
+  <script src="js/game.js?v=43"></script>
 </body>
 </html>

@@ -14,6 +14,7 @@
 //  POST { action: 'matchEnd', match, key, winners: [names], play: { name: { moved, active, jumps } }, together }
 //       -> { eligible: [names] }
 //  POST { action: 'claim', token, match }  (you won that match) -> { prize, inv, ticket }
+//  POST { action: 'starter', token }  (open one of your two welcome crates) -> { prize, inv, ticket }
 //  POST { action: 'verify', ticket } (a host checking a joiner) -> { name, colors, cos, dev }
 //  POST { action: 'logout', token }
 //  POST { action: 'delete', token, password }  -> deletes the account and everything stored with it
@@ -85,8 +86,9 @@ const OLD = { lemon: 'butter', lavender: 'lilac', fog: 'sky', cream: 'butter', c
   silver: 'sky', platinum: 'periwinkle', pearl: 'butter', graphite: 'sapphire', crimson: 'bloodmoon', midnight: 'abyss' };
 function cleanInv(inv) {
   const colors = [...new Set((inv && inv.colors || []).map((id) => (ITEMS.byId[id] ? id : OLD[id])).filter((id) => ITEMS.byId[id]))];
-  while (colors.length < 2) { const s = ITEMS.starter(rnd); for (const id of s) if (colors.length < 2 && !colors.includes(id)) colors.push(id); }
-  return { colors, cos: [] };
+  const starter = Math.max(0, Math.min(2, +(inv && inv.starter) || 0));   // welcome crates still to open
+  while (colors.length + starter < 2) { const s = ITEMS.starter(rnd); for (const id of s) if (colors.length + starter < 2 && !colors.includes(id)) colors.push(id); }
+  return { colors, cos: [], starter };
 }
 async function getUser(name) {
   const raw = await redis('GET', userKey(name));
@@ -162,7 +164,7 @@ module.exports = async (req, res) => {
         const user = { name, salt, hash, data, gen: newGen(), updated: now, created: now };
         const ok = await redis('SET', userKey(name), JSON.stringify(user), 'NX');
         if (ok !== 'OK') return res.status(409).json({ error: 'That name is taken.' });
-        user.inv = { colors: ITEMS.starter(rnd), cos: [] };
+        user.inv = { colors: [], cos: [], starter: 2 };   // two welcome crates, opened in the game
         await putInv(user);
         return res.json(profile(user, await newSession(user)));
       }
@@ -256,6 +258,18 @@ module.exports = async (req, res) => {
         if (prize) user.inv.colors.push(prize.id);
         await putInv(user);
         await redis('SET', 'lastclaim:' + me, String(now), 'EX', 86400);
+        return res.json({ prize: prize ? prize.id : null, inv: user.inv, ticket: ticketFor(user) });
+      }
+
+      // a new account's welcome crates: two, each a normal roll, never the same color twice
+      case 'starter': {
+        const user = await sessionUser(b.token);
+        if (!user) return res.status(401).json({ error: 'Logged out.' });
+        if (!(user.inv.starter > 0)) return res.status(409).json({ error: 'No crates left.' });
+        const prize = ITEMS.roll(user.inv.colors, rnd);
+        if (prize) user.inv.colors.push(prize.id);
+        user.inv.starter--;
+        await putInv(user);
         return res.json({ prize: prize ? prize.id : null, inv: user.inv, ticket: ticketFor(user) });
       }
 
