@@ -1797,7 +1797,7 @@ function botsThink(dt) {
   }
   const T = CONFIG.tag, go = isPlaying() && game.rl <= 0;
   for (const b of bots.values()) {
-    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id);
+    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id) || performance.now() < (b.lockUntil || 0);
     if (isFrozen(b.id)) { b.p.vel.x = 0; b.p.vel.z = 0; }
     b.p.speedMul = !go ? 1 : game.mode === 'duel' && isIt(b.id) ? T.duelChaserSpeed
       : game.mode === 'bomb' && isIt(b.id) ? T.bombSpeed : game.mode === 'koth' && !isIt(b.id) ? T.kothSpeed
@@ -1812,7 +1812,11 @@ function botsAfter() {
   const now = performance.now();
   for (const b of bots.values()) {
     World.wrapPos(b.p.pos);
-    if (b.p.pos.y < World.map.killY) { b.p.teleport(randomSpawn()); hostFell(b.id); }
+    if (b.p.pos.y < World.map.killY) {
+      b.p.teleport(randomSpawn());
+      if (isPlaying() && !isOut(b.id)) b.lockUntil = now + CONFIG.tag.fallLock * 1000;
+      hostFell(b.id);
+    }
     const p = players.get(b.id);
     if (!p) continue;
     p.tp.copy(b.p.pos);
@@ -2104,7 +2108,9 @@ function frame(now) {
 function updateGame(dt) {
   const playing = isPlaying(), go = playing && game.rl <= 0, T = CONFIG.tag;
   // frozen: both duelists before each chase, and everyone on the start line of a race
-  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId);
+  const locked = performance.now() < fallLockUntil;   // just fell off: held in place for a moment
+  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId) || locked;
+  if (locked && me.grounded) { me.vel.x = 0; me.vel.z = 0; }
   if (isFrozen(myId)) { me.vel.x = 0; me.vel.z = 0; }
   const duelChaser = playing && game.mode === 'duel' && isIt(myId);
   // whoever does the chasing runs a little faster
@@ -2139,6 +2145,8 @@ function updateGame(dt) {
     me.teleport(sp, faceCenter(sp));
     flash('rgba(0,0,0,.9)');
     SFX.fall();
+    // jumping off isn't an escape: you're stuck for a moment when you come back
+    if (playing && World.map.kind !== 'race' && !isOut(myId)) fallLockUntil = performance.now() + CONFIG.tag.fallLock * 1000;
     if (World.map.kind === 'race') {
       if (playing && game.mode === 'race') { stats.fell(); if (!raceDone) showBanner('<div class="big red">BACK TO THE START</div>', 1.2); }
     } else if (playing) { if (Net.isHost) hostFell(myId); else Net.send({ t: 'fell' }); }
@@ -2223,6 +2231,10 @@ function updateGame(dt) {
   // hold look-behind: the camera turns around, you keep running the way you were going
   const back = locked && held('lookBack');
   arms.forEach((a) => (a.visible = !back));
+  const ghostHands = isOut(myId);
+  if (skinMat.transparent !== ghostHands) {
+    for (const m of [skinMat, sleeveMat]) { m.transparent = ghostHands; m.opacity = ghostHands ? 0.3 : 1; m.depthWrite = !ghostHands; m.needsUpdate = true; }
+  }
   camera.rotation.set(me.pitch + pitchKick + n3 * tr * 0.02, me.yaw + (back ? Math.PI : 0) + n1 * tr * 0.012, (roll + rollKick) * (back ? -1 : 1) + n2 * tr * 0.025);
 
   const sp = Math.max(0, Math.min(1, (hs - M.walkSpeed) / (18 - M.walkSpeed)));
@@ -2276,7 +2288,9 @@ function updateGame(dt) {
     if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
     a.crown.visible = it && game.mode === 'koth';
     a.ice.visible = isFrozen(p.id);
-    setScampGhost(a.scamp, isOut(p.id) ? 0.25 : p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
+    // knocked out in Bomb Tag: gone - nobody else can see them at all
+    a.root.visible = !isOut(p.id);
+    setScampGhost(a.scamp, p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
     applyCos(a.scamp, p.cos, now);
     a.label.material.opacity = isOut(p.id) ? 0.4 : 1;
     // see-through outline of whoever matters to you right now
@@ -2298,7 +2312,7 @@ function updateGame(dt) {
       || (game.mode === 'koth' && isIt(myId)))) nearestSeeker = Math.min(nearestSeeker, dist);
     // blob shadow on whatever is under them, fading as they get higher
     const rp = a.root.position, fy = World.floorBelow(rp.x, rp.y + 0.3, rp.z), up = rp.y - fy;
-    a.blob.visible = fy > -1e8 && up < 6;
+    a.blob.visible = fy > -1e8 && up < 6 && a.root.visible;
     if (a.blob.visible) {
       a.blob.position.set(rp.x, fy + 0.02, rp.z);
       a.blob.scale.setScalar(1 + up * 0.12);
@@ -2331,7 +2345,7 @@ function updateGame(dt) {
   sbTimer += dt;
   if (sbTimer > 0.25 || boardDirty) { sbTimer = 0; boardDirty = false; renderBoard(); }
 }
-let finishSentAt = 0, boardDirty = true, beepT = 0;
+let finishSentAt = 0, boardDirty = true, beepT = 0, fallLockUntil = 0;
 
 // you chatter by yourself after a near miss, and now and then during a close chase
 let chaseT = 0, autoTauntAt = 0, nearMiss = false;
@@ -2559,6 +2573,7 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (isExposed(myId)) hint = `EXPOSED - they can see you for ${((exposedUntil[myId] - now) / 1000).toFixed(1)}s`;
   if (now < tagHintUntil) hint = tagHint;
   if (frozen && !isFrozen(myId)) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
+  if (now < fallLockUntil) hint = `You fell - back in ${((fallLockUntil - now) / 1000).toFixed(1)}s`;
   else if (game.phase === 'lobby') {
     hint = Net.isHost
       ? (players.size < 2 ? `Warmup - tell friends the code ${Net.code}` : 'Warmup - press ENTER (or P → Start round) to play')
