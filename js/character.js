@@ -5,8 +5,8 @@
 //  Thin black stick arms + legs with ball hands and little L feet.
 //  Faces -z, feet at y = 0, about 1.8m tall.   buildScamp(bodyColor, eyeColor) / animateScamp(...)
 // ============================================================
-const SCAMP_DARK = 0x16161c;   // stick limbs
-const STICK = new THREE.MeshLambertMaterial({ color: SCAMP_DARK });
+const SCAMP_DARK = 0x000000;   // stick limbs, hands and feet: pure black, no shading
+const STICK = new THREE.MeshBasicMaterial({ color: SCAMP_DARK });
 
 // sharp box centered on 0,0,0 (kept under this name for the first-person arms)
 function roundedBox(w, h, d) {
@@ -124,7 +124,7 @@ function setScampGhost(c, op) {
   if (c.ghost === op) return;
   c.ghost = op;
   const on = op < 1;
-  if (!c.stickGhost) c.stickGhost = new THREE.MeshLambertMaterial({ color: SCAMP_DARK, transparent: true, depthWrite: false });
+  if (!c.stickGhost) c.stickGhost = new THREE.MeshBasicMaterial({ color: SCAMP_DARK, transparent: true, depthWrite: false });
   c.stickGhost.opacity = op;
   c.rig.traverse((o) => {
     if (o.isMesh && c.xray.indexOf(o) < 0) {

@@ -442,6 +442,7 @@ class Bot {
       // advance along the path
       while (this.pi < R.path.length) {
         const n = Nav.nodes[R.path[this.pi]];
+        if (!n) { this.route = null; return; }   // a route from a map that's gone
         const dh = Math.hypot(n.x - p.pos.x, n.z - p.pos.z);
         if (dh < (R.types[this.pi] === NAV_GAP ? 0.9 : 0.6) && Math.abs(n.y - p.pos.y) < 1.1) this.pi++;
         else break;

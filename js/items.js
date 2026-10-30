@@ -5,58 +5,52 @@
 // ============================================================
 const ITEMS = (() => {
   // each rarity has its own color: common light gray, uncommon green, rare blue, epic red,
-  // legendary gold, mythic black
+  // legendary gold, mythic black. Weights are percent: black or white turns up 1 time in 100.
   const TIERS = [
-    { id: 'common', name: 'Common', color: '#c9ced6', weight: 50 },
-    { id: 'uncommon', name: 'Uncommon', color: '#5cc96b', weight: 27 },
-    { id: 'rare', name: 'Rare', color: '#4a8cff', weight: 14 },
+    { id: 'common', name: 'Common', color: '#c9ced6', weight: 52 },
+    { id: 'uncommon', name: 'Uncommon', color: '#5cc96b', weight: 26 },
+    { id: 'rare', name: 'Rare', color: '#4a8cff', weight: 13 },
     { id: 'epic', name: 'Epic', color: '#ff4d4d', weight: 6 },
-    { id: 'legendary', name: 'Legendary', color: '#ffc23d', weight: 2.5 },
-    { id: 'mythic', name: 'Mythic', color: '#111111', weight: 0.5 },
+    { id: 'legendary', name: 'Legendary', color: '#ffc23d', weight: 2 },
+    { id: 'mythic', name: 'Mythic', color: '#111111', weight: 1 },
   ];
-  // every tier is one family, laid out by hue (rainbow order, grays last):
-  //   common = soft pastels, uncommon = brighter candy colors, rare = deep jewel tones,
-  //   epic = neons, legendary = metals, mythic = black and white
+  // 50 colors, from least to most cool, fewer in every step up:
+  //   common (16) soft pastels -> uncommon (12) candy brights -> rare (10) deep jewel tones ->
+  //   epic (6) neons -> legendary (4) one-of-a-kind statement colors -> mythic (2) pure black + white.
+  // Nothing below mythic is pale or dark enough to pass for white or black.
   const hueKey = (hex) => {
     const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
     const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
-    if (d < 0.12) return 10 - mx;   // grays + near-whites at the end, light to dark
+    if (d < 0.12) return 10 - mx;
     let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    h = (h * 60 + 360 + 15) % 360;   // reds that lean pink sort with the reds
-    return h / 360;
+    return ((h * 60 + 360 + 15) % 360) / 360;   // rainbow order (pinkish reds sort with the reds)
   };
   const C = (tier, list) => list.map(([id, name, hex]) => ({ id, name, hex, tier, kind: 'color' })).sort((a, b) => hueKey(a.hex) - hueKey(b.hex));
   const COLORS = [].concat(
     C('common', [
-      ['blush', 'Blush', '#ffb3c6'], ['bubblegum', 'Bubblegum', '#ff8fa3'], ['peach', 'Peach', '#ffc8a2'], ['apricot', 'Apricot', '#ffb37a'],
-      ['butter', 'Butter', '#ffe599'], ['lemon', 'Lemon', '#fff0a0'], ['pistachio', 'Pistachio', '#c8e6a0'], ['mint', 'Mint', '#9be3a8'],
-      ['seafoam', 'Seafoam', '#7ed6c8'], ['sky', 'Sky', '#a8dcef'], ['cornflower', 'Cornflower', '#8fb4ff'], ['periwinkle', 'Periwinkle', '#b8c0ff'],
-      ['lilac', 'Lilac', '#c3a6ff'], ['lavender', 'Lavender', '#e0b0ff'], ['orchid', 'Orchid', '#f4a6ff'], ['sand', 'Sand', '#d9c2a7'],
-      ['fog', 'Fog', '#c9ced6'], ['cream', 'Cream', '#f7f3ea'], ['rose', 'Rose', '#ff9b9b'], ['sage', 'Sage', '#b5cfa8'],
+      ['blush', 'Cotton Candy', '#ffb0c8'], ['bubblegum', 'Strawberry Milk', '#ff9eb0'], ['rose', 'Salmon', '#ff9a8a'], ['peach', 'Peach Fuzz', '#ffbc94'],
+      ['apricot', 'Apricot', '#ffb070'], ['sand', 'Biscuit', '#dcbc93'], ['butter', 'Custard', '#ffdb7a'], ['pistachio', 'Pistachio', '#c3df8e'],
+      ['sage', 'Matcha', '#a3c98a'], ['mint', 'Spearmint', '#8fdca3'], ['seafoam', 'Sea Glass', '#7fd3c4'], ['sky', 'Powder Blue', '#9cceee'],
+      ['cornflower', 'Cornflower', '#8eaefc'], ['periwinkle', 'Periwinkle', '#aab2ff'], ['lilac', 'Wisteria', '#c1a3fb'], ['orchid', 'Lilac Dream', '#e6a3f5'],
     ]),
     C('uncommon', [
-      ['cherry', 'Cherry', '#ff6b8a'], ['coral', 'Coral', '#ff7f7f'], ['tangerine', 'Tangerine', '#ff9f5a'], ['caramel', 'Caramel', '#e0a96d'],
-      ['sunflower', 'Sunflower', '#ffd23f'], ['lime', 'Lime', '#b6f27a'], ['moss', 'Moss', '#9cc46a'], ['jade', 'Jade', '#5fd3a0'],
-      ['teal', 'Teal', '#4fc2b5'], ['aqua', 'Aqua', '#5fd6e0'], ['azure', 'Azure', '#6fa8ff'], ['iris', 'Iris', '#9a8cff'],
-      ['grape', 'Grape', '#b57bff'], ['plum', 'Plum', '#d48cc4'], ['fuchsia', 'Fuchsia', '#ff7ad9'], ['slate', 'Slate', '#9aa5bd'],
+      ['cherry', 'Watermelon', '#ff5a7e'], ['coral', 'Grapefruit', '#ff7663'], ['tangerine', 'Mango', '#ff9a3c'], ['sunflower', 'Lemon Drop', '#ffc928'],
+      ['lime', 'Kiwi', '#9ee34f'], ['jade', 'Clover', '#3ccb7f'], ['teal', 'Lagoon', '#22bdb0'], ['aqua', 'Splash', '#33c7e8'],
+      ['azure', 'Blue Raspberry', '#3f8cff'], ['iris', 'Bluebell', '#7f78ff'], ['grape', 'Grape Soda', '#a45cf5'], ['fuchsia', 'Bubble Pink', '#ff63c8'],
     ]),
     C('rare', [
-      ['ruby', 'Ruby', '#d7263d'], ['blood', 'Garnet', '#9e1b32'], ['tomato', 'Tomato', '#f2552c'], ['sunset', 'Sunset', '#e8743b'],
-      ['amber', 'Amber', '#e89a00'], ['chocolate', 'Chocolate', '#7a4a2e'], ['emerald', 'Emerald', '#1f9e5a'], ['forest', 'Forest', '#2f6f46'],
-      ['turquoise', 'Turquoise', '#11a3a3'], ['deepsea', 'Deep Sea', '#0b4f6c'], ['sapphire', 'Sapphire', '#2856c9'], ['navy', 'Navy', '#22356b'],
-      ['amethyst', 'Amethyst', '#7a3fc8'], ['royal', 'Royal Purple', '#4b1d9e'], ['magenta', 'Magenta', '#c2258f'], ['mauve', 'Mauve', '#8f5f84'],
-      ['steel', 'Steel', '#4f5f75'],
+      ['ruby', 'Ruby', '#d11a3a'], ['tomato', 'Paprika', '#e2471b'], ['amber', 'Topaz', '#e69100'], ['chocolate', 'Cocoa', '#8f5530'],
+      ['emerald', 'Emerald', '#12a058'], ['forest', 'Pine', '#2e8150'], ['turquoise', 'Caribbean', '#089fa3'], ['sapphire', 'Sapphire', '#2152cf'],
+      ['amethyst', 'Amethyst', '#7633cb'], ['magenta', 'Magenta', '#c0198a'],
     ]),
     C('epic', [
-      ['neonred', 'Neon Red', '#ff1f3d'], ['hotorange', 'Neon Orange', '#ff6a00'], ['laser', 'Laser Lemon', '#f5ff3a'], ['toxic', 'Toxic', '#b4ff00'],
-      ['neongreen', 'Neon Green', '#39ff6a'], ['cyber', 'Cyber Teal', '#00ffd5'], ['electric', 'Electric Blue', '#1fa2ff'], ['ultraviolet', 'Ultraviolet', '#7a2cff'],
-      ['neonpurple', 'Neon Purple', '#c026ff'], ['neonpink', 'Neon Pink', '#ff2fa8'],
+      ['neonred', 'Laser Red', '#ff1a45'], ['hotorange', 'Blaze', '#ff6a00'], ['laser', 'Highlighter', '#eaff00'],
+      ['neongreen', 'Radioactive', '#29ff5c'], ['cyber', 'Hyper Cyan', '#00ecff'], ['neonpink', 'Hot Pink', '#ff1aa6'],
     ]),
     C('legendary', [
-      ['gold', 'Gold', '#d4af37'], ['rosegold', 'Rose Gold', '#e8a598'], ['bronze', 'Bronze', '#b06d2c'], ['copper', 'Copper', '#c4683a'],
-      ['silver', 'Silver', '#c0c6cc'], ['platinum', 'Platinum', '#e5e4e2'], ['pearl', 'Pearl', '#f3eee4'], ['graphite', 'Graphite', '#3a3d44'],
+      ['gold', '24K Gold', '#f2b300'], ['ultraviolet', 'Ultraviolet', '#6a1aff'], ['bloodmoon', 'Blood Moon', '#b0002c'], ['abyss', 'Abyss', '#00727e'],
     ]),
-    C('mythic', [['white', 'White', '#ffffff'], ['black', 'Black', '#111111']]),
+    C('mythic', [['white', 'Pure White', '#ffffff'], ['black', 'Void Black', '#111111']]),
   );
   // cosmetics are developer-only: never in crates, only in developer mode
   const COSMETICS = [

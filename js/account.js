@@ -8,12 +8,12 @@
 const Account = (() => {
   const $ = (id) => document.getElementById(id);
   const API = /vercel\.app$/.test(location.hostname) ? 'api/account' : 'https://sirishpande.vercel.app/api/account';
-  const KEYS = { settings: 'scamper-settings', stats: 'scamper-stats', me: 'scamper-account' };
+  const KEYS = { settings: 'scamper-settings', stats: 'scamper-stats', me: 'scamper-account', last: 'scamper-last-name' };
   const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) || null; } catch (e) { return null; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   let me = read(KEYS.me);   // { name, token, ticket, inv: { colors, cos }, dev, updated }
   if (me && (!me.token || !me.inv)) me = null;
-  let online = null, saveTimer = 0, checkTimer = 0, tab = 'new';
+  let online = null, saveTimer = 0, checkTimer = 0, tab = 'new', pendingSave = false;
   const listeners = [];
   const changed = () => { write(KEYS.me, me); render(); for (const f of listeners) f(); };
 
@@ -37,6 +37,10 @@ const Account = (() => {
     $('accOut').classList.toggle('hidden', inn);
     $('accIn').classList.toggle('hidden', !inn);
     $('accTab').textContent = inn ? me.name : 'Account';
+    // the quick log-in box on the Play page
+    $('qForm').classList.toggle('hidden', inn);
+    $('qIn').classList.toggle('hidden', !inn);
+    if (inn) $('qName').textContent = me.name;
     $('accTabNew').classList.toggle('on', tab === 'new');
     $('accTabLogin').classList.toggle('on', tab === 'login');
     $('accConfirmRow').classList.toggle('hidden', tab !== 'new');
@@ -84,6 +88,7 @@ const Account = (() => {
     try {
       const j = await call({ action: tab === 'new' ? 'register' : 'login', username, password, data: local() });
       take(j);
+      write(KEYS.last, j.name);
       $('accPass').value = $('accPass2').value = '';
       // logging in on another computer: bring your settings + stats along
       if (j.data && j.data.settings && Object.keys(j.data.settings).length) { write(KEYS.settings, j.data.settings); if (j.data.stats) write(KEYS.stats, j.data.stats); write(KEYS.me, me); location.reload(); return; }
@@ -100,6 +105,29 @@ const Account = (() => {
       write(KEYS.me, me);
     } catch (e) { if (e.status === 401) { me = null; changed(); } }
   }
+
+  // quick log in (Play page): your last name is filled in, Enter logs in
+  const last = read(KEYS.last);
+  if (last) { $('qUser').value = last; $('accUser').value = last; tab = 'login'; }
+  $('qUser').addEventListener('input', () => { const el = $('qUser'), v = el.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); if (v !== el.value) el.value = v; });
+  $('qForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const username = $('qUser').value.trim(), password = $('qPass').value, msg = $('qMsg');
+    if (!username || !password) { (username ? $('qPass') : $('qUser')).focus(); return; }
+    msg.textContent = 'Logging in…';
+    msg.className = 'q-msg';
+    $('qGo').disabled = true;
+    try {
+      const j = await call({ action: 'login', username, password });
+      take(j);
+      write(KEYS.last, j.name);
+      $('qPass').value = '';
+      if (j.data && j.data.settings && Object.keys(j.data.settings).length) { write(KEYS.settings, j.data.settings); if (j.data.stats) write(KEYS.stats, j.data.stats); write(KEYS.me, me); location.reload(); return; }
+      changed();
+    } catch (err) { msg.textContent = err.message; msg.className = 'q-msg bad'; }
+    $('qGo').disabled = false;
+  };
+  $('qOut').onclick = (e) => { e.preventDefault(); $('accLogout').onclick(); };
 
   $('accTabNew').onclick = () => { tab = 'new'; status(''); render(); checkName(); };
   $('accTabLogin').onclick = () => { tab = 'login'; status(''); render(); checkName(); };
@@ -151,6 +179,7 @@ const Account = (() => {
         return;
       }
       changed();
+      if (pendingSave) { pendingSave = false; saveTimer = setTimeout(save, 4000); }
     } catch (e) {
       if (e.status === 401) { me = null; changed(); }
       else online = false;
@@ -163,14 +192,25 @@ const Account = (() => {
     // the game saved settings or stats: send them up a few seconds later
     dirty() {
       if (!me || online === false) return;
+      // wait until this computer has loaded the account first, so old local data can't
+      // overwrite newer data saved from another computer
+      if (online !== true) { pendingSave = true; return; }
       clearTimeout(saveTimer);
       saveTimer = setTimeout(save, 4000);
     },
     // you won: ask the server for a prize. Resolves to the prize's id, or null
-    async claim() {
+    // host: a round went live with these players' tickets -> a match id (null = doesn't count)
+    async matchStart(tickets) {
+      try { const j = await call({ action: 'matchStart', players: tickets }); return j.match ? { id: j.match, key: j.key } : null; } catch (e) { return null; }
+    },
+    // host: the round ended -> which account names earned a prize
+    async matchEnd(match, winners, moved) {
+      try { return (await call({ action: 'matchEnd', match: match.id, key: match.key, winners, moved })).eligible || []; } catch (e) { return []; }
+    },
+    async claim(match) {
       if (!me) return null;
       try {
-        const j = await call({ action: 'claim', token: me.token });
+        const j = await call({ action: 'claim', token: me.token, match });
         me.inv = j.inv;
         me.ticket = j.ticket;
         changed();
@@ -178,10 +218,11 @@ const Account = (() => {
       } catch (e) { return null; }
     },
     // host: what does the player holding this ticket really own? (null = not a real account)
+    // 'offline' = couldn't tell right now (try again); null = definitely not a real account
     async verify(ticket) {
       if (!ticket) return null;
       try { return await call({ action: 'verify', ticket }); }
-      catch (e) { return e.net ? 'offline' : null; }
+      catch (e) { return e.status === 401 ? null : 'offline'; }
     },
   };
 })();

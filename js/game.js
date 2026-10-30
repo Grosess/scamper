@@ -38,6 +38,12 @@ const stats = (() => {
     started() {},
     ended(r) {
       if (!r || !r.mode) return;
+      if (r.mode === 'gp') {   // the rounds already counted as games; the final only counts as a Grand Prix
+        mode('gp').games++;
+        if ((r.winners || []).includes(myId)) mode('gp').wins++;
+        save();
+        return;
+      }
       d.games++;
       mode(r.mode).games++;
       const won = (r.winners || []).includes(myId);
@@ -46,7 +52,6 @@ const stats = (() => {
       if ([...players.values()].some((p) => p.id !== myId && !p.cpu)) {
         d.pvp.games++; mode(r.mode).pg++;
         if (won) { d.pvp.wins++; mode(r.mode).pw++; }
-        if (won && Account.me) setTimeout(openCrate, 2200);   // winners get a prize crate
       }
       if (r.mode === 'koth' && game.koth) d.kothBest = Math.max(d.kothBest, Math.floor(game.koth.pts[myId] || 0));
       save();
@@ -259,7 +264,7 @@ function loadMap(id) {
   const m = getMap(id);
   Object.assign(CONFIG.move, DEFAULT_MOVE, m.move || {});   // per-map physics (low gravity...)
   World.load(scene, m);
-  if (bots.size) Nav.build();   // CPUs need the new map's routes
+  if (bots.size) { Nav.build(); for (const b of bots.values()) { b.route = null; b.pi = 0; } }   // CPUs need the new map's routes (old ones point at old nodes)
   if (m.kind === 'race') buildFinish(m);
   buildSpots(m);
   renderer.shadowMap.needsUpdate = true;
@@ -431,8 +436,8 @@ vmScene.add(vmCam, new THREE.HemisphereLight(0xffffff, 0x667788, 0.95));
 const vmSun = new THREE.DirectionalLight(0xffffff, 0.55);
 vmSun.position.set(0.4, 1, 0.3);
 vmScene.add(vmSun);
-const skinMat = new THREE.MeshLambertMaterial({ color: SCAMP_DARK });
-const sleeveMat = new THREE.MeshLambertMaterial({ color: SCAMP_DARK });
+const skinMat = new THREE.MeshBasicMaterial({ color: SCAMP_DARK });
+const sleeveMat = new THREE.MeshBasicMaterial({ color: SCAMP_DARK });
 const arms = [-1, 1].map((side) => {
   const g = new THREE.Group();
   // stick arm + ball hand, like the character
@@ -1003,7 +1008,7 @@ function applySnap(m) {
 }
 
 // ---------- host: rules ----------
-const H = { rndNext: 0, rndLast: [], exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
+const H = { match: null, moved: {}, lastPos: {}, round: 0, rndNext: 0, rndLast: [], exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
 // random starting colors for new players: bright, readable bodies
 // the palette: every body and eye color comes from these soft pastels (eyes can also be white or ink)
 const COLORS = ['#ff8fa3', '#ffb3c6', '#ff9b9b', '#ffb37a', '#ffd166', '#ffe599', '#c8e6a0', '#9be3a8', '#7ed6c8',
@@ -1119,6 +1124,48 @@ function beginRound(modeId, o) {
   game.tl = H.timeLeft;
   game.rl = H.releaseLeft;
   pushState();
+  hostMatchStart();
+}
+// --- prizes need a real game: the round is registered with the account server when it starts
+// (it checks everyone's account itself and times the round), the host counts how far everyone
+// really moves, and at the end the server decides who earned a crate. An idle second device or a
+// two-second round earns nothing.
+function hostMatchStart() {
+  H.match = null;
+  H.moved = {};
+  H.lastPos = {};
+  const tickets = [...players.values()].filter((p) => !p.cpu).map((p) => (p.id === myId ? Account.me && Account.me.ticket : p.ticket)).filter(Boolean);
+  if (tickets.length < 2) return;
+  const round = H.round = (H.round || 0) + 1;
+  Account.matchStart(tickets).then((id) => { if (H.round === round) H.match = id; });
+}
+// distance each player really covers this round (teleports and respawns don't count)
+function hostTrackMoves() {
+  for (const id of players.keys()) {
+    const p = posOf(id);
+    if (!p) continue;
+    const l = H.lastPos[id];
+    if (l) { const d = wrapDist(p, l); if (d < 6) H.moved[id] = (H.moved[id] || 0) + d; }
+    H.lastPos[id] = { x: p.x, y: p.y, z: p.z };
+  }
+}
+function hostMatchEnd(r) {
+  const match = H.match;
+  H.match = null;
+  if (!match) return;
+  const acct = (id) => (players.get(id) || {}).name.toLowerCase();
+  const moved = {};
+  for (const id in H.moved) if (players.has(id)) moved[acct(id)] = Math.round(H.moved[id]);
+  Account.matchEnd(match, (r.winners || []).filter((id) => players.has(id)).map(acct), moved).then((eligible) => {
+    if (!eligible.length) return;
+    const m = { t: 'prize', match: match.id, names: eligible };
+    Net.broadcast(m);
+    onPrize(m);
+  });
+}
+// a winner of a real match: open a crate
+function onPrize(m) {
+  if (Account.me && Array.isArray(m.names) && m.names.includes(Account.me.name.toLowerCase())) setTimeout(() => openCrate(String(m.match)), 1500);
 }
 // --- Grand Prix: a run of rounds, each a random mode on a random map. Every round hands out
 // points by placing; the most points after the last round wins the whole thing ---
@@ -1149,7 +1196,7 @@ const gpStandings = () => [...players.keys()].sort((a, b) => (game.gp.pts[b] || 
 function gpFinal() {
   const st = gpStandings(), top = game.gp.pts[st[0]] || 0, w = st.filter((id) => (game.gp.pts[id] || 0) === top);
   return { mode: 'gp', winners: w, ranking: st, title: w.length === 1 ? `${nameOf(w[0])} wins the Grand Prix!` : 'The Grand Prix is a tie!',
-    sub: `${game.gp.of} rounds`, lines: st.map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${game.gp.pts[id] || 0} pts`) };
+    sub: `${game.gp.round} rounds`, lines: st.map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${game.gp.pts[id] || 0} pts`) };
 }
 
 // --- randomizer (host): a happening every so often, never the same one twice in a row ---
@@ -1162,7 +1209,9 @@ function hostRandomTick(dt) {
   H.rndNext -= dt;
   if (H.rndNext > 0) return;
   // never the same one twice in a row; now and then two at once
-  const pick = (no) => { const pool = Object.keys(RANDOM_EVENTS).filter((k) => !no.includes(k)); return pool[Math.floor(Math.random() * pool.length)]; };
+  // (no Teleport in a race: every spawn there is the start line)
+  const skip = game.mode === 'race' ? ['shuffle'] : [];
+  const pick = (no) => { const pool = Object.keys(RANDOM_EVENTS).filter((k) => !no.includes(k) && !skip.includes(k)); return pool[Math.floor(Math.random() * pool.length)]; };
   const evs = [pick(H.rndLast)];
   if (Math.random() < 0.2 && !RANDOM_EVENTS[evs[0]].once) evs.push(pick(H.rndLast.concat(evs, ['swap', 'shuffle'])));
   H.rndLast = evs;
@@ -1403,6 +1452,7 @@ function hostEndRound(sub) {
   if (!isPlaying()) return;
   game.phase = 'results';
   game.result = computeResult(sub);
+  hostMatchEnd(game.result);
   game.rnd = null;
   if (game.gp) gpAward(game.result);
   H.resultsLeft = CONFIG.tag.resultsTime;
@@ -1527,8 +1577,8 @@ function hostHandle(from, m) {
       setTimeout(() => Net.kick(from), 300);
       return;
     }
-    // guests show up as guests straight away; an account's name + colors are checked with the server
-    const L = lookFor(m.ticket ? 'trust' : null, m), name = uniqueName(L.name);
+    // everyone shows up as a guest until the account server confirms who they are
+    const L = lookFor(null, m), name = uniqueName(L.name);
     ensurePlayer(from, name, L.color, L.eye, L.cos);
     if (m.ticket) hostVerify(from, m);
     game.scores[from] = { tags: 0 };
@@ -1552,11 +1602,9 @@ function hostHandle(from, m) {
   }
 }
 
-// what someone may look like. acct: what the account server says they own, null = a guest,
-// 'trust' = couldn't check (the server is unreachable), so take their word for it
+// what someone may look like. acct: what the account server says they own (null = a guest)
 function lookFor(acct, m) {
-  if (acct === 'trust') return { name: cleanName(m.name), color: pickColor(m.color), eye: pickEye(m.eye), cos: pickCos(m.cos) };
-  if (!acct) {
+  if (!acct || !acct.colors || !acct.colors.length) {
     const g = String(m.name || '').toLowerCase();
     return { name: ITEMS.GUEST_NAMES.includes(g) ? g : ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)], color: GUEST.body, eye: GUEST.eye, cos: null };
   }
@@ -1569,20 +1617,23 @@ function hostApplyLook(id, m, acct) {
   if (!p || p.cpu) return;
   const L = lookFor(acct, m), old = p.name, name = L.name === old ? old : uniqueName(L.name);
   ensurePlayer(id, name, L.color, L.eye, L.cos);
-  if (name !== old) hostFeed(`${old} is now ${name}`);
+  if (name !== old && !p.joining) hostFeed(`${old} is now ${name}`);
+  p.joining = false;
   pushState();
 }
-// ask the account server what this player's ticket really owns (cached until their ticket changes)
-function hostVerify(id, m) {
+// ask the account server what this player's ticket really owns (remembered until their ticket
+// changes). If the server can't be reached they stay a guest, and it tries again a few times.
+function hostVerify(id, m, tries = 0) {
   const p = players.get(id);
   if (!p) return;
   if (p.ticket === m.ticket && p.acct !== undefined) { hostApplyLook(id, m, p.acct); return; }
-  p.ticket = m.ticket;
+  if (!tries) { p.ticket = m.ticket; p.joining = p.acct === undefined; }
   Account.verify(m.ticket).then((v) => {
     const q = players.get(id);
     if (!q || q.ticket !== m.ticket) return;
-    q.acct = v === 'offline' ? 'trust' : v;
-    hostApplyLook(id, m, q.acct);
+    if (v === 'offline') { if (tries < 4) setTimeout(() => hostVerify(id, m, tries + 1), 3000 * (tries + 1)); return; }
+    q.acct = v;
+    hostApplyLook(id, m, v);
   });
 }
 // someone changed their colors / cosmetics in the middle of a game
@@ -1645,6 +1696,7 @@ function hostTick(dt) {
       }
     } else {
       H.timeLeft -= dt;
+      hostTrackMoves();
       if (game.rndOn) hostRandomTick(dt);
       if (game.mode === 'race') H.raceTime += dt;
       if (game.mode === 'bomb' && game.it.length) {
@@ -1717,6 +1769,7 @@ function clientHandle(m) {
     case 'snap': applySnap(m); break;
     case 'tp': if (Array.isArray(m.p)) me.teleport(m.p, Number.isFinite(+m.y) ? +m.y : faceCenter(m.p)); break;
     case 'feed': addFeed(String(m.text).slice(0, 120)); break;
+    case 'prize': onPrize(m); break;
     case 'tagev': showTagEvent(String(m.from), String(m.to)); break;
     case 'boom': if (Array.isArray(m.p)) onBoom(String(m.id), m.p.map(Number), !!m.out); break;
     case 'full': inGame = false; showMsg('Lobby full', 'That game already has the maximum number of players.'); break;
@@ -1992,7 +2045,7 @@ function paletteHTML(part) {
   return ITEMS.TIERS.map((t) => {
     const list = ITEMS.COLORS.filter((c) => c.tier === t.id);
     return `<div class="tier-row" style="--tc:${t.color}">${t.name}</div>` + list.map((c) => (own.has(c.hex)
-      ? `<button type="button" class="sw${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (your ${part === 'eye' ? 'body' : 'eyes'} - click to swap)` : ''}"></button>`
+      ? `<button type="button" class="sw t-${t.id}${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (your ${part === 'eye' ? 'body' : 'eyes'} - click to swap)` : ''}"></button>`
       : `<button type="button" class="sw locked" style="--tc:${t.color}" title="${t.name} - win games to unlock" disabled></button>`)).join('');
   }).join('');
 }
@@ -2672,7 +2725,7 @@ function updateGame(dt) {
     a.marker.visible = !!xr && (game.mode !== 'bomb' || it || isExposed(p.id));
     if (a.marker.visible) { a.marker.material.color.set(xr); a.marker.scale.set(0.45, 0.45, 1).multiplyScalar(0.8 + Math.min(1.6, dist / 18)); }
     a.bodyMat.emissive.setHex(it && game.mode === 'bomb' ? 0x3a0806 : 0x000000);
-    // how close is the danger (for the heartbeat + red vignette)
+    // how close is the danger (for the red vignette)
     if (go && !isOut(myId) && (canTagPair(myId, p.id) || canTagPair(p.id, myId))) oppDist = Math.min(oppDist, dist);
     if (go && !isOut(myId) && ((game.mode === 'bomb' && it && !isIt(myId)) || (game.mode === 'duel' && it && !isIt(myId) && inDuel(myId))
       || (game.mode === 'koth' && isIt(myId)))) nearestSeeker = Math.min(nearestSeeker, dist);
@@ -2715,70 +2768,98 @@ function updateGame(dt) {
 // ---------- prize crate: it shakes, pops open, and a reel of items spins and slows down on your prize ----------
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let crateBusy = false;
-async function openCrate() {
+async function openCrate(match) {
   if (crateBusy) return;
   crateBusy = true;
   try {
-    const id = await Account.claim(), prize = id && ITEMS.byId[id];
+    const id = await Account.claim(match), prize = id && ITEMS.byId[id];
     if (!prize) return;
-    const box = $('prize'), crate = $('crate'), wrap = $('reelWrap'), reel = $('reel'), label = $('prizeName');
-    const tierOf = (it) => ITEMS.tier(it.tier);
+    const box = $('prize'), crate = $('crate'), wrap = $('reelWrap'), reel = $('reel'), reveal = $('reveal'), fl = $('prizeFlash');
+    const tierOf = (it) => ITEMS.tier(it.tier), t = tierOf(prize), rank = ITEMS.TIERS.indexOf(t);
+    const flash = (c) => { fl.style.setProperty('--fc', c); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); };
     box.className = 'prize';
     crate.className = 'crate';
     crate.style.display = '';
     wrap.classList.add('hidden');
-    label.innerHTML = '';
+    reveal.classList.add('hidden');
+    // 1. the crate drops in, then shakes harder and harder
+    await wait(650);
     crate.classList.add('shake');
-    for (let i = 0; i < 6; i++) tone(180 + i * 40, 140 + i * 40, 0.08, 'square', 0.04, i * 0.17);
-    await wait(1100);
-    crate.classList.remove('shake');
+    for (let i = 0; i < 10; i++) tone(160 + i * 30, 120 + i * 30, 0.07, 'square', 0.03 + i * 0.004, i * 0.11);
+    await wait(700);
+    crate.classList.add('hard');
+    await wait(450);
+    // 2. it bursts open
+    crate.classList.remove('shake', 'hard');
     crate.classList.add('open');
-    tone(300, 900, 0.25, 'triangle', 0.08);
-    await wait(500);
+    flash('#ffffff');
+    tone(200, 1200, 0.3, 'triangle', 0.09);
+    await wait(420);
     crate.style.display = 'none';
-    // the reel: random items (by rarity), with the prize at slot WIN
-    const N = 58, WIN = 50, items = [];
+    // 3. the line: a flat strip of colors - common ones wide, rare ones thin - races past the marker
+    // and slows to a stop on the prize. The marker and the glow take the rarity of what's under it.
+    const W = { common: 92, uncommon: 76, rare: 60, epic: 46, legendary: 34, mythic: 24 };
+    const N = 70, WIN = 60, items = [];
     for (let i = 0; i < N; i++) items.push(i === WIN ? prize : ITEMS.roll([], Math.random));
-    reel.innerHTML = items.map((it) => `<div class="it" style="--tc:${tierOf(it).color}">${it.kind === 'cos' ? `<div class="cos">${esc(it.name.toUpperCase())}</div>` : `<div class="sw" style="background:${it.hex}"></div>`}</div>`).join('');
+    reel.innerHTML = items.map((it) => `<i style="width:${W[it.tier]}px;background:${it.hex}"></i>`).join('');
+    const left = [0];
+    for (let i = 0; i < N; i++) left.push(left[i] + W[items[i].tier]);
     reel.style.transform = 'translateX(0)';
+    reel.style.filter = '';
     wrap.classList.remove('hidden');
-    const step = 114, half = wrap.clientWidth / 2;
-    const end = WIN * step + 52 - half + (Math.random() - 0.5) * 80;   // stop somewhere on the prize tile
-    const T = 5800, t0 = performance.now();
-    let last = -1;
+    const half = wrap.clientWidth / 2, w = W[prize.tier];
+    const end = left[WIN] + w * (0.15 + Math.random() * 0.7) - half;   // stop somewhere inside the prize
+    const T = 6200, t0 = performance.now();
+    let last = -1, lastX = 0;
     await new Promise((done) => {
       const f = (now) => {
-        const k = Math.min(1, (now - t0) / T), x = end * (1 - Math.pow(1 - k, 4));
+        const k = Math.min(1, (now - t0) / T), x = end * (1 - Math.pow(1 - k, 4)), v = x - lastX;
+        lastX = x;
         reel.style.transform = `translateX(${-x}px)`;
-        const at = Math.floor((x + half) / step);
-        if (at !== last && items[at]) {   // tick + the glow takes the color of what's under the line
+        reel.style.filter = v > 12 ? `blur(${Math.min(3, v / 14).toFixed(1)}px)` : '';   // motion blur while it's flying
+        let at = last < 0 ? 0 : last;
+        while (at < N - 1 && left[at + 1] <= x + half) at++;
+        if (at !== last) {
           last = at;
-          tone(1100, 800, 0.025, 'square', 0.025);
-          wrap.style.setProperty('--glow', tierOf(items[at]).color);
-          wrap.classList.toggle('mythic', items[at].tier === 'mythic');   // black glow, white rim
+          tone(700 + 700 * k, 600 + 600 * k, 0.025, 'square', 0.025);   // ticks climb as it slows
+          const tc = tierOf(items[at]).color;
+          wrap.style.setProperty('--glow', tc);
+          wrap.classList.toggle('mythic', items[at].tier === 'mythic');
         }
         if (k < 1) requestAnimationFrame(f); else done();
       };
       requestAnimationFrame(f);
     });
-    // the reveal: bigger the rarer it is
-    const t = tierOf(prize), rank = ITEMS.TIERS.indexOf(t);
+    reel.style.filter = '';
+    await wait(350);
+    // 4. the reveal: rays, a flash and a big card - bigger and louder the rarer it is
     reel.children[WIN].classList.add('win');
+    flash(t.id === 'mythic' ? '#000000' : t.color);
+    reveal.className = `reveal ${t.id}`;
+    box.classList.add('revealed');
+    reveal.style.setProperty('--rc', t.id === 'mythic' ? '#ffffff' : t.color);
+    $('rvSw').style.background = prize.hex;
+    $('rvTier').textContent = t.name.toUpperCase();
+    $('rvName').textContent = prize.name;
+    if (rank >= 4) box.classList.add('quake');
     if (t.id === 'mythic') box.classList.add('mythic');
-    label.innerHTML = `<div class="pt${t.id === 'mythic' ? ' black' : ''}" style="--tc:${t.color}">${t.name.toUpperCase()}</div><div class="pn">${esc(prize.name)}</div>`;
-    [523, 659, 784, 1046, 1318, 1568].slice(0, 2 + rank).forEach((f, i) => tone(f, f * 1.01, 0.18, 'triangle', 0.07, i * 0.09));
-    for (let i = 0; i < 12 + rank * 18; i++) {
-      const c = document.createElement('i');
+    [523, 659, 784, 1046, 1318, 1568].slice(0, 2 + rank).forEach((fq, i) => tone(fq, fq * 1.01, 0.22, 'triangle', 0.08, i * 0.09));
+    if (rank >= 4) tone(110, 55, 0.6, 'sawtooth', 0.06, 0.05);
+    for (let i = 0; i < 24 + rank * 22; i++) {
+      const c = document.createElement('i'), a = Math.random() * Math.PI * 2, r = 160 + Math.random() * 420;
       c.className = 'confetti';
-      c.style.left = `${Math.random() * 100}vw`;
-      c.style.background = Math.random() < 0.5 ? t.color : prize.hex || t.color;
-      c.style.animationDuration = `${1.6 + Math.random() * 1.6}s`;
-      c.style.animationDelay = `${Math.random() * 0.4}s`;
+      c.style.setProperty('--dx', `calc(-50% + ${Math.cos(a) * r}px)`);
+      c.style.setProperty('--dy', `calc(-50% + ${Math.sin(a) * r + 120}px)`);
+      c.style.setProperty('--rot', `${Math.random() * 900 - 450}deg`);
+      c.style.background = Math.random() < 0.5 ? (t.id === 'mythic' ? (Math.random() < 0.5 ? '#000' : '#fff') : t.color) : prize.hex;
+      c.style.animationDuration = `${1.2 + Math.random() * 1.2}s`;
       document.body.appendChild(c);
-      setTimeout(() => c.remove(), 3800);
+      setTimeout(() => c.remove(), 2600);
     }
-    await wait(3600);
-    box.classList.add('hidden');
+    await wait(4200);
+    box.classList.add('out');
+    await wait(450);
+    box.className = 'prize hidden';
   } finally { crateBusy = false; }
 }
 
@@ -2925,6 +3006,7 @@ function setDark(on) {
   const m = World.map;
   scene.fog = on ? darkFog : m.fogDensity ? fogExp : fogLin;
   scene.background.set(on ? '#000000' : m.sky);
+  if (!on) { scene.fog.color.set(m.sky); ambient.color.set(m.hemi[0]); }
   if (on) tone(160, 70, 0.12, 'square', 0.05);
   else tone(90, 220, 0.1, 'square', 0.04);
 }
@@ -3025,8 +3107,8 @@ function setSpeedlines(op) {
   el.classList.toggle('on', op !== '0.00');
 }
 
-// --- 2-player helpers: where's the other player, heartbeat, countdowns, close calls ---
-let shake = 0, nearFlag = false, closeCallAt = 0, beatT = 0, lastCount = 0, lastTick = 0;
+// --- 2-player helpers: where's the other player, countdowns ---
+let shake = 0, nearFlag = false, closeCallAt = 0, lastCount = 0, lastTick = 0;
 const projV = new THREE.Vector3();
 function twoPlayerFx(dt, nearestSeeker) {
   const playing = isPlaying(), now = performance.now();
@@ -3105,11 +3187,6 @@ function twoPlayerFx(dt, nearestSeeker) {
   }
   if (ptr.style.display !== (show ? 'block' : 'none')) ptr.style.display = show ? 'block' : 'none';
 
-  // heartbeat when the danger is closing in
-  if (playing && game.rl <= 0 && nearestSeeker < 16) {
-    beatT -= dt;
-    if (beatT <= 0) { SFX.beat(); beatT = 0.32 + 0.9 * (nearestSeeker / 16); }
-  } else beatT = 0;
 }
 const projV2 = new THREE.Vector3();
 
@@ -3266,7 +3343,7 @@ function renderName() {
   $('name').value = myName();
   $('nameHint').innerHTML = Account.me ? (devOn() ? 'Developer mode is on' : '') : 'Guest name. <a data-go="account">Create an account</a> to pick your own.';
 }
-$('nameHint').onclick = (e) => { if (e.target.dataset.go) showView($('menu'), e.target.dataset.go); };
+$('nameHint').onclick = $('qMsg').onclick = (e) => { if (e.target.dataset.go) { e.preventDefault(); showView($('menu'), e.target.dataset.go); } };
 
 // character preview + fur color on the main menu
 // first time here: a random body color (eyes that stand out on it), kept from then on
