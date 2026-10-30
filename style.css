@@ -520,9 +520,6 @@ button { font-family: inherit; }
 .confetti { position: fixed; left: 50%; top: 50%; width: 10px; height: 16px; z-index: 56; pointer-events: none; animation: burst cubic-bezier(0.15, 0.8, 0.4, 1) forwards; }
 @keyframes burst { 0% { transform: translate(-50%, -50%) rotate(0); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
 /* the swatches in the color grids: legendary shimmer, mythic glow */
-.palette .sw.t-legendary { position: relative; overflow: hidden; }
-.palette .sw.t-legendary::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.7) 50%, transparent 65%); animation: sheen 2.2s ease-in-out infinite; }
-.palette .sw.t-mythic { box-shadow: 0 0 0 2px #000, 0 0 10px 2px rgba(0, 0, 0, 0.6); }
 
 /* lobby: compact mode + map pickers */
 .mode-cards { grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -574,3 +571,15 @@ button { font-family: inherit; }
 .prize { gap: 46px; }
 .prize .prize-title, .prize .reel-wrap { transition: opacity 0.4s; }
 .prize.revealed .prize-title, .prize.revealed .reel-wrap { opacity: 0.15; }
+/* legendary swatches stand apart: double size, a thick gold frame and a warm glow */
+.palette .sw.t-legendary { grid-column: span 2; border: 3px solid #ffc23d; outline: 2px solid var(--ink); box-shadow: 0 0 10px 2px rgba(255, 194, 61, 0.75); }
+.palette .sw.t-legendary.on { outline: 3px solid var(--ink); outline-offset: 2px; }
+.palette .sw.locked.t-legendary, .palette .sw.locked { grid-column: auto; }
+/* color names: on the color bar, and a caption under the grids */
+.color-split .half { flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 1px; }
+.color-split .half .cname { font: italic 600 12px Rubik, sans-serif; letter-spacing: 0; text-transform: none; opacity: 0.85; }
+.color-split .half::after { position: absolute; right: 10px; bottom: 8px; }
+.pal-cap { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 6px 4px 0; border-top: 2px solid var(--line); margin-top: 4px; position: sticky; bottom: -8px; background: var(--panel); }
+.pal-cap b { font: 400 17px 'Lilita One', Impact, sans-serif; color: var(--ink); }
+.pal-cap span { font: 800 10px Rubik, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; background: var(--tc, var(--line-2)); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.play-actions { align-self: start; }

@@ -9,8 +9,9 @@ const Account = (() => {
   const $ = (id) => document.getElementById(id);
   const API = /vercel\.app$/.test(location.hostname) ? 'api/account' : 'https://sirishpande.vercel.app/api/account';
   const KEYS = { settings: 'scamper-settings', stats: 'scamper-stats', me: 'scamper-account', last: 'scamper-last-name' };
-  const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) || null; } catch (e) { return null; } };
-  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const read = (k) => Store.get(k);
+  const write = (k, v) => (v === null ? Store.remove(k) : Store.set(k, v));
+  const hadSettings = !!read(KEYS.settings);   // nothing saved on this computer yet? then fetch it from the account
   let me = read(KEYS.me);   // { name, token, ticket, inv: { colors, cos }, dev, updated }
   if (me && (!me.token || !me.inv)) me = null;
   let online = null, saveTimer = 0, checkTimer = 0, tab = 'new', pendingSave = false;
@@ -170,7 +171,7 @@ const Account = (() => {
       const j = await call({ action: 'load', token: me.token });
       const newer = j.updated > (me.updated || 0);
       take(j);
-      if (newer && j.data && !sessionStorage.getItem('scamper-synced')) {
+      if ((newer || !hadSettings) && j.data && j.data.settings && Object.keys(j.data.settings).length && !sessionStorage.getItem('scamper-synced')) {
         sessionStorage.setItem('scamper-synced', '1');
         write(KEYS.settings, j.data.settings || {});
         write(KEYS.stats, j.data.stats || {});

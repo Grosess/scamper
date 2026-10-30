@@ -20,8 +20,8 @@ const settings = Object.assign(
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
-function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
-function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} Account.dirty(); }
+function loadJSON(k) { return Store.get(k) || {}; }   // local storage, or its cookie copy (store.js)
+function saveSettings() { Store.set('scamper-settings', settings); Account.dirty(); }
 
 // CPU players (host only): id -> Bot (see bots.js)
 const bots = new Map();
@@ -31,7 +31,7 @@ const stats = (() => {
   const KEY = 'scamper-stats';
   const d = Object.assign({ games: 0, wins: 0, tags: 0, exploded: 0, playTime: 0, modes: {}, race: { best: {}, finishes: 0, falls: 0 }, kothBest: 0, pvp: { games: 0, wins: 0 } }, loadJSON(KEY));
   const mode = (m) => (d.modes[m] = Object.assign({ games: 0, wins: 0, tags: 0, pg: 0, pw: 0 }, d.modes[m] || {}));
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} Account.dirty(); };
+  const save = () => { Store.set(KEY, d); Account.dirty(); };
   let unsaved = 0;
   return {
     data: d,
@@ -700,7 +700,8 @@ function fixLook() {
   const own = ownedColors();
   if (!own.length) return;
   if (!own.includes(settings.color)) settings.color = own[0];
-  if (!own.includes(settings.eye) || settings.eye === settings.color) settings.eye = own.find((h) => h !== settings.color) || own[0];
+  // body and eyes can't match - except in developer mode
+  if (!own.includes(settings.eye) || (settings.eye === settings.color && !devOn())) settings.eye = own.find((h) => h !== settings.color) || own[0];
 }
 // cosmetics you haven't won are switched off
 function limitCos(c, owns) {
@@ -1609,7 +1610,7 @@ function lookFor(acct, m) {
     return { name: ITEMS.GUEST_NAMES.includes(g) ? g : ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)], color: GUEST.body, eye: GUEST.eye, cos: null };
   }
   const own = acct.colors, color = own.includes(m.color) ? m.color : own[0];
-  const eye = own.includes(m.eye) && m.eye !== color ? m.eye : own.find((h) => h !== color) || own[0];
+  const eye = own.includes(m.eye) && (m.eye !== color || acct.dev) ? m.eye : own.find((h) => h !== color) || own[0];
   return { name: acct.name, color, eye, cos: limitCos(pickCos(m.cos), (k) => acct.cos.includes(k)) };
 }
 function hostApplyLook(id, m, acct) {
@@ -2041,19 +2042,38 @@ function updatePauseUI() {
 // every color by rarity: the ones you own you can click, the rest are locked "?" tiles
 function paletteHTML(part) {
   if (!Account.me) return `<div class="pal-msg">Guests are always blue. ${inGame ? 'Make an account from the main menu' : '<a data-go="account">Create an account</a>'} to get your own colors.</div>`;
-  const own = new Set(ownedColors()), cur = part === 'eye' ? settings.eye : settings.color, other = part === 'eye' ? settings.color : settings.eye;
+  const own = new Set(ownedColors()), cur = part === 'eye' ? settings.eye : settings.color, other = devOn() ? null : part === 'eye' ? settings.color : settings.eye;
   return ITEMS.TIERS.map((t) => {
     const list = ITEMS.COLORS.filter((c) => c.tier === t.id);
     return `<div class="tier-row" style="--tc:${t.color}">${t.name}</div>` + list.map((c) => (own.has(c.hex)
       ? `<button type="button" class="sw t-${t.id}${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (your ${part === 'eye' ? 'body' : 'eyes'} - click to swap)` : ''}"></button>`
-      : `<button type="button" class="sw locked" style="--tc:${t.color}" title="${t.name} - win games to unlock" disabled></button>`)).join('');
-  }).join('');
+      : `<button type="button" class="sw locked" style="--tc:${t.color}" title="${t.name} - win games to unlock"></button>`)).join('');
+  }).join('') + '<div class="pal-cap"></div>';
+}
+// a color's name (and rarity) for labels
+function colorName(hex) {
+  const it = ITEMS.colorByHex[hex];
+  return it ? it.name : hex === GUEST.body ? 'Guest Blue' : hex === GUEST.eye ? 'Ink' : '';
+}
+// the color grids say what you're pointing at (or what you're wearing) underneath
+function palCaption(el, part) {
+  const cap = el.querySelector('.pal-cap');
+  if (!cap) return;
+  const show = (hex) => {
+    const it = ITEMS.colorByHex[hex], t = it && ITEMS.tier(it.tier);
+    cap.innerHTML = it ? `<b>${esc(it.name)}</b><span style="--tc:${t.color}">${t.name}</span>` : '';
+  };
+  show(part === 'eye' ? settings.eye : settings.color);
+  el.onmouseover = (e) => { const b = e.target.closest('.sw'); if (b && b.dataset.c) show(b.dataset.c); else if (b) cap.innerHTML = '<b>???</b><span>Not unlocked yet</span>'; };
+  el.onmouseleave = () => show(part === 'eye' ? settings.eye : settings.color);
 }
 function renderMeEdit() {
   $('pNameText').textContent = myName();
   $('youSub').textContent = Account.me ? '' : 'Guests are always blue. Make an account from the main menu to get your own name and colors.';
   $('pBody').innerHTML = paletteHTML('body');
   $('pEye').innerHTML = paletteHTML('eye');
+  palCaption($('pBody'), 'body');
+  palCaption($('pEye'), 'eye');
 }
 function sendMe() {
   if (!inGame) return;
@@ -3398,15 +3418,17 @@ function renderPreview(dt) { preview.render(dt); }
 const inkFor = (hex) => { const c = new THREE.Color(hex); return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.6 ? '#1f2433' : '#ffffff'; };
 let palFor = '';   // which half the swatch palette is open for: 'body' | 'eye' | ''
 const markColors = () => {
-  for (const [id, c] of [['bodySwatch', settings.color], ['eyeSwatch', settings.eye]]) {
+  for (const [id, c, label] of [['bodySwatch', settings.color, 'Body'], ['eyeSwatch', settings.eye, 'Eyes']]) {
     $(id).style.background = c;
     $(id).style.color = inkFor(c);
+    $(id).innerHTML = `<span>${label}</span><em class="cname">${esc(colorName(c))}</em>`;
   }
   $('bodySwatch').classList.toggle('open', palFor === 'body');
   $('eyeSwatch').classList.toggle('open', palFor === 'eye');
   const pal = $('palette');
   pal.classList.toggle('hidden', !palFor);
   pal.innerHTML = palFor ? paletteHTML(palFor) : '';
+  if (palFor) palCaption(pal, palFor);
 };
 const setColors = (body, eye) => {
   if (body) { settings.color = body; settings.colorPicked = true; }

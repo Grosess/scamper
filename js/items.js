@@ -15,8 +15,8 @@ const ITEMS = (() => {
     { id: 'mythic', name: 'Mythic', color: '#111111', weight: 1 },
   ];
   // 50 colors, from least to most cool, fewer in every step up:
-  //   common (16) soft pastels -> uncommon (12) candy brights -> rare (10) deep jewel tones ->
-  //   epic (6) neons -> legendary (4) one-of-a-kind statement colors -> mythic (2) pure black + white.
+  //   common (16) soft pastels -> uncommon (12) candy brights -> rare (11) loud neons + earthy tones ->
+  //   epic (5) rich jewel tones -> legendary (4) one-of-a-kind statement colors -> mythic (2) pure black + white.
   // Nothing below mythic is pale or dark enough to pass for white or black.
   const hueKey = (hex) => {
     const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
@@ -38,14 +38,15 @@ const ITEMS = (() => {
       ['lime', 'Kiwi', '#9ee34f'], ['jade', 'Clover', '#3ccb7f'], ['teal', 'Lagoon', '#22bdb0'], ['aqua', 'Splash', '#33c7e8'],
       ['azure', 'Blue Raspberry', '#3f8cff'], ['iris', 'Bluebell', '#7f78ff'], ['grape', 'Grape Soda', '#a45cf5'], ['fuchsia', 'Bubble Pink', '#ff63c8'],
     ]),
+    // rare = loud or muddy; epic = the rich, classy ones (picked by looks, not by brightness)
     C('rare', [
-      ['ruby', 'Ruby', '#d11a3a'], ['tomato', 'Paprika', '#e2471b'], ['amber', 'Topaz', '#e69100'], ['chocolate', 'Cocoa', '#8f5530'],
-      ['emerald', 'Emerald', '#12a058'], ['forest', 'Pine', '#2e8150'], ['turquoise', 'Caribbean', '#089fa3'], ['sapphire', 'Sapphire', '#2152cf'],
-      ['amethyst', 'Amethyst', '#7633cb'], ['magenta', 'Magenta', '#c0198a'],
+      ['tomato', 'Slate', '#5d6b7a'], ['hotorange', 'Blaze', '#ff6a00'], ['amber', 'Mustard', '#c9a227'], ['chocolate', 'Cocoa', '#8f5530'],
+      ['laser', 'Highlighter', '#e6f52e'], ['forest', 'Olive', '#7d8a2a'], ['neongreen', 'Radioactive', '#2bf05a'], ['cyber', 'Hyper Cyan', '#00d9f0'],
+      ['turquoise', 'Denim', '#3d5f9e'], ['magenta', 'Plum', '#8e3b78'], ['neonpink', 'Hot Pink', '#ff1f9e'],
     ]),
     C('epic', [
-      ['neonred', 'Laser Red', '#ff1a45'], ['hotorange', 'Blaze', '#ff6a00'], ['laser', 'Highlighter', '#eaff00'],
-      ['neongreen', 'Radioactive', '#29ff5c'], ['cyber', 'Hyper Cyan', '#00ecff'], ['neonpink', 'Hot Pink', '#ff1aa6'],
+      ['ruby', 'Ruby', '#d4143d'], ['copper', 'Copper', '#c8692c'], ['emerald', 'Emerald', '#0f8a4f'],
+      ['sapphire', 'Royal Blue', '#1d3fc4'], ['amethyst', 'Orchid Bloom', '#b5179e'],
     ]),
     C('legendary', [
       ['gold', '24K Gold', '#f2b300'], ['ultraviolet', 'Ultraviolet', '#6a1aff'], ['bloodmoon', 'Blood Moon', '#b0002c'], ['abyss', 'Abyss', '#00727e'],

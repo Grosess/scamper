@@ -76,7 +76,7 @@ const invKey = (name) => 'inv:' + String(name).toLowerCase();   // kept apart, s
 // colors from the old catalog -> the closest one in the current catalog
 const OLD = { lemon: 'butter', lavender: 'lilac', fog: 'sky', cream: 'butter', caramel: 'tangerine', moss: 'lime', plum: 'fuchsia',
   slate: 'azure', blood: 'ruby', deepsea: 'turquoise', navy: 'sapphire', royal: 'amethyst', mauve: 'magenta', steel: 'sapphire',
-  sunset: 'tomato', toxic: 'laser', electric: 'cyber', neonpurple: 'neonpink', rosegold: 'gold', bronze: 'amber', copper: 'tomato',
+  sunset: 'tomato', toxic: 'laser', electric: 'cyber', neonpurple: 'neonpink', rosegold: 'gold', bronze: 'amber', neonred: 'ruby',
   silver: 'sky', platinum: 'periwinkle', pearl: 'butter', graphite: 'sapphire', crimson: 'bloodmoon', midnight: 'abyss' };
 function cleanInv(inv) {
   const colors = [...new Set((inv && inv.colors || []).map((id) => (ITEMS.byId[id] ? id : OLD[id])).filter((id) => ITEMS.byId[id]))];

@@ -307,11 +307,18 @@ function applyCos(c, cos, t) {
     c.neonOn = false;
   }
 }
-// neon: like a neon sign. The body goes dark (a hint of its own color), the edges and eyes glow in a
-// color drifting between cyan and hot pink, a soft aura hangs around the blocks, and now and then
-// the tubes buzz and flicker.
-const NEON_A = new THREE.Color('#14f1ff'), NEON_B = new THREE.Color('#ff2fd0'), NEON_DARK = new THREE.Color('#0b0c16');
-const _neon = new THREE.Color();
+// neon: like a neon sign in your own colors. The body goes dark, the edges and the aura glow in your
+// body color (drifting a little toward your eye color), the eyes glow in your eye color, and now
+// and then the tubes buzz and flicker.
+const NEON_DARK = new THREE.Color('#0b0c16');
+const _neon = new THREE.Color(), _hslN = {};
+// a color made "neon": full saturation and bright. Grays (black, white, ink) can't glow on their
+// own, so they borrow the other color, nudged along the rainbow
+function neonOf(src, fallback, out) {
+  src.getHSL(_hslN);
+  if (_hslN.s < 0.15) { fallback.getHSL(_hslN); _hslN.h = (_hslN.h + 0.08) % 1; if (_hslN.s < 0.15) _hslN.h = 0.55; }
+  return out.setHSL(_hslN.h, 1, 0.58);
+}
 function neonScamp(c, t, rb) {
   if (!c.halos) {
     c.halos = [];
@@ -332,11 +339,14 @@ function neonScamp(c, t, rb) {
   c.flick = Math.max(0, (c.flick || 0) - dt);
   if (!c.flick && Math.random() < dt * 0.35) c.flick = 0.06 + Math.random() * 0.12;
   const on = c.flick ? (Math.sin(t * 90) > 0 ? 0.25 : 0.6) : 1;
-  _neon.copy(NEON_A).lerp(NEON_B, 0.5 + 0.5 * Math.sin(t * 0.8));
+  if (!c.neonA) { c.neonA = new THREE.Color(); c.neonB = new THREE.Color(); }
+  neonOf(c.base.body, c.base.eye, c.neonA);
+  neonOf(c.base.eye, c.base.body, c.neonB);
+  _neon.copy(c.neonA).lerp(c.neonB, 0.25 + 0.25 * Math.sin(t * 0.8));
   c.outline.color.copy(_neon).multiplyScalar(on * 1.6);
   if (rb !== 'body' && rb !== 'both') c.fur.color.copy(c.base.body).lerp(NEON_DARK, 0.84);
   c.fur.emissive.copy(_neon).multiplyScalar(0.07 * on);
-  if (rb !== 'eyes' && rb !== 'both') c.eyeMat.color.copy(_neon).lerp(new THREE.Color(0xffffff), 0.35).multiplyScalar(on);
+  if (rb !== 'eyes' && rb !== 'both') c.eyeMat.color.copy(c.neonB).lerp(new THREE.Color(0xffffff), 0.3).multiplyScalar(on);
   for (const h of c.halos) { h.visible = true; h.material.color.copy(_neon); h.material.opacity = h.userData.op * on; }
   c.neonOn = true;
 }
