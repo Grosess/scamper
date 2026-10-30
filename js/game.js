@@ -680,7 +680,7 @@ function pickCos(c) {
 // ---------- who you are: an account (its unique name + what it has won) or a guest ----------
 // guests all look the same (blue, dark eyes) and get a cute random name - make an account for more
 const GUEST = ITEMS.GUEST;
-if (!ITEMS.GUEST_NAMES.includes(settings.guestName)) settings.guestName = ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)];
+if (!ITEMS.GUEST_NAMES.includes(settings.guestName)) { settings.guestName = ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)]; saveSettings(); }
 const devOn = () => !!(Account.me && Account.me.dev && settings.devMode);   // developer mode: everything unlocked
 const myName = () => (Account.me ? Account.me.name : settings.guestName);
 function ownedColors() {
