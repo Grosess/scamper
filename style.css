@@ -579,7 +579,17 @@ button { font-family: inherit; }
 .color-split .half { flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 1px; }
 .color-split .half .cname { font: italic 600 12px Rubik, sans-serif; letter-spacing: 0; text-transform: none; opacity: 0.85; }
 .color-split .half::after { position: absolute; right: 10px; bottom: 8px; }
-.pal-cap { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 6px 4px 0; border-top: 2px solid var(--line); margin-top: 4px; position: sticky; bottom: -8px; background: var(--panel); }
-.pal-cap b { font: 400 17px 'Lilita One', Impact, sans-serif; color: var(--ink); }
-.pal-cap span { font: 800 10px Rubik, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; background: var(--tc, var(--line-2)); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+/* the hover popup over a swatch */
+.sw-tip { position: fixed; z-index: 70; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 7px; padding: 6px 9px; background: #fff; border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); pointer-events: none; white-space: nowrap; }
+.sw-tip b { font: 800 14px Rubik, system-ui, sans-serif; color: var(--ink); }
+.sw-tip span { font: 800 10px Rubik, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; background: var(--tc, var(--line-2)); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 .play-actions { align-self: start; }
+.skin-pick { cursor: pointer; }
+/* color bar labels: the sidebar's font, upright */
+.color-split .half { font-family: Rubik, system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.02em; }
+.color-split .half .cname { font: 600 12px Rubik, system-ui, sans-serif; font-style: normal; }
+/* color bar: label + color name stacked on the left, EDIT lined up with the name */
+.color-split .half { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-content: end; column-gap: 8px; row-gap: 2px; padding: 8px 12px 9px; }
+.color-split .half > span { grid-column: 1; grid-row: 1; line-height: 1.1; }
+.color-split .half .cname { grid-column: 1; grid-row: 2; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.color-split .half::after { position: static; grid-column: 2; grid-row: 2; align-self: end; line-height: 1.1; }

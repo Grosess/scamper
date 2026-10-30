@@ -21,7 +21,8 @@ function buildScamp(color, eyeColor = '#ffffff') {
   const mouthMat = new THREE.MeshLambertMaterial({ color: '#b8323f' });   // inside of the mouth: tongue red
 
   const box = (parent, w, h, d, mat, x, y, z, edges = true) => {
-    const g = new THREE.BoxGeometry(w, h, d);
+    // the body blocks get many thin rows, so the rainbow wave's bands come out crisp
+    const g = mat === fur ? new THREE.BoxGeometry(w, h, d, 1, 24, 1) : new THREE.BoxGeometry(w, h, d);
     const m = new THREE.Mesh(g, mat);
     m.position.set(x, y, z);
     m.castShadow = false;   // players get a cheap blob shadow instead (game.js)
@@ -216,8 +217,8 @@ function paintScamp(c, mat, baseColor, style, t) {
   for (const { geo, ys } of scampParts(c, mat)) {
     const col = geo.attributes.color;
     for (let i = 0; i < ys.length; i++) {
-      const h = (((ys[i] * 0.55 - surge) % 1) + 1) % 1;
-      _hsl.setHSL(h, 0.8, 0.6 + 0.07 * Math.sin(h * Math.PI * 6));   // a lighter "foam" line in each band
+      const h = (((ys[i] * 0.7 - surge) % 1) + 1) % 1;
+      _hsl.setHSL(h, 0.72, 0.66);   // soft, a little pastel, like the rest of the game
       col.setXYZ(i, _hsl.r, _hsl.g, _hsl.b);
     }
     col.needsUpdate = true;
@@ -349,4 +350,32 @@ function neonScamp(c, t, rb) {
   if (rb !== 'eyes' && rb !== 'both') c.eyeMat.color.copy(c.neonB).lerp(new THREE.Color(0xffffff), 0.3).multiplyScalar(on);
   for (const h of c.halos) { h.visible = true; h.material.color.copy(_neon); h.material.opacity = h.userData.op * on; }
   c.neonOn = true;
+}
+
+// image skin (developer mode): one picture over the front and back of the whole block - body and
+// head together, as if it were one piece - with the sides stretched. url = a data: URL, or null.
+// Call it every frame after applyCos (the rainbow / base color would otherwise paint over it).
+function setScampSkin(c, url) {
+  if (url !== c.skinUrl) {
+    c.skinUrl = url;
+    if (c.skinTex) { c.skinTex.dispose(); c.skinTex = null; }
+    if (url) {
+      if (!c.skinUV) {
+        // squeeze each block's texture coordinates into its share of the picture: the body is the
+        // bottom part, the head the top part
+        const BH = 0.62, HH = 0.56, cut = BH / (BH + HH);
+        c.rig.traverse((o) => {
+          if (!o.isMesh || o.material !== c.fur) return;
+          const head = o.parent === c.head, uv = o.geometry.attributes.uv;
+          for (let i = 0; i < uv.count; i++) uv.setY(i, head ? cut + uv.getY(i) * (1 - cut) : uv.getY(i) * cut);
+          uv.needsUpdate = true;
+        });
+        c.skinUV = true;
+      }
+      c.skinTex = new THREE.TextureLoader().load(url);
+    }
+    c.fur.map = c.skinTex;
+    c.fur.needsUpdate = true;
+  }
+  if (url) c.fur.color.set(0xffffff);
 }

@@ -887,7 +887,7 @@ function applyState(s) {
   const oldChase = seen.chase, wasOut = seen.out;
   const ids = new Set(s.roster.map((r) => r.id));
   for (const id of [...players.keys()]) if (!ids.has(id)) removePlayer(id);
-  for (const r of s.roster) { const p = ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickCos(r.cos)); p.cpu = BOT_SKILL[r.cpu] ? r.cpu : null; }
+  for (const r of s.roster) { if (pendingSkins[r.id] !== undefined) { const q = players.get(r.id) || ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickCos(r.cos)); q.skin = pendingSkins[r.id]; delete pendingSkins[r.id]; } const p = ensurePlayer(r.id, String(r.name).slice(0, 16), pickColor(r.color), pickEye(r.eye), pickCos(r.cos)); p.cpu = BOT_SKILL[r.cpu] ? r.cpu : null; }
 
   if (s.map && (!World.map || s.map !== World.map.id)) loadMap(s.map);
   game.phase = s.phase;
@@ -1582,6 +1582,7 @@ function hostHandle(from, m) {
     const L = lookFor(null, m), name = uniqueName(L.name);
     ensurePlayer(from, name, L.color, L.eye, L.cos);
     if (m.ticket) hostVerify(from, m);
+    for (const q of players.values()) if (q.skin) Net.sendTo(from, { t: 'skin', id: q.id, img: q.skin });
     game.scores[from] = { tags: 0 };
     if (isPlaying() && game.mode === 'koth') game.koth.pts[from] = 0;
     if (game.gp) game.gp.pts[from] = game.gp.pts[from] || 0;
@@ -1600,6 +1601,8 @@ function hostHandle(from, m) {
     hostFinish(from);
   } else if (m.t === 'upd') {
     hostUpdatePlayer(from, m);
+  } else if (m.t === 'skin') {
+    hostSetSkin(from, m.img);
   }
 }
 
@@ -1620,6 +1623,7 @@ function hostApplyLook(id, m, acct) {
   ensurePlayer(id, name, L.color, L.eye, L.cos);
   if (name !== old && !p.joining) hostFeed(`${old} is now ${name}`);
   p.joining = false;
+  if (p.skinWant !== undefined) hostSetSkin(id, p.skinWant);
   pushState();
 }
 // ask the account server what this player's ticket really owns (remembered until their ticket
@@ -1771,6 +1775,7 @@ function clientHandle(m) {
     case 'tp': if (Array.isArray(m.p)) me.teleport(m.p, Number.isFinite(+m.y) ? +m.y : faceCenter(m.p)); break;
     case 'feed': addFeed(String(m.text).slice(0, 120)); break;
     case 'prize': onPrize(m); break;
+    case 'skin': { const p = players.get(String(m.id)); if (p) p.skin = cleanImg(m.img); else pendingSkins[m.id] = cleanImg(m.img); break; }
     case 'tagev': showTagEvent(String(m.from), String(m.to)); break;
     case 'boom': if (Array.isArray(m.p)) onBoom(String(m.id), m.p.map(Number), !!m.out); break;
     case 'full': inGame = false; showMsg('Lobby full', 'That game already has the maximum number of players.'); break;
@@ -2038,6 +2043,47 @@ function updatePauseUI() {
   $('addCpu').disabled = players.size >= CONFIG.tag.maxPlayers;
 }
 
+// ---------- image skins (developer mode only) ----------
+// A picture you pick is shrunk to a small JPEG and sent straight to the other players (through the
+// host) - never to the account server, never saved: it's gone when you refresh.
+let mySkinImg = null;
+const pendingSkins = {};
+const myImg = () => (devOn() ? mySkinImg : null);
+const cleanImg = (img) => (typeof img === 'string' && img.length < 80000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img) ? img : null);
+// host: someone set (or cleared) their image skin. Only the developer account may have one.
+function hostSetSkin(id, img) {
+  const p = players.get(id);
+  if (!p || p.cpu) return;
+  p.skinWant = cleanImg(img);
+  const ok = id === myId ? devOn() : !!(p.acct && p.acct.dev);
+  const skin = ok ? p.skinWant : null;
+  if (skin === (p.skin || null)) return;
+  p.skin = skin;
+  Net.broadcast({ t: 'skin', id, img: skin });
+}
+function sendSkin() {
+  if (!inGame) return;
+  if (Net.isHost) hostSetSkin(myId, myImg()); else Net.send({ t: 'skin', img: myImg() });
+}
+// crop the picture to the block's shape (from the middle) and shrink it
+function pickSkin(file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const W = 128, H = 244, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const k = Math.max(W / img.width, H / img.height), w = img.width * k, h = img.height * k;
+    cv.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    URL.revokeObjectURL(url);
+    mySkinImg = cv.toDataURL('image/jpeg', 0.82);
+    renderCos();
+    sendSkin();
+  };
+  img.src = url;
+}
+$('skinFile').addEventListener('change', (e) => { pickSkin(e.target.files[0]); e.target.value = ''; });
+$('skinClear').onclick = () => { mySkinImg = null; renderCos(); sendSkin(); };
+
 // ---------- you: colors + cosmetics, also mid-game (pause menu -> You) ----------
 // every color by rarity: the ones you own you can click, the rest are locked "?" tiles
 function paletteHTML(part) {
@@ -2048,32 +2094,31 @@ function paletteHTML(part) {
     return `<div class="tier-row" style="--tc:${t.color}">${t.name}</div>` + list.map((c) => (own.has(c.hex)
       ? `<button type="button" class="sw t-${t.id}${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (your ${part === 'eye' ? 'body' : 'eyes'} - click to swap)` : ''}"></button>`
       : `<button type="button" class="sw locked" style="--tc:${t.color}" title="${t.name} - win games to unlock"></button>`)).join('');
-  }).join('') + '<div class="pal-cap"></div>';
+  }).join('');
 }
 // a color's name (and rarity) for labels
 function colorName(hex) {
   const it = ITEMS.colorByHex[hex];
   return it ? it.name : hex === GUEST.body ? 'Guest Blue' : hex === GUEST.eye ? 'Ink' : '';
 }
-// the color grids say what you're pointing at (or what you're wearing) underneath
-function palCaption(el, part) {
-  const cap = el.querySelector('.pal-cap');
-  if (!cap) return;
-  const show = (hex) => {
-    const it = ITEMS.colorByHex[hex], t = it && ITEMS.tier(it.tier);
-    cap.innerHTML = it ? `<b>${esc(it.name)}</b><span style="--tc:${t.color}">${t.name}</span>` : '';
-  };
-  show(part === 'eye' ? settings.eye : settings.color);
-  el.onmouseover = (e) => { const b = e.target.closest('.sw'); if (b && b.dataset.c) show(b.dataset.c); else if (b) cap.innerHTML = '<b>???</b><span>Not unlocked yet</span>'; };
-  el.onmouseleave = () => show(part === 'eye' ? settings.eye : settings.color);
-}
+// hovering a swatch in any color grid: a little popup above the mouse with its name + rarity
+const swTip = document.createElement('div');
+swTip.className = 'sw-tip hidden';
+document.body.appendChild(swTip);
+addEventListener('mousemove', (e) => {
+  const b = e.target.closest && e.target.closest('.palette .sw');
+  if (!b) { swTip.classList.add('hidden'); return; }
+  const it = ITEMS.colorByHex[b.dataset.c], t = it && ITEMS.tier(it.tier);
+  swTip.innerHTML = it ? `<b>${esc(it.name)}</b><span style="--tc:${t.color}">${t.name}</span>` : '<b>???</b><span>Locked</span>';
+  swTip.style.left = `${e.clientX}px`;
+  swTip.style.top = `${e.clientY - 14}px`;
+  swTip.classList.remove('hidden');
+});
 function renderMeEdit() {
   $('pNameText').textContent = myName();
   $('youSub').textContent = Account.me ? '' : 'Guests are always blue. Make an account from the main menu to get your own name and colors.';
   $('pBody').innerHTML = paletteHTML('body');
   $('pEye').innerHTML = paletteHTML('eye');
-  palCaption($('pBody'), 'body');
-  palCaption($('pEye'), 'eye');
 }
 function sendMe() {
   if (!inGame) return;
@@ -2727,6 +2772,7 @@ function updateGame(dt) {
     const imp = hasEv('impostors');
     setScampGhost(a.scamp, !imp && p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
     applyCos(a.scamp, imp ? null : p.cos, now);
+    setScampSkin(a.scamp, imp ? null : p.skin || null);
     if (imp) a.scamp.fur.color.set(IMPOSTOR);
     a.label.material.opacity = isOut(p.id) ? 0.4 : 1;
     // see-through outline of whoever matters to you right now
@@ -3004,6 +3050,7 @@ function updateSelfAvatar(dt, tp) {
   const imp = hasEv('impostors'), cos = imp ? null : myCos();
   setScampGhost(a.scamp, isOut(myId) ? 0.3 : cos && cos.ghost ? cos.ghostOp : 1);
   applyCos(a.scamp, cos, now);
+  setScampSkin(a.scamp, imp ? null : myImg());
   if (imp) a.scamp.fur.color.set(IMPOSTOR);
   a.bomb.visible = playing && game.mode === 'bomb' && isIt(myId);
   if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
@@ -3408,6 +3455,7 @@ const preview = (() => {
       const cos = myCos();
       setScampGhost(c, cos && cos.ghost ? cos.ghostOp : 1);
       applyCos(c, cos, t);
+      setScampSkin(c, myImg());
       r.render(sc, cam);
     },
   };
@@ -3428,7 +3476,6 @@ const markColors = () => {
   const pal = $('palette');
   pal.classList.toggle('hidden', !palFor);
   pal.innerHTML = palFor ? paletteHTML(palFor) : '';
-  if (palFor) palCaption(pal, palFor);
 };
 const setColors = (body, eye) => {
   if (body) { settings.color = body; settings.colorPicked = true; }
@@ -3446,6 +3493,8 @@ markColors();
 const COS_ITEM = { rb: 'rainbow', ghost: 'ghost', neon: 'neon', glint: 'glint' };
 function renderCos() {
   $('cosPanel').classList.toggle('hidden', !Object.values(COS_ITEM).some(ownsCos));
+  $('skinRow').classList.toggle('hidden', !devOn());
+  $('skinClear').classList.toggle('on', !mySkinImg);
   $('cosPanel').querySelectorAll('.pills[data-k]').forEach((g) => { if (COS_ITEM[g.dataset.k]) g.closest('.cos-row').classList.toggle('hidden', !ownsCos(COS_ITEM[g.dataset.k])); });
   const c = Object.assign({}, COS_DEFAULT, settings.cos || {});
   $('cosPanel').querySelectorAll('.pills[data-k]').forEach((g) => g.querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === String(c[g.dataset.k]))));
@@ -3478,6 +3527,7 @@ function onAccount() {
   renderMeEdit();
   $('devModeRow').classList.toggle('hidden', !(Account.me && Account.me.dev));
   sendMe();
+  sendSkin();
 }
 Account.onChange(onAccount);
 renderName();
@@ -3518,6 +3568,7 @@ $('hostBtn').onclick = () => {
     me.teleport(sp, faceCenter(sp));
     enterGame();
     pushState();
+    sendSkin();
   });
 };
 
@@ -3542,6 +3593,7 @@ function join() {
     me.teleport(sp, faceCenter(sp));
     enterGame();
     Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, cos: myCos(), ticket: Account.me ? Account.me.ticket : null });
+    if (myImg()) Net.send({ t: 'skin', img: myImg() });
   });
 }
 $('joinBtn').onclick = join;
