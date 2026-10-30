@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=32">
+  <link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
 
@@ -24,6 +24,7 @@
         <button class="nav-btn" data-view="settings"><span class="nav-num">03</span>Settings</button>
         <button class="nav-btn" data-view="controls"><span class="nav-num">04</span>Controls</button>
         <button class="nav-btn" data-view="howto"><span class="nav-num">05</span>How to play</button>
+        <button class="nav-btn" data-view="account"><span class="nav-num">06</span><span id="accTab">Account</span></button>
       </nav>
     </aside>
 
@@ -45,9 +46,10 @@
             </label>
             <div class="field">Colors</div>
             <div class="color-split">
-              <label class="half" id="bodySwatch"><span>Body</span><input type="color" id="bodyColor" aria-label="Body color"></label>
-              <label class="half" id="eyeSwatch"><span>Eyes</span><input type="color" id="eyeColor" aria-label="Eye color"></label>
+              <button type="button" class="half" id="bodySwatch"><span>Body</span></button>
+              <button type="button" class="half" id="eyeSwatch"><span>Eyes</span></button>
             </div>
+            <div id="palette" class="palette hidden"></div>
             <div id="cosPanel" class="cos-panel hidden">
               <div class="field">Cosmetics</div>
               <div class="cos-row"><span>Rainbow</span><div class="pills" data-k="rb"><button class="pill" data-v="off">Off</button><button class="pill" data-v="body">Body</button><button class="pill" data-v="eyes">Eyes</button><button class="pill" data-v="both">Both</button></div></div>
@@ -88,6 +90,25 @@
         <div id="statsBody" class="stats-body"></div>
       </section>
 
+      <section class="view hidden" data-view="account">
+        <header class="view-head"><h2>Account</h2><p>Log in to keep your settings and stats on any computer.</p></header>
+        <div class="tile acc">
+          <div id="accOut">
+            <label class="field">Username<input id="accUser" maxlength="16" autocomplete="username" spellcheck="false"></label>
+            <label class="field">Password<input id="accPass" type="password" maxlength="72" autocomplete="current-password"></label>
+            <div class="acc-btns"><button id="accLogin" class="btn primary">Log in</button><button id="accRegister" class="btn">Create account</button></div>
+            <p class="note">Usernames: 3-16 letters, numbers or _. Passwords: at least 6 characters. There's no password reset, so don't forget it.</p>
+          </div>
+          <div id="accIn" class="hidden">
+            <p class="acc-who">Logged in as <b id="accName"></b></p>
+            <p class="note" id="accSaved">Your settings and stats save to your account automatically.</p>
+            <button id="accLogout" class="btn">Log out</button>
+          </div>
+          <div id="accOff" class="hidden"><p class="note" id="accOffText">Accounts only work on the Vercel version of Scamper. Here your settings and stats are saved in this browser.</p></div>
+          <p id="accStatus" class="note"></p>
+        </div>
+      </section>
+
       <section class="view hidden" data-view="settings">
         <header class="view-head"><h2>Settings</h2><p>Saved on this device.</p></header>
         <div class="slot" data-panel="settings"></div>
@@ -120,6 +141,21 @@
             <div class="tile-kicker">Mode</div>
             <h3>Duel (1v1)</h3>
             <p>Two players take turns chasing. Catch the runner before the timer ends to score; survive and the runner scores. The chaser sees the runner's outline through walls. First to the target wins.</p>
+          </div>
+          <div class="tile">
+            <div class="tile-kicker">Mode</div>
+            <h3>Race</h3>
+            <p>Everyone starts together on a race course. Get to the finish first. There are no checkpoints: fall off and you're back at the start. The leaderboard shows how far everyone has to go.</p>
+          </div>
+          <div class="tile">
+            <div class="tile-kicker">Mode</div>
+            <h3>Grand Prix</h3>
+            <p>A run of 3, 5 or 7 rounds. Each round is a random mode on a random map. Placings score points (10, 7, 5, 4, 3, 2, then 1 each; Freeze Tag gives 8 to the winning side and 3 to the rest). Most points after the last round wins.</p>
+          </div>
+          <div class="tile">
+            <div class="tile-kicker">Modifier</div>
+            <h3>Randomizer</h3>
+            <p>Turn it on for any mode. Every so often something happens to everyone for a few seconds: No Gravity, Tiny (small and floaty, fits through anything), Lights Out (the lights cut out every 2 seconds and you can only see a meter ahead), Zoomies, or Ice Rink.</p>
           </div>
           <div class="tile wide">
             <div class="tile-kicker">Maps</div>
@@ -261,6 +297,7 @@
         <label class="toggle"><input type="checkbox" id="showSpeed"><span></span>Show speedometer</label>
         <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, a bit less sharp, smoother)</label>
         <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
+        <label class="toggle"><input type="checkbox" id="thirdPerson"><span></span>Third person camera</label>
       </div>
       <input id="secretCode" class="secret-code" maxlength="64" autocomplete="off" spellcheck="false" aria-hidden="true" tabindex="-1">
     </div>
@@ -285,26 +322,30 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=32"></script>
-  <script src="js/config.js?v=32"></script>
-  <script src="js/map.js?v=32"></script>
-  <script src="js/maps/rooftops.js?v=32"></script>
-  <script src="js/maps/shipyard.js?v=32"></script>
-  <script src="js/maps/corridors.js?v=32"></script>
-  <script src="js/maps/fog.js?v=32"></script>
-  <script src="js/maps/playhouse.js?v=32"></script>
-  <script src="js/maps/moon.js?v=32"></script>
-  <script src="js/maps/kitchen.js?v=32"></script>
-  <script src="js/maps/clocktower.js?v=32"></script>
-  <script src="js/maps/lab.js?v=32"></script>
-  <script src="js/maps/skatepark.js?v=32"></script>
-  <script src="js/maps/bounce.js?v=32"></script>
-  <script src="js/maps/infinite.js?v=32"></script>
-  <script src="js/character.js?v=32"></script>
-  <script src="js/world.js?v=32"></script>
-  <script src="js/player.js?v=32"></script>
-  <script src="js/bots.js?v=32"></script>
-  <script src="js/net.js?v=32"></script>
-  <script src="js/game.js?v=32"></script>
+  <script src="js/look.js?v=33"></script>
+  <script src="js/config.js?v=33"></script>
+  <script src="js/map.js?v=33"></script>
+  <script src="js/maps/rooftops.js?v=33"></script>
+  <script src="js/maps/shipyard.js?v=33"></script>
+  <script src="js/maps/corridors.js?v=33"></script>
+  <script src="js/maps/fog.js?v=33"></script>
+  <script src="js/maps/playhouse.js?v=33"></script>
+  <script src="js/maps/moon.js?v=33"></script>
+  <script src="js/maps/kitchen.js?v=33"></script>
+  <script src="js/maps/clocktower.js?v=33"></script>
+  <script src="js/maps/lab.js?v=33"></script>
+  <script src="js/maps/skatepark.js?v=33"></script>
+  <script src="js/maps/bounce.js?v=33"></script>
+  <script src="js/maps/infinite.js?v=33"></script>
+  <script src="js/maps/climb.js?v=33"></script>
+  <script src="js/maps/chambers.js?v=33"></script>
+  <script src="js/maps/volcano.js?v=33"></script>
+  <script src="js/character.js?v=33"></script>
+  <script src="js/world.js?v=33"></script>
+  <script src="js/player.js?v=33"></script>
+  <script src="js/bots.js?v=33"></script>
+  <script src="js/net.js?v=33"></script>
+  <script src="js/account.js?v=33"></script>
+  <script src="js/game.js?v=33"></script>
 </body>
 </html>

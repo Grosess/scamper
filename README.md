@@ -32,11 +32,16 @@ Settings (sensitivity, FOV, volume, invert Y...) and rebindable controls are on 
 - **Bomb Tag**: one player gets the bomb. Run into someone to pass it on (no instant pass-backs). When the fuse runs out, whoever holds it is out and spectates as a ghost; a new bomb drops on someone else. Last one standing wins. The fuse scales with the player count so a game takes 1.5-3.5 minutes; with 2 players each has 2 lives. The holder runs a little faster.
 - **King of the Tag**: the king scores a point every second. Run into the king to steal the crown (a new king is safe for 2s). If the king falls off, the crown drops in the middle for anyone to grab. Most points wins. Chasers run a little faster.
 - **Duel (1v1)**: exactly 2 players taking turns to chase. Catch the runner before the timer ends to score, survive to score; falling off scores for your opponent. First to 3/5/7 wins. The chaser sees the runner's outline through walls and runs a little faster.
-- (Race mode is switched off for now.) **Race**: everyone starts together on a race course. Get to the finish first. No checkpoints - fall off and you're back at the start. The leaderboard shows meters to go. After the first finisher, everyone else has 60 seconds.
+- **Freeze Tag**: seekers (about one per four players) freeze runners by tagging them; free runners thaw frozen teammates by touching them. Seekers win by freezing everyone at once, runners win if the clock runs out.
+- **Race**: everyone starts together on a race course (Cloud Spire, The Chambers, The Volcano). Get to the finish first. No checkpoints - fall off and you're back at the start. The leaderboard shows meters to go. After the first finisher, everyone else has 60 seconds. (CPUs can't finish the courses yet.)
+- **Grand Prix**: 3, 5 or 7 rounds in a row, each a random mode on a random map. Placings score points (10, 7, 5, 4, 3, 2, then 1; in Freeze Tag the winning side gets 8 each and the rest 3). Most points after the last round wins.
+- **Randomizer** (a modifier - turn it on for any mode, Grand Prix included): every so often something happens to everyone for ~13 seconds: **No Gravity**, **Tiny** (small, floaty, fits through anything), **Lights Out** (the lights cut out every 2 seconds - in the dark you only see a meter ahead and nobody's outline), **Zoomies** or **Ice Rink**.
 
 **CPUs**: the host can add CPU players (Easy / Medium / Hard) in the Lobby tab of the pause menu, and remove them with the ×. They play every mode with the same movement as people. Easy CPUs only walk, hop and drop; Medium ones also mantle and use jump pads; Hard ones jump gaps, aim where you're heading, slide to close in, and flee toward spots they can reach before you.
 
-Your stats (games, wins, tags...) are saved in your browser - see **Stats** in the main menu.
+Your stats (games, wins, tags...) are saved in your browser - see **Stats** in the main menu. Win rate only counts games with other people in them, not games against just CPUs. On the Vercel version you can also log in (**Account** in the main menu) to keep settings and stats on any computer.
+
+**Third person**: Settings -> Third person camera (off by default). The camera pulls in so it never goes through walls.
 
 ### Maps
 
@@ -64,6 +69,12 @@ Level features: **jump pads** (glowing squares), **moving platforms** you can ri
 
 Every file is static, so any static host will work: GitHub Pages, itch.io (upload a zip as an HTML game), or Netlify Drop.
 
+**Vercel (with accounts):**
+1. Sign in at vercel.com with GitHub, **Add New -> Project**, import this repo, keep the defaults, **Deploy**. You get `something.vercel.app`, and every push to `main` redeploys it.
+2. For log ins: in the project open **Storage -> Create Database -> Upstash (Redis)**, pick the free plan and connect it to the project, then **Redeploy**. That sets `KV_REST_API_URL` / `KV_REST_API_TOKEN`, which `api/account.js` uses. Without it the game still works; the Account page just says accounts are off.
+
+Passwords are stored as salted scrypt hashes, never as text. There's no password reset.
+
 ## Make it yours
 
 | File | What's in it |
@@ -76,6 +87,7 @@ Every file is static, so any static host will work: GitHub Pages, itch.io (uploa
 | `js/world.js` | Collision, moving platforms, balloons, level features |
 | `js/game.js` | Camera, HUD, menus, sounds, stats, and the rules for every mode |
 | `js/net.js` | Lobbies and join codes |
+| `js/account.js`, `api/account.js` | Optional log in (the page, and the Vercel function that stores accounts) |
 | `style.css` | How the menus and HUD look |
 
 Some easy changes to try:

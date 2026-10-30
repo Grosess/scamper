@@ -137,8 +137,8 @@ defineMap({
     room(49, 71, -6, 6, 0, 10, { deep: 4, floor: [[49, 53, -6, 6]], doors: [{ s: '-x', c: 0 }, { s: '+x', c: 0, y: 3 }] });
     k.box(60, -0.5, 0, 6, 2, 6, PANEL);                                    // island (top 1.5)
     k.box(68, -0.5, 0, 6, 3.5, 12, PANEL);                                 // exit shelf (top 3)
-    k.pad(51.4, 0, 0, 1.6, 1.6, 15, { push: { x: 6.2, z: 0 }, color: BL });
-    k.pad(60.8, 1.5, 0, 1.6, 1.6, 15, { push: { x: 6, z: 0 }, color: BL });
+    k.pad(51.4, 0, 0, 1.6, 1.6, 10, { push: { x: 11.5, z: 0 }, color: BL });
+    k.pad(60.6, 1.5, 0, 1.6, 1.6, 10, { push: { x: 11.5, z: 0 }, color: BL });
 
     // ---------------- 4: kick chimney ----------------
     room(72, 84, -6, 6, 3, 12, { doors: [{ s: '-x', c: 0 }, { s: '+x', c: 0, y: 11 }] });

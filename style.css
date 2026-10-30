@@ -15,7 +15,8 @@
   --yellow: #ffd166;
   --mint: #7ed6c8;
   --lilac: #c3a6ff;
-  --red: #ff6b6b;
+  --red: #ff8a8a;
+  --red-ink: #d4545c;  /* red text on light panels (readable) */
   --shadow: 4px 4px 0 rgba(31, 36, 51, 0.16);
 }
 
@@ -55,7 +56,7 @@ button { font-family: inherit; }
 .nav-btn.resume { background: var(--yellow); color: var(--ink); font-weight: 800; justify-content: center; margin-bottom: 10px; border-color: var(--ink); box-shadow: var(--shadow); }
 .nav-btn.resume:hover { filter: brightness(1.04); }
 .nav-btn.danger { margin-top: 10px; }
-.nav-btn.danger:hover { color: var(--red); }
+.nav-btn.danger:hover { color: var(--red-ink); }
 .side-foot { margin-top: auto; padding-top: 24px; font-size: 12px; color: var(--muted); }
 
 .content { overflow-y: auto; padding: 32px clamp(16px, 4vw, 52px); }
@@ -100,7 +101,7 @@ button { font-family: inherit; }
 .big-btn { margin-top: auto; padding: 16px; font-size: 18px; }
 .host-card h3 { margin-bottom: 18px; }
 #menuStatus { min-height: 22px; margin-top: 12px; font-weight: 600; color: var(--muted); }
-#menuStatus.bad { color: var(--red); }
+#menuStatus.bad { color: var(--red-ink); }
 
 .toggles { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
 .toggle { display: flex; align-items: center; gap: 12px; font-weight: 600; cursor: pointer; user-select: none; }
@@ -208,7 +209,7 @@ button { font-family: inherit; }
 .mode-card { padding: 9px 11px; }
 .mode-card b { display: block; font-size: 14px; margin-bottom: 2px; }
 .mode-card span { display: block; font-size: 11px; color: var(--muted); line-height: 1.3; }
-.mode-card .warn { color: var(--red); margin-top: 3px; }
+.mode-card .warn { color: var(--red-ink); margin-top: 3px; }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .pill { padding: 7px 14px; cursor: pointer; font: 700 13px Rubik, sans-serif; color: var(--ink); background: var(--panel); border: 2px solid var(--line-2); }
 .pill:hover:not(:disabled) { border-color: var(--ink); }
@@ -259,7 +260,7 @@ button { font-family: inherit; }
 #phaseBox { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; min-width: 170px; }
 #phaseText { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: 0.12em; }
 #timerText { font-family: Bungee, Impact, sans-serif; font-size: 26px; }
-#timerText.urgent { color: var(--red); animation: pulse 0.45s infinite alternate; }
+#timerText.urgent { color: var(--red-ink); animation: pulse 0.45s infinite alternate; }
 #roleBadge { margin-left: auto; font-family: Bungee, Impact, sans-serif; font-size: 18px; }
 #roleBadge.it { background: var(--pink); animation: pulse 0.9s infinite alternate; }
 #roleBadge.runner { background: var(--mint); }
@@ -335,7 +336,12 @@ button { font-family: inherit; }
 .color-split .half + .half { border-left: 2px solid var(--ink); }
 .color-split .half:hover { filter: brightness(1.06); }
 .color-split .half::after { content: 'edit'; font: 700 11px Rubik, sans-serif; letter-spacing: 0.04em; opacity: 0.7; text-transform: uppercase; }
-.color-split input[type=color] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.color-split .half { border: 0; color: inherit; text-align: left; }
+.color-split .half.open::after { content: 'close'; }
+.palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; padding: 8px; background: var(--panel); border: 2px solid var(--ink); box-shadow: var(--shadow); }
+.palette .sw { height: 30px; border: 2px solid var(--ink); cursor: pointer; padding: 0; }
+.palette .sw:hover { transform: translate(-1px, -1px); box-shadow: 2px 2px 0 var(--ink); }
+.palette .sw.on { outline: 3px solid var(--ink); outline-offset: 2px; }
 
 /* leaderboard, right side of the HUD */
 #board { position: absolute; right: 16px; top: 92px; width: 232px; background: rgba(255, 255, 255, 0.95); border: 2px solid var(--ink); box-shadow: var(--shadow); color: var(--ink); font-size: 13px; }
@@ -352,7 +358,7 @@ button { font-family: inherit; }
 .board-row.hot { background: #ffe3e8; }
 .board-row.hot .btag { background: var(--red); }
 .board-row.gold { background: #fff3cf; }
-.board-row.gold .btag { background: #c99a10; }
+.board-row.gold .btag { background: #f0c75e; color: var(--ink); }
 .board-row.dead { opacity: 0.45; }
 
 /* Bomb Tag fuse: big, centered under the top bar; shakes and goes red near the end */
@@ -361,12 +367,12 @@ button { font-family: inherit; }
 #fuseNum { font-family: Bungee, Impact, sans-serif; font-size: 38px; line-height: 1.05; }
 .fuse-track { height: 8px; background: var(--line); border: 1.5px solid var(--ink); }
 #fuseBar { height: 100%; background: var(--yellow); transform-origin: left; }
-#fuse.warn #fuseBar { background: #ff9f43; }
+#fuse.warn #fuseBar { background: #ffb37a; }
 #fuse.crit { background: var(--pink); animation: fuseShake 0.09s infinite; }
 #fuse.crit #fuseBar { background: var(--red); }
 #fuse.crit #fuseNum { color: #7a0010; }
 #fuse.mine { width: 240px; border-width: 3px; }
-#fuse.mine .fuse-head::after { content: ' · YOU HAVE IT'; color: var(--red); }
+#fuse.mine .fuse-head::after { content: ' · YOU HAVE IT'; color: var(--red-ink); }
 @keyframes fuseShake { 0% { transform: translate(-50%, 0) rotate(-1.5deg); } 50% { transform: translate(calc(-50% + 3px), 2px) rotate(1.5deg); } 100% { transform: translate(calc(-50% - 2px), -1px) rotate(-1deg); } }
 
 /* stats page */
@@ -396,8 +402,15 @@ button { font-family: inherit; }
 .player-list .tag.cpu { background: var(--lilac); }
 .cpu-x { margin-left: 6px; width: 22px; height: 22px; border: 2px solid var(--ink); background: #fff; font-weight: 800; cursor: pointer; line-height: 1; }
 .board-row.icy { background: #dff6ff; }
-.board-row.icy .btag { background: #3aa7d6; }
+.board-row.icy .btag { background: #8fd3f0; color: var(--ink); }
 /* held in place after falling off: an emptying bar */
 #fallHold { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); width: 260px; text-align: center; padding: 7px 12px 10px; background: rgba(255, 255, 255, 0.95); border: 2px solid var(--ink); box-shadow: var(--shadow); color: var(--ink); }
 #fallHold .fuse-head { margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.14em; color: var(--muted); }
 #fallBar { height: 100%; background: var(--pink); transform-origin: left; }
+
+/* ================= account ================= */
+.tile.acc { max-width: 420px; }
+.acc-btns { display: flex; gap: 10px; margin-bottom: 12px; }
+.acc-btns .btn { flex: 1; }
+.acc-who { font-size: 18px; margin: 0 0 8px; }
+#accStatus.bad { color: var(--red-ink); }

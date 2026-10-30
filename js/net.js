@@ -12,7 +12,6 @@ const Net = {
   onMessage: () => {},
   onLeave: () => {},
   onLost: () => {},
-  onOpen: () => {},   // host: a player's connection finished opening
 
   // Codes alternate consonant/vowel (like "MOKU", "ZEPA") so they're easy to say out loud.
   makeCode() {
@@ -28,8 +27,7 @@ const Net = {
     // ?relay=1 forces everything through TURN relays (what happens on strict networks) - for testing
     const relayOnly = /[?&]relay=1/.test(location.search);
     const iceServers = CONFIG.net.iceServers.concat(CONFIG.net.turn ? [CONFIG.net.turn] : []);
-    // gather network routes up front, so connecting through proxies / strict networks is quicker
-    const config = { iceServers, iceTransportPolicy: relayOnly ? 'relay' : 'all', iceCandidatePoolSize: 6 };
+    const config = { iceServers, iceTransportPolicy: relayOnly ? 'relay' : 'all' };
     return Object.assign({ debug: 1, config }, CONFIG.net.peerServer || {});
   },
 
@@ -60,16 +58,14 @@ const Net = {
   },
 
   _accept(c) {
-    // a joiner's hello can arrive before our side reports 'open' - tell the game when it opens
-    // so it can (re)send the joiner everything
-    c.on('open', () => { this.conns.set(c.peer, c); this.onOpen(c.peer); });
+    c.on('open', () => this.conns.set(c.peer, c));
     c.on('data', (d) => this.onMessage(c.peer, d));
     c.on('close', () => { this.conns.delete(c.peer); this.onLeave(c.peer); });
     c.on('error', () => {});
   },
 
-  // join a lobby. First tries often stall while the browsers are still finding a route to each
-  // other, so a stalled or not-found attempt quietly starts over (up to 3 tries) before giving up.
+  // join a lobby. If the code isn't found right away it tries once more (the host may have
+  // just reconnected to the matchmaking server), then explains what went wrong.
   join(code, cb, attempt = 0) {
     const peer = new Peer(this._opts());
     let done = false, reached = false;
@@ -77,27 +73,22 @@ const Net = {
       if (done) return;
       done = true;
       clearTimeout(timer);
-      clearTimeout(stall);
       peer.destroy();
-      if (retry && attempt < 2) setTimeout(() => this.join(code, cb, attempt + 1), 800);
+      if (retry && attempt === 0) setTimeout(() => this.join(code, cb, 1), 1500);
       else cb(msg);
     };
     const timer = setTimeout(() => fail(reached
       ? 'Found the lobby but could not connect to the host. One of your networks is blocking direct connections - try a phone hotspot, or set up a relay (see README).'
       : 'Could not reach the matchmaking server. Check your internet and try again.', !reached), 20000);
-    let stall = 0;
 
     peer.on('open', (id) => {
       this.id = id;
       reached = true;
       const c = peer.connect(CONFIG.net.prefix + code, { reliable: true, serialization: 'json', metadata: { v: CONFIG.version } });
-      // connection not open after 7s: start over with a fresh connection instead of waiting it out
-      stall = setTimeout(() => fail('Found the lobby but could not connect to the host. One of your networks is blocking direct connections - try a phone hotspot, or set up a relay (see README).', true), 7000);
       c.on('open', () => {
         if (done) return;
         done = true;
         clearTimeout(timer);
-        clearTimeout(stall);
         this.peer = peer;
         this.hostConn = c;
         this.code = code;

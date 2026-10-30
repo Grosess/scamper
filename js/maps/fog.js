@@ -156,7 +156,7 @@ defineMap({
     // ---- north yards ----
     k.box(-20, 0, -20, 2.4, 2.6, 2.4, WOOD);                     // shed
     k.box(-16.5, 0, -21.5, 1, 0.4, 3, TRUNK);                    // garden bed
-    k.pad(-8.5, 0, -18.5, 1.6, 1.6, 16, { look: 'tramp', color: BLUE, push: { x: 0, z: 4.5 } });
+    k.pad(-0.7, 0, -22.3, 1.6, 1.6, 16, { look: 'tramp', color: BLUE, push: { x: -8.8, z: 8.8 } });
     k.box(-1.8, 0, -20, 1.8, 0.75, 0.9, WOOD);                    // picnic table + benches
     k.box(-1.8, 0, -21, 1.8, 0.45, 0.35, WOOD);
     k.box(-1.8, 0, -19, 1.8, 0.45, 0.35, WOOD);

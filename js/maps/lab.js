@@ -216,7 +216,7 @@ defineMap({
     slab(k, (6 + A) / 2, L1, -4.25, A - 6, 3.5, UPPER, { t: 0.4 });
     for (const s of [-1, 1]) k.deco(4.25 + s * 1.78, L1 - 0.3, 0, 0.04, 0.16, 2 * A - 0.4, OR, { emissive: '#663000' });
     // floor: launch plates (onto the bridges), vaults, laser bars, juke posts
-    k.pad(-6.5, 0, -7.5, 1.6, 1.6, 18, { push: { x: 0, z: 2.6 }, color: OR });
+    k.pad(-6.5, 0, -20.7, 1.6, 1.6, 20.5, { push: { x: 0, z: 11.5 }, color: OR });
     k.pad(7.5, 0, 6.5, 1.6, 1.6, 18, { push: { x: -2.6, z: 0 }, color: OR });
     k.box(-6, 0, 1.5, 3, 1.0, 0.6, OR);
     k.box(-0.5, 0, -6.5, 0.6, 1.0, 3, OR);

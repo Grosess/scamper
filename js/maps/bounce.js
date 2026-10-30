@@ -61,8 +61,8 @@ defineMap({
     k.box(-1, 0, -13.5, 6, 2.2, 5, DECK, D);              // 2.2  x -4..2
     // foam blocks: stepped way out of the pit, set at angles
     for (const [x, z, r] of [[-27.4, -5, 0.4], [-27.6, 1.8, -0.3], [-33.5, 3.6, 0.7]]) k.box(x, -2.5, z, 2, 1.25, 2, BLOCK, { tex: 'none', rot: r });
-    k.pad(-31, -2.5, -6.5, 2, 2, 22.4, { look: 'tramp', color: LAUNCH, push: { x: 0, z: -6 } });   // pit -> 6.6 terrace
-    k.pad(-31, -2.5, -1, 2, 2, 13, { look: 'tramp', color: MAT });                                  // just for fun
+    k.pad(-31, -2.5, 0.6, 2, 2, 23, { look: 'tramp', color: LAUNCH, push: { x: 0, z: -11.5 } });   // pit -> 6.6 terrace
+    k.pad(-31, -2.5, -4, 2, 2, 13, { look: 'tramp', color: MAT });                                  // just for fun
 
     // ---- middle: bridge over the runway (4.4) from the west terraces to the south deck (4.4) ----
     slab(k, -6, 4.4, 0, 3, 22, DECK2, { t: 0.4, tex: 'none' });          // x -7.5..-4.5, z -11..11
@@ -84,7 +84,7 @@ defineMap({
     // banked ramps against the south wall under the bridge (slide down them for speed)
     k.ramp(20.5, 11.5, 3, 4, 0, 2.4, '+z', CREAM, D);
     k.ramp(27.5, 11.5, 3, 4, 0, 2.4, '+z', CREAM, D);
-    k.pad(30.8, 0, 9, 1.6, 1.6, 23, { color: LAUNCH, push: { x: 3.8, z: 0 } });   // floor -> end balcony
+    k.pad(18.6, 0, 9, 1.6, 1.6, 25, { color: LAUNCH, push: { x: 11.5, z: 0 } });   // floor -> end balcony
 
     // ---- floor: vaults and slide bars between the runway and the walls ----
     k.box(-18, 0, -6, 4, 1, 0.6, CREAM, D);

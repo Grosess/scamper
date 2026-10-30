@@ -16,12 +16,12 @@ if (typeof THREE === 'undefined' || typeof Peer === 'undefined') {
 
 // ---------- settings ----------
 const settings = Object.assign(
-  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false, unlocked: false, cos: null },
+  { name: '', sens: 1, fov: CONFIG.camera.fov, autorun: false, volume: 0.8, invertY: false, showSpeed: true, shake: 1, perfMode: true, showFps: false, thirdPerson: false, unlocked: false, cos: null },
   ['scamper-settings', 'catenaries-settings', 'tagrush-settings'].map(loadJSON).find((o) => Object.keys(o).length) || {});
 const DEFAULT_KEYS = JSON.parse(JSON.stringify(CONFIG.keys));
 if (settings.keys) for (const a in DEFAULT_KEYS) if (Array.isArray(settings.keys[a])) CONFIG.keys[a] = settings.keys[a].slice(0, 2);
 function loadJSON(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
-function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} }
+function saveSettings() { try { localStorage.setItem('scamper-settings', JSON.stringify(settings)); } catch (e) {} Account.dirty(); }
 
 // CPU players (host only): id -> Bot (see bots.js)
 const bots = new Map();
@@ -29,9 +29,9 @@ const bots = new Map();
 // ---------- stats (saved in this browser) ----------
 const stats = (() => {
   const KEY = 'scamper-stats';
-  const d = Object.assign({ games: 0, wins: 0, tags: 0, exploded: 0, playTime: 0, modes: {}, race: { best: {}, finishes: 0, falls: 0 }, kothBest: 0 }, loadJSON(KEY));
-  const mode = (m) => (d.modes[m] = d.modes[m] || { games: 0, wins: 0, tags: 0 });
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} };
+  const d = Object.assign({ games: 0, wins: 0, tags: 0, exploded: 0, playTime: 0, modes: {}, race: { best: {}, finishes: 0, falls: 0 }, kothBest: 0, pvp: { games: 0, wins: 0 } }, loadJSON(KEY));
+  const mode = (m) => (d.modes[m] = Object.assign({ games: 0, wins: 0, tags: 0, pg: 0, pw: 0 }, d.modes[m] || {}));
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} Account.dirty(); };
   let unsaved = 0;
   return {
     data: d,
@@ -40,7 +40,13 @@ const stats = (() => {
       if (!r || !r.mode) return;
       d.games++;
       mode(r.mode).games++;
-      if ((r.winners || []).includes(myId)) { d.wins++; mode(r.mode).wins++; }
+      const won = (r.winners || []).includes(myId);
+      if (won) { d.wins++; mode(r.mode).wins++; }
+      // win rate only counts games against other people, not ones with just CPUs
+      if ([...players.values()].some((p) => p.id !== myId && !p.cpu)) {
+        d.pvp.games++; mode(r.mode).pg++;
+        if (won) { d.pvp.wins++; mode(r.mode).pw++; }
+      }
       if (r.mode === 'koth' && game.koth) d.kothBest = Math.max(d.kothBest, Math.floor(game.koth.pts[myId] || 0));
       save();
     },
@@ -94,6 +100,8 @@ Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, n
 sun.shadow.camera.updateProjectionMatrix();
 sun.shadow.bias = -0.0005;
 scene.add(sun);
+// layer 1 = players only (drawn again around endless maps), so the lights have to reach it too
+for (const l of [hemi, ambient, sun]) l.layers.enable(1);
 
 // spotlights hanging from steel rafters over the void
 const spotGroup = new THREE.Group();
@@ -472,7 +480,7 @@ function makeAvatar(p) {
   const label = makeLabel(p.name, '#ffffff');
   label.position.y = 2.75;
   // floating arrow over their head when they're the one to find (duel runner, king...)
-  const marker = makeLabel('\u25BC', '#c6ff3d', 128);
+  const marker = makeLabel('\u25BC', '#b6f27a', 128);
   marker.position.y = 3.3;
   marker.material.fog = false;
   marker.material.depthTest = false;
@@ -704,11 +712,39 @@ function setPose(p, s) {
 
 const nameOf = (id) => (players.get(id) || { name: '???' }).name;
 
+// ---------- randomizer: random happenings in the middle of a round (works with every mode) ----------
+// move(b) changes the movement numbers (b = this map's normal ones) while the happening lasts
+const RANDOM_EVENTS = {
+  nograv: { name: 'NO GRAVITY', sub: 'Everyone floats - jump and drift', secs: 13,
+    move: (b) => ({ gravity: b.gravity * 0.05, maxFall: 3, jumpSpeed: b.jumpSpeed * 0.45, wallKickUp: b.wallKickUp * 0.35, wallHangGravity: 0 }) },
+  // like a mini mushroom: tiny, quick little legs, big floaty jumps, slow falls, fits through anything
+  tiny: { name: 'TINY', sub: 'Small, floaty and squeezes through anything', secs: 15, scale: 0.45,
+    move: (b) => ({ standHeight: 0.8, crouchHeight: 0.45, radius: 0.18, eyeFromTop: 0.07, stepHeight: 0.22, mantleMaxHeight: 0.9, wallDetect: 0.3,
+      walkSpeed: b.walkSpeed * 0.9, runSpeed: b.runSpeed * 0.9, gravity: b.gravity * 0.55, jumpSpeed: b.jumpSpeed * 0.88, maxFall: b.maxFall * 0.35, wallKickUp: b.wallKickUp * 0.8 }) },
+  // the lights cut out every 2 seconds: in the dark you only see about a meter ahead, and nobody's outline
+  dark: { name: 'LIGHTS OUT', sub: 'The lights keep cutting out', secs: 14 },
+  zoom: { name: 'ZOOMIES', sub: 'Everyone is way faster', secs: 13,
+    move: (b) => ({ walkSpeed: b.walkSpeed * 1.35, runSpeed: b.runSpeed * 1.35, maxSpeed: b.maxSpeed * 1.3, slideBoostCap: b.slideBoostCap * 1.3 }) },
+  ice: { name: 'ICE RINK', sub: 'Every floor is slippery', secs: 13,
+    move: (b) => ({ groundAccel: b.groundAccel * 0.3, groundFriction: b.groundFriction * 0.1, overspeedDecay: b.overspeedDecay * 0.15, coastDecay: b.coastDecay * 0.15, speedTurn: b.speedTurn * 0.35, slideFriction: b.slideFriction * 0.3 }) },
+};
+const curEvent = () => (isPlaying() && game.rnd && RANDOM_EVENTS[game.rnd.ev] ? game.rnd.ev : null);
+const evScale = () => { const e = RANDOM_EVENTS[curEvent()]; return e && e.scale ? e.scale : 1; };
+// lights-out blinks on the shared clock, so everyone's lights go out together
+const isDark = () => curEvent() === 'dark' && Math.floor(worldTime() / 2) % 2 === 0;
+function applyMove() {
+  if (!World.map) return;
+  const base = Object.assign({}, DEFAULT_MOVE, World.map.move || {}), e = RANDOM_EVENTS[curEvent()];
+  Object.assign(CONFIG.move, base, e && e.move ? e.move(base) : {});
+  // growing back to full size under something low: stay crouched until there's room
+  for (const p of [me, ...[...bots.values()].map((b) => b.p)]) if (p && !World.canStand(p)) p.crouching = true;
+}
+
 // ---------- game state (host is the source of truth) ----------
 //   mode   'bomb' | 'duel' | 'koth' | 'race'
 //   it     the special player: bomb holder / duel chaser / king
 const game = { setup: null, phase: 'lobby', mode: 'bomb', map: '', it: [], scores: {}, tl: 0, rl: 0, fz: 0, im: 0, result: null,
-  duel: null, bomb: null, koth: null, race: null, lastTag: null };
+  duel: null, bomb: null, koth: null, race: null, lastTag: null, rnd: null, rndOn: false, gp: null };
 loadMap(settings.lastMap || MAPS[0].id);
 const isIt = (id) => game.it.includes(id);
 const me = new LocalPlayer();
@@ -774,11 +810,10 @@ const fmtRace = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, 
 const ord = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
 
 // what the last applied state looked like (the host edits `game` before applying, so compare to this)
-const seen = { phase: 'lobby', it: [], chase: 0, out: false };
-let gotState = false, exposedUntil = {};
+const seen = { phase: 'lobby', it: [], chase: 0, out: false, ev: null, res: '' };
+let exposedUntil = {};
 const isExposed = (id) => (exposedUntil[id] || 0) > performance.now();
 function applyState(s) {
-  gotState = true;
   const wasIt = seen.it.includes(myId), oldPhase = seen.phase, oldIt = seen.it;
   const oldChase = seen.chase, wasOut = seen.out;
   const ids = new Set(s.roster.map((r) => r.id));
@@ -796,6 +831,9 @@ function applyState(s) {
   game.koth = s.koth || null;
   game.race = s.race || null;
   game.freeze = s.freeze || null;
+  game.rnd = s.rnd && RANDOM_EVENTS[s.rnd.ev] ? { ev: s.rnd.ev, left: +s.rnd.left || 0 } : null;
+  game.rndOn = !!s.rndOn;
+  game.gp = s.gp && typeof s.gp === 'object' ? s.gp : null;
   if (s.setup) game.setup = s.setup;
   game.lastTag = s.lastTag ? { from: s.lastTag.from, to: s.lastTag.to, at: performance.now() - s.lastTag.ago * 1000 } : null;
   exposedUntil = {};
@@ -841,6 +879,18 @@ function applyState(s) {
   }
   if (!wasOut && isOut(myId) && !started) showBanner('<div class="big">YOU\'RE OUT</div><div>Spectating - you can still run around</div>', 2.5);
 
+  // randomizer happening started / ended
+  const ev = curEvent();
+  if (ev !== seen.ev) {
+    seen.ev = ev;
+    applyMove();
+    if (ev) {
+      const e = RANDOM_EVENTS[ev];
+      SFX.start();
+      showBanner(`<div class="sub">RANDOMIZER</div><div class="big gold">${e.name}</div><div>${esc(e.sub)}</div>`, 2.2);
+    } else if (playing) addFeed('Randomizer: back to normal');
+  }
+
   // my race finish got confirmed
   if (playing && game.mode === 'race' && game.race && game.race.done[myId] !== undefined && !raceDone) {
     raceDone = true;
@@ -852,7 +902,8 @@ function applyState(s) {
   }
   if (!playing || game.mode !== 'race') raceDone = false;
 
-  if (game.phase === 'results' && oldPhase !== 'results' && game.result) {
+  const resKey = game.phase === 'results' && game.result ? `${game.result.title}|${game.result.sub}` : '';
+  if (resKey && resKey !== seen.res) {
     SFX.end();
     const r = game.result;
     stats.ended(r);
@@ -860,6 +911,7 @@ function applyState(s) {
       `<ol class="results">${(r.lines || []).map((l) => `<li>${esc(l)}</li>`).join('')}</ol>`);
   }
   if (game.phase === 'lobby' && oldPhase === 'results') $('banner').classList.remove('show');
+  seen.res = resKey;
 
   seen.phase = game.phase;
   seen.it = game.it.slice();
@@ -886,13 +938,23 @@ function applySnap(m) {
 }
 
 // ---------- host: rules ----------
-const H = { exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
+const H = { rndNext: 0, rndLast: '', exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
 // random starting colors for new players: bright, readable bodies
-const COLORS = ['#ff8fa3', '#ffd166', '#7ed6c8', '#8fb4ff', '#c3a6ff', '#ffb37a', '#9be3a8', '#ff6b6b', '#a8dcef', '#f4a6ff', '#2f3138', '#5b6cff', '#3ec98b', '#ff9f43'];
+// the palette: every body and eye color comes from these soft pastels (eyes can also be white or ink)
+const COLORS = ['#ff8fa3', '#ffb3c6', '#ff9b9b', '#ffb37a', '#ffd166', '#ffe599', '#c8e6a0', '#9be3a8', '#7ed6c8',
+  '#a8dcef', '#8fb4ff', '#b8c0ff', '#c3a6ff', '#e0b0ff', '#f4a6ff', '#d9c2a7', '#c9ced6', '#f7f3ea'];
+const EYE_COLORS = ['#ffffff', '#1f2433', '#ff8fa3', '#ffb37a', '#ffd166', '#9be3a8', '#7ed6c8', '#a8dcef', '#8fb4ff', '#c3a6ff', '#f4a6ff', '#e0b0ff'];
+// any other color snaps to the closest one in the palette
+function nearestIn(list, hex) {
+  const c = new THREE.Color(hex), q = new THREE.Color();
+  let best = list[0], bd = Infinity;
+  for (const h of list) { q.set(h); const d = (q.r - c.r) ** 2 + (q.g - c.g) ** 2 + (q.b - c.b) ** 2; if (d < bd) { bd = d; best = h; } }
+  return best;
+}
 
 const isHex = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
-function pickColor(want) { return isHex(want) ? want.toLowerCase() : COLORS[Math.floor(Math.random() * COLORS.length)]; }
-const pickEye = (want) => (isHex(want) ? want.toLowerCase() : '#ffffff');
+function pickColor(want) { return isHex(want) ? nearestIn(COLORS, want.toLowerCase()) : COLORS[Math.floor(Math.random() * COLORS.length)]; }
+const pickEye = (want) => (isHex(want) ? nearestIn(EYE_COLORS, want.toLowerCase()) : '#ffffff');
 function cleanName(n) { return String(n || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 14) || 'bobo'; }
 function uniqueName(n) {
   const taken = new Set([...players.values()].map((p) => p.name));
@@ -903,7 +965,8 @@ function uniqueName(n) {
 function buildState() {
   return {
     t: 'state', phase: game.phase, mode: game.mode, map: game.map, it: game.it.slice(), setup: game.setup,
-    duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race, freeze: game.freeze,
+    duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race, freeze: game.freeze, gp: game.gp, rndOn: game.rndOn,
+    rnd: game.rnd ? { ev: game.rnd.ev, left: r2(game.rnd.left) } : null,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
     exposed: Object.fromEntries(Object.entries(H.exposed).map(([id, t]) => [id, Math.max(0, (t - performance.now()) / 1000)]).filter(([, s]) => s > 0)),
     scores: game.scores, result: game.result,
@@ -951,10 +1014,21 @@ function hostSetMap(id) {
 
 function hostStartRound() {
   if (isPlaying()) return;
-  const su = getSetup(), mode = modeInfo(su.mode), o = su.opts[mode.id];
-  const ids = [...players.keys()];
-  const why = startProblem(mode, ids.length);
+  const su = getSetup(), mode = modeInfo(su.mode);
+  const why = startProblem(mode, players.size);
   if (why) { showBanner(`<div class="big">CAN'T START</div><div>${esc(why)}</div>`, 2.5); return; }
+  game.rndOn = !!su.random;
+  if (mode.id === 'gp') {
+    game.gp = { round: 0, of: su.opts.gp.rounds, pts: {}, last: '', done: false };
+    for (const id of players.keys()) game.gp.pts[id] = 0;
+    hostGpNext();
+    return;
+  }
+  game.gp = null;
+  beginRound(mode.id, su.opts[mode.id]);
+}
+function beginRound(modeId, o) {
+  const mode = modeInfo(modeId), ids = [...players.keys()];
   // the map has to fit the mode (race courses for Race, arenas for the rest)
   if ((World.map.kind === 'race') !== (mode.kind === 'race')) hostSetMap(MAPS.find((m) => (m.kind === 'race') === (mode.kind === 'race')).id);
   game.mode = mode.id;
@@ -964,6 +1038,8 @@ function hostStartRound() {
   ids.forEach((id) => (game.scores[id] = { tags: 0 }));
   game.duel = game.bomb = game.koth = game.race = game.freeze = null;
   game.it = [];
+  game.rnd = null;
+  H.rndNext = 10 + Math.random() * 6;   // first happening after the release
   H.lastTag = null;
   H.endIn = 0;
   H.immune = 0;
@@ -979,6 +1055,55 @@ function hostStartRound() {
   game.rl = H.releaseLeft;
   pushState();
 }
+// --- Grand Prix: a run of rounds, each a random mode on a random map. Every round hands out
+// points by placing; the most points after the last round wins the whole thing ---
+const GP_PTS = [10, 7, 5, 4, 3, 2];
+const GP_OPTS = { bomb: { len: 90 }, freeze: { len: 120 }, koth: { len: 120 }, race: { len: 240 }, duel: { chase: 30, target: 3 } };
+function hostGpNext() {
+  const g = game.gp, n = players.size;
+  g.round++;
+  let pool = ['bomb', 'freeze', 'koth', 'race'].concat(n === 2 ? ['duel'] : []).filter((m) => m !== g.last);
+  const m = pool[Math.floor(Math.random() * pool.length)];
+  g.last = m;
+  const race = m === 'race', maps = MAPS.filter((x) => (x.kind === 'race') === race && x.id !== game.map);
+  const pick = maps.length ? maps[Math.floor(Math.random() * maps.length)] : MAPS.find((x) => (x.kind === 'race') === race);
+  game.phase = 'lobby';
+  hostSetMap(pick.id);
+  hostFeed(`Grand Prix round ${g.round}/${g.of}: ${modeInfo(m).name} on ${World.map.name}`);
+  beginRound(m, GP_OPTS[m]);
+}
+// after a Grand Prix round: hand out the points
+function gpAward(r) {
+  const g = game.gp, rank = (r.ranking || []).filter((id) => players.has(id));
+  if (r.teams) for (const id of rank) g.pts[id] = (g.pts[id] || 0) + (r.winners.includes(id) ? 8 : 3);
+  else rank.forEach((id, i) => (g.pts[id] = (g.pts[id] || 0) + (i < GP_PTS.length ? GP_PTS[i] : 1)));
+  r.sub = `Grand Prix · round ${g.round} of ${g.of}${r.sub ? ' · ' + r.sub : ''}`;
+  r.lines = r.lines.concat(['- Grand Prix -'], gpStandings().map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${g.pts[id] || 0} pts`));
+}
+const gpStandings = () => [...players.keys()].sort((a, b) => (game.gp.pts[b] || 0) - (game.gp.pts[a] || 0));
+function gpFinal() {
+  const st = gpStandings(), top = game.gp.pts[st[0]] || 0, w = st.filter((id) => (game.gp.pts[id] || 0) === top);
+  return { mode: 'gp', winners: w, ranking: st, title: w.length === 1 ? `${nameOf(w[0])} wins the Grand Prix!` : 'The Grand Prix is a tie!',
+    sub: `${game.gp.of} rounds`, lines: st.map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${game.gp.pts[id] || 0} pts`) };
+}
+
+// --- randomizer (host): a happening every so often, never the same one twice in a row ---
+function hostRandomTick(dt) {
+  if (game.rnd) {
+    game.rnd.left -= dt;
+    if (game.rnd.left <= 0) { game.rnd = null; H.rndNext = 9 + Math.random() * 7; pushState(); }
+    return;
+  }
+  H.rndNext -= dt;
+  if (H.rndNext > 0) return;
+  const pool = Object.keys(RANDOM_EVENTS).filter((k) => k !== H.rndLast);
+  const ev = pool[Math.floor(Math.random() * pool.length)];
+  H.rndLast = ev;
+  game.rnd = { ev, left: RANDOM_EVENTS[ev].secs };
+  hostFeed(`Randomizer: ${RANDOM_EVENTS[ev].name}`);
+  pushState();
+}
+
 function startProblem(mode, n) {
   if (mode.max && n !== mode.max) return `${mode.name} needs exactly ${mode.max} players (${n} here).`;
   if (n < mode.min) return `${mode.name} needs ${mode.min}+ players. Share your code first.`;
@@ -1201,6 +1326,8 @@ function hostEndRound(sub) {
   if (!isPlaying()) return;
   game.phase = 'results';
   game.result = computeResult(sub);
+  game.rnd = null;
+  if (game.gp) gpAward(game.result);
   H.resultsLeft = CONFIG.tag.resultsTime;
   H.endIn = 0;
   pushState();
@@ -1211,20 +1338,20 @@ function computeResult(sub) {
   const tags = (id) => (game.scores[id] || { tags: 0 }).tags;
   if (game.mode === 'duel' && game.duel) {
     const d = game.duel, [a, b] = d.ids, w = d.pts[a] >= d.pts[b] ? a : b;
-    return { mode: 'duel', winners: [w], title: `${d.names[w]} wins the duel!`, sub: sub || `${d.pts[a]} - ${d.pts[b]}`,
+    return { mode: 'duel', winners: [w], ranking: [w, d.ids.find((i) => i !== w)], title: `${d.names[w]} wins the duel!`, sub: sub || `${d.pts[a]} - ${d.pts[b]}`,
       lines: d.ids.map((i) => `${d.names[i]} - ${d.pts[i]} points`) };
   }
   if (game.mode === 'bomb' && game.bomb) {
     const b = game.bomb, order = b.alive.concat(b.out.slice().reverse()).filter((id) => players.has(id));
     const w = b.alive.length === 1 ? b.alive[0] : null;
-    return { mode: 'bomb', winners: w ? [w] : [], title: w ? `${nameOf(w)} survives!` : 'Game over', sub: sub || 'Last one standing wins',
+    return { mode: 'bomb', winners: w ? [w] : [], ranking: order, title: w ? `${nameOf(w)} survives!` : 'Game over', sub: sub || 'Last one standing wins',
       lines: order.map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${tags(id)} passes`) };
   }
   if (game.mode === 'freeze' && game.freeze) {
     const seekers = list.filter((p) => isIt(p.id)), runners = list.filter((p) => !isIt(p.id));
     const won = runners.length && runners.every((p) => game.freeze.frozen.includes(p.id)) ? 'seekers' : 'runners';
     const w = won === 'seekers' ? seekers : runners;
-    return { mode: 'freeze', winners: w.map((p) => p.id), title: won === 'seekers' ? 'Seekers win!' : 'Runners win!',
+    return { mode: 'freeze', winners: w.map((p) => p.id), teams: true, ranking: list.map((p) => p.id), title: won === 'seekers' ? 'Seekers win!' : 'Runners win!',
       sub: sub || (won === 'seekers' ? 'Everyone got frozen' : 'Not everyone was frozen'),
       lines: seekers.map((p) => `${p.name} (seeker) - ${tags(p.id)} freezes`).concat(runners.map((p) => `${p.name} - ${tags(p.id)} thaws${game.freeze.frozen.includes(p.id) ? ' (frozen)' : ''}`)) };
   }
@@ -1232,7 +1359,7 @@ function computeResult(sub) {
     const pts = game.koth.pts;
     list.sort((a, b) => (pts[b.id] || 0) - (pts[a.id] || 0));
     const w = list[0];
-    return { mode: 'koth', winners: w ? [w.id] : [], title: w ? `${w.name} rules!` : 'Round over', sub: sub || 'Most time with the crown wins',
+    return { mode: 'koth', winners: w ? [w.id] : [], ranking: list.map((p) => p.id), title: w ? `${w.name} rules!` : 'Round over', sub: sub || 'Most time with the crown wins',
       lines: list.map((p) => `${p.name} - ${Math.floor(pts[p.id] || 0)} points, ${tags(p.id)} steals`) };
   }
   if (game.mode === 'race' && game.race) {
@@ -1240,7 +1367,7 @@ function computeResult(sub) {
     const lines = r.order.filter((id) => players.has(id)).map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${fmtRace(r.done[id])}`)
       .concat(rest.map((p) => `${p.name} - ${Math.round(raceToGo(posOf(p.id)))}m to go`));
     const w = r.order[0];
-    return { mode: 'race', winners: w ? [w] : [], title: w ? `${nameOf(w)} wins the race!` : 'Nobody finished', sub: sub || World.map.name, lines };
+    return { mode: 'race', winners: w ? [w] : [], ranking: r.order.filter((id) => players.has(id)).concat(rest.map((p) => p.id)), title: w ? `${nameOf(w)} wins the race!` : 'Nobody finished', sub: sub || World.map.name, lines };
   }
   return { mode: game.mode, winners: [], title: 'Round over', sub: sub || '', lines: [] };
 }
@@ -1311,7 +1438,7 @@ function hostTryTag(tagger, target) {
 
 function hostHandle(from, m) {
   if (m.t === 'hello') {
-    if (players.has(from)) { Net.sendTo(from, buildState()); return; }
+    if (players.has(from)) return;
     if (m.v !== CONFIG.version) {
       // different versions can't play together - tell them exactly what to do
       Net.sendTo(from, { t: 'oldver', v: CONFIG.version });
@@ -1327,6 +1454,7 @@ function hostHandle(from, m) {
     ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye), pickCos(m.cos));
     game.scores[from] = { tags: 0 };
     if (isPlaying() && game.mode === 'koth') game.koth.pts[from] = 0;
+    if (game.gp) game.gp.pts[from] = game.gp.pts[from] || 0;
     hostFeed(`${name} joined`);
     pushState();
     autoMode();
@@ -1393,6 +1521,7 @@ function hostTick(dt) {
       }
     } else {
       H.timeLeft -= dt;
+      if (game.rndOn) hostRandomTick(dt);
       if (game.mode === 'race') H.raceTime += dt;
       if (game.mode === 'bomb' && game.it.length) {
         H.fuse -= dt;
@@ -1425,7 +1554,20 @@ function hostTick(dt) {
     if (H.stateAcc >= 1 && isPlaying()) { H.stateAcc = 0; pushState(); }
   } else if (game.phase === 'results') {
     H.resultsLeft -= dt;
-    if (H.resultsLeft <= 0) { game.phase = 'lobby'; game.result = null; game.it = []; game.bomb = game.koth = game.race = game.duel = null; pushState(); }
+    if (H.resultsLeft <= 0) {
+      const g = game.gp;
+      if (g && !g.done && g.round < g.of && players.size >= 2) { hostGpNext(); return; }
+      if (g && !g.done) {   // the series is over: show the overall standings for a bit longer
+        g.done = true;
+        game.result = gpFinal();
+        H.resultsLeft = CONFIG.tag.resultsTime + 3;
+        pushState();
+        return;
+      }
+      game.phase = 'lobby'; game.result = null; game.it = []; game.gp = null;
+      game.bomb = game.koth = game.race = game.duel = game.freeze = null;
+      pushState();
+    }
   }
 
   H.snapAcc += dt;
@@ -1471,6 +1613,7 @@ function clientTick(dt) {
     if (game.rl > 0) game.rl = Math.max(0, game.rl - dt);
     else {
       game.tl = Math.max(0, game.tl - dt);
+      if (game.rnd) game.rnd.left = Math.max(0, game.rnd.left - dt);
       if (game.mode === 'bomb' && game.it.length) game.fz = Math.max(0, game.fz - dt);
       if (game.mode === 'koth') {
         game.im = Math.max(0, game.im - dt);
@@ -1491,14 +1634,6 @@ Net.onMessage = (from, m) => {
   else if (from === 'host') clientHandle(m);
 };
 Net.onLeave = (id) => { if (Net.isHost) hostOnLeave(id); };
-// the joiner's connection finished opening on our side: if they already said hello, send them
-// everything again (anything sent before this point was dropped)
-Net.onOpen = (id) => {
-  if (!Net.isHost || !players.has(id)) return;
-  Net.sendTo(id, buildState());
-  const p = players.get(id);
-  Net.sendTo(id, { t: 'tp', p: [p.tp.x, p.tp.y, p.tp.z] });
-};
 Net.onLost = () => {
   if (!inGame) return;
   inGame = false;
@@ -1660,15 +1795,15 @@ function renderStats() {
   const mins = Math.floor(d.playTime / 60), time = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
   const tile = (k, v) => `<div class="stat"><b>${esc(String(v))}</b><span>${esc(k)}</span></div>`;
   const modeRows = MODES.filter((m) => m.id !== 'race').map((m) => {
-    const x = d.modes[m.id] || { games: 0, wins: 0, tags: 0 };
-    return `<tr><td>${m.name}</td><td>${x.games}</td><td>${x.wins}</td><td>${pct(x.wins, x.games)}</td><td>${x.tags}</td></tr>`;
+    const x = Object.assign({ games: 0, wins: 0, tags: 0, pg: 0, pw: 0 }, d.modes[m.id] || {});
+    return `<tr><td>${m.name}</td><td>${x.games}</td><td>${x.wins}</td><td>${pct(x.pw, x.pg)}</td><td>${x.tags}</td></tr>`;
   }).join('');
   const race = d.modes.race || { games: 0, wins: 0 };
   const best = MAPS.filter((m) => m.kind === 'race').map((m) => `<tr><td>${esc(m.name)}</td><td>${d.race.best[m.id] ? fmtRace(d.race.best[m.id]) : '-'}</td></tr>`).join('');
-  $('statsBody').innerHTML = `<div class="tile"><div class="stat-grid">${tile('games', d.games)}${tile('wins', d.wins)}${tile('win rate', pct(d.wins, d.games))}` +
+  $('statsBody').innerHTML = `<div class="tile"><div class="stat-grid">${tile('games', d.games)}${tile('wins', d.wins)}${tile('win rate vs people', pct(d.pvp.wins, d.pvp.games))}` +
     `${tile('tags', d.tags)}${tile('times blown up', d.exploded)}${tile('played', time)}</div></div>` +
     `<div class="tile"><div class="tile-kicker">Tag modes</div><table class="stat-table"><thead><tr><th></th><th>Games</th><th>Wins</th><th>Win rate</th><th>Tags</th></tr></thead><tbody>${modeRows}</tbody></table>` +
-    `<p class="note">Best King of the Tag score: ${d.kothBest}</p></div>` +
+    `<p class="note">Win rate only counts games with other people in them (not games against just CPUs). Best King of the Tag score: ${d.kothBest}</p></div>` +
     (!MAPS.some((m) => m.kind === 'race') ? '' : `<div class="tile"><div class="tile-kicker">Racing</div><table class="stat-table"><thead><tr><th>Course</th><th>Best time</th></tr></thead><tbody>${best}</tbody></table>` +
     `<p class="note">${race.games} races · ${race.wins} wins · ${d.race.finishes} finishes · ${d.race.falls} falls</p></div>`);
 }
@@ -1798,6 +1933,11 @@ function botGoal(b) {
     const k = others.find((q) => isIt(q.id));
     return k ? { type: 'chase', pos: posOfP(k), vel: velOf(k) } : { type: 'wander' };
   }
+  if (game.mode === 'race' && World.map.race) {
+    if (game.race && game.race.done[id] !== undefined) return { type: 'wander' };
+    const f = World.map.race.finish;
+    return { type: 'go', pos: { x: f.x, y: f.y, z: f.z } };
+  }
   return { type: 'wander' };
 }
 // before the physics steps: decide, plan and press keys
@@ -1809,7 +1949,7 @@ function botsThink(dt) {
   }
   const T = CONFIG.tag, go = isPlaying() && game.rl <= 0;
   for (const b of bots.values()) {
-    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id) || performance.now() < (b.lockUntil || 0);
+    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || game.mode === 'race' || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id) || performance.now() < (b.lockUntil || 0);
     if (isFrozen(b.id)) { b.p.vel.x = 0; b.p.vel.z = 0; }
     b.p.speedMul = !go ? 1 : game.mode === 'duel' && isIt(b.id) ? T.duelChaserSpeed
       : game.mode === 'bomb' && isIt(b.id) ? T.bombSpeed : game.mode === 'koth' && !isIt(b.id) ? T.kothSpeed
@@ -1826,7 +1966,7 @@ function botsAfter() {
     World.wrapPos(b.p.pos);
     if (b.p.pos.y < World.map.killY) {
       b.p.teleport(randomSpawn());
-      if (isRunner(b.id)) b.lockUntil = now + CONFIG.tag.fallLock * 1000;
+      if (isRunner(b.id) && World.map.kind !== 'race') b.lockUntil = now + CONFIG.tag.fallLock * 1000;
       hostFell(b.id);
     }
     const p = players.get(b.id);
@@ -1836,6 +1976,7 @@ function botsAfter() {
     p.pitch = 0;
     p.mode = b.p.mode();
     if (!isPlaying() || game.rl > 0) continue;
+    if (game.mode === 'race') { hostFinish(b.id); continue; }
     const reach = CONFIG.tag.touchRange + (game.mode === 'duel' && isIt(b.id) ? CONFIG.tag.duelReachBonus : 0);
     for (const q of players.values()) {
       if (q.id === b.id || !canTagPair(b.id, q.id)) continue;
@@ -1859,8 +2000,12 @@ const MODES = [
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
   { id: 'koth', name: 'King of the Tag', kind: 'tag', min: 2, desc: 'Hold the crown to score a point every second. Run into the king to steal it. Most points wins.',
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
+  { id: 'race', name: 'Race', kind: 'race', min: 1, desc: 'Race to the finish. Fall off and you go back to the start - no checkpoints.',
+    opts: [{ key: 'len', label: 'Time limit', vals: [[240, '4 min'], [360, '6 min'], [480, '8 min']], def: 360 }] },
+  { id: 'gp', name: 'Grand Prix', kind: 'gp', min: 2, desc: 'A run of rounds, each a random mode on a random map. Every round gives points for your placing - most points at the end wins.',
+    opts: [{ key: 'rounds', label: 'Rounds', vals: [[3, '3'], [5, '5'], [7, '7']], def: 5 }] },
 ];
-const hostSetup = { mode: players.size === 2 ? 'duel' : 'bomb', opts: {} };
+const hostSetup = { mode: players.size === 2 ? 'duel' : 'bomb', opts: {}, random: false };
 for (const m of MODES) { hostSetup.opts[m.id] = {}; for (const o of m.opts) hostSetup.opts[m.id][o.key] = o.def; }
 const getSetup = () => (!Net.isHost && game.setup && game.setup.opts ? game.setup : hostSetup);
 const canEditSetup = () => Net.isHost && !isPlaying();
@@ -1873,7 +2018,7 @@ let modePicked = false;
 function autoMode() {
   if (!Net.isHost || modePicked || isPlaying()) return;
   const want = players.size === 2 ? 'duel' : 'bomb';
-  if (hostSetup.mode !== want && hostSetup.mode !== 'race') { hostSetup.mode = want; setupChanged(); }
+  if (hostSetup.mode !== want && hostSetup.mode !== 'race' && hostSetup.mode !== 'gp') { hostSetup.mode = want; setupChanged(); }
 }
 $('modeCards').onclick = (e) => {
   const c = e.target.closest('.mode-card');
@@ -1882,7 +2027,7 @@ $('modeCards').onclick = (e) => {
   hostSetup.mode = c.dataset.id;
   // switching between racing and tag swaps to a map of the right kind
   const race = modeInfo(hostSetup.mode).kind === 'race';
-  if ((World.map.kind === 'race') !== race && inGame) hostSetMap(MAPS.find((m) => (m.kind === 'race') === race).id);
+  if ((World.map.kind === 'race') !== race && inGame && modeInfo(hostSetup.mode).kind !== 'gp') hostSetMap(MAPS.find((m) => (m.kind === 'race') === race).id);
   setupChanged();
 };
 $('mapCards').onclick = (e) => {
@@ -1894,7 +2039,8 @@ $('mapCards').onclick = (e) => {
 $('modeOpts').onclick = (e) => {
   const b = e.target.closest('.pill');
   if (!b || !canEditSetup()) return;
-  hostSetup.opts[hostSetup.mode][b.dataset.k] = +b.dataset.v;
+  if (b.dataset.k === 'random') hostSetup.random = b.dataset.v === '1';
+  else hostSetup.opts[hostSetup.mode][b.dataset.k] = +b.dataset.v;
   setupChanged();
 };
 
@@ -1907,7 +2053,7 @@ function renderSetup() {
     const m = modeInfo(c.dataset.id), why = startProblem(m, players.size);
     c.querySelector('.warn').textContent = why && players.size > 0 ? why.split('.')[0] : '';
   });
-  const maps = MAPS.filter((m) => (m.kind === 'race') === race);
+  const gp = mode.kind === 'gp', maps = gp ? [] : MAPS.filter((m) => (m.kind === 'race') === race);
   const html = maps.map((m) => {
     const [a, b] = m.accent || ['#333', '#555'];
     return `<button class="map-card${m.id === game.map ? ' on' : ''}" data-id="${m.id}"${edit ? '' : ' disabled'}>
@@ -1915,13 +2061,15 @@ function renderSetup() {
       <div class="map-body"><span class="map-name">${esc(m.name)}</span></div></button>`;
   }).join('');
   if ($('mapCards').dataset.html !== html) { $('mapCards').dataset.html = html; $('mapCards').innerHTML = html; }
-  $('mapPickBlurb').textContent = World.map.blurb;
+  $('mapPickBlurb').textContent = gp ? 'Every round picks a random mode and a random map.' : World.map.blurb;
   const o = su.opts[mode.id] || {};
-  $('modeOpts').innerHTML = mode.opts.map((op) => `<div class="pill-row"><span>${op.label}</span><div class="pills">` +
-    op.vals.map(([v, l]) => `<button class="pill${o[op.key] === v ? ' on' : ''}" data-k="${op.key}" data-v="${v}"${edit ? '' : ' disabled'}>${l}</button>`).join('') +
+  // the randomizer is a modifier for every mode (Grand Prix too)
+  const rnd = { key: 'random', label: 'Randomizer', vals: [[0, 'Off'], [1, 'On']] }, rv = su.random ? 1 : 0;
+  $('modeOpts').innerHTML = mode.opts.concat([rnd]).map((op) => `<div class="pill-row"><span>${op.label}</span><div class="pills">` +
+    op.vals.map(([v, l]) => `<button class="pill${(op === rnd ? rv : o[op.key]) === v ? ' on' : ''}" data-k="${op.key}" data-v="${v}"${edit ? '' : ' disabled'}>${l}</button>`).join('') +
     '</div></div>').join('');
-  const desc = mode.opts.map((op) => (op.vals.find((v) => v[0] === o[op.key]) || ['', ''])[1]).join(' · ');
-  $('startSummary').innerHTML = `<b>${mode.name}</b> on <b>${esc(World.map.name)}</b> · ${esc(desc)}`;
+  const desc = mode.opts.map((op) => (op.vals.find((v) => v[0] === o[op.key]) || ['', ''])[1]).concat(su.random ? ['Randomizer'] : []).join(' · ');
+  $('startSummary').innerHTML = gp ? `<b>Grand Prix</b> · ${esc(desc)} rounds` : `<b>${mode.name}</b> on <b>${esc(World.map.name)}</b> · ${esc(desc)}`;
 }
 $('mapSel').innerHTML = MAPS.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
 $('mapSel').onchange = () => {
@@ -1969,6 +2117,7 @@ bindToggle('invertY', 'invertY');
 bindToggle('showSpeed', 'showSpeed', applySpeedVis);
 bindToggle('perf', 'perfMode', applyPerf);
 bindToggle('showFps', 'showFps', () => $('fps').classList.toggle('hidden', !settings.showFps));
+bindToggle('thirdPerson', 'thirdPerson');
 $('fps').classList.toggle('hidden', !settings.showFps);
 applySpeedVis();
 
@@ -2108,6 +2257,7 @@ function frame(now) {
   World.animate(now / 1000, dt);   // after the physics step, so movers are drawn where they collide
   renderPreview(dt);
   renderer.render(scene, camera);
+  if (inGame && World.map.wrap) drawWrapCopies();
   if (inGame) {
     vmCam.rotation.z = camera.rotation.z;
     renderer.autoClear = false;
@@ -2241,13 +2391,19 @@ function updateGame(dt) {
   rollKick *= Math.exp(-6 * dt);
   pitchKick *= Math.exp(-7 * dt);
   // hold look-behind: the camera turns around, you keep running the way you were going
-  const back = locked && held('lookBack');
-  arms.forEach((a) => (a.visible = !back));
+  const back = locked && held('lookBack'), tp = settings.thirdPerson;
+  arms.forEach((a) => (a.visible = !back && !tp));
   const ghostHands = isOut(myId);
   if (skinMat.transparent !== ghostHands) {
     for (const m of [skinMat, sleeveMat]) { m.transparent = ghostHands; m.opacity = ghostHands ? 0.3 : 1; m.depthWrite = !ghostHands; m.needsUpdate = true; }
   }
   camera.rotation.set(me.pitch + pitchKick + n3 * tr * 0.02, me.yaw + (back ? Math.PI : 0) + n1 * tr * 0.012, (roll + rollKick) * (back ? -1 : 1) + n2 * tr * 0.025);
+  if (tp) placeThirdPerson(dt); else tpDist = 0;
+  updateSelfAvatar(dt, tp);
+  // randomizer: lights out (only a meter or so of view, pitch black past it)
+  const dark = isDark();
+  if (dark !== darkOn || (dark && scene.fog !== darkFog)) setDark(dark);
+  if (dark) darkFog.far = 1.6 + tpDist;
 
   const sp = Math.max(0, Math.min(1, (hs - M.walkSpeed) / (18 - M.walkSpeed)));
   fovPunch *= Math.exp(-5 * dt);
@@ -2292,6 +2448,7 @@ function updateGame(dt) {
     a.vy += (Math.max(-30, Math.min(30, (a.root.position.y - py) / dt)) - a.vy) * ease(8);
     animateScamp(a.scamp, dt, performance.now() / 1000, a.spd, p.mode, Math.abs(a.vy) > 1.5 && p.mode !== 1, p.talk);
     a.root.rotation.y = lerpAngle(a.root.rotation.y, p.yaw, k);
+    a.root.scale.setScalar(evScale());
     a.rig.rotation.x += ((p.mode === 1 ? 1.05 : 0) - a.rig.rotation.x) * k;
     a.rig.scale.y += ((p.mode === 2 ? 0.62 : 1) - a.rig.scale.y) * k;
     const it = isIt(p.id) && playing, dist = a.root.position.distanceTo(me.pos), now = performance.now() / 1000;
@@ -2308,12 +2465,14 @@ function updateGame(dt) {
     // see-through outline of whoever matters to you right now
     let xr = null;
     if (playing && game.rl <= 0) {
-      if (game.mode === 'duel' && isIt(myId) && inDuel(p.id)) xr = '#c6ff3d';
+      if (game.mode === 'duel' && isIt(myId) && inDuel(p.id)) xr = '#b6f27a';
       else if (game.mode === 'koth' && it && !isIt(myId)) xr = '#ffd166';
-      else if (game.mode === 'bomb' && !isOut(myId) && !isOut(p.id) && dist < 30) xr = it ? '#ff4d3d' : isIt(myId) ? '#ffffff' : null;
+      else if (game.mode === 'bomb' && !isOut(myId) && !isOut(p.id) && dist < 30) xr = it ? '#ff7b7b' : isIt(myId) ? '#ffffff' : null;
       else if (game.mode === 'freeze' && !isIt(myId) && isFrozen(p.id)) xr = '#7fe3ff';   // frozen teammates to rescue
-      if (isExposed(p.id) && canTagPair(myId, p.id)) xr = '#ff4d3d';   // they fell: you can see them anywhere
+      if (isExposed(p.id) && canTagPair(myId, p.id)) xr = '#ff7b7b';   // they fell: you can see them anywhere
     }
+    if (dark) xr = null;   // lights out: no outlines, no markers, no names
+    a.label.visible = !dark;
     setScampXray(a.scamp, xr);
     a.marker.visible = !!xr && (game.mode !== 'bomb' || it || isExposed(p.id));
     if (a.marker.visible) { a.marker.material.color.set(xr); a.marker.scale.set(0.45, 0.45, 1).multiplyScalar(0.8 + Math.min(1.6, dist / 18)); }
@@ -2327,7 +2486,7 @@ function updateGame(dt) {
     a.blob.visible = fy > -1e8 && up < 6 && a.root.visible;
     if (a.blob.visible) {
       a.blob.position.set(rp.x, fy + 0.02, rp.z);
-      a.blob.scale.setScalar(1 + up * 0.12);
+      a.blob.scale.setScalar((1 + up * 0.12) * evScale());
       a.blob.material.opacity = 0.42 * (1 - up / 6);
     }
   }
@@ -2341,7 +2500,7 @@ function updateGame(dt) {
     looseCrown.userData.crown.rotation.y = t * 1.5;
   }
   const holding = playing && game.mode === 'bomb' && isIt(myId);
-  vmBomb.visible = holding;
+  vmBomb.visible = holding && !settings.thirdPerson;
   const fuseFrac = game.bomb && game.it.length ? game.fz / game.bomb.fuseLen : 1;
   if (holding) {
     animateBomb(vmBomb, performance.now() / 1000, fuseFrac);
@@ -2354,10 +2513,141 @@ function updateGame(dt) {
   talkT = Math.max(0, talkT - dt);
   updateHud(hs, frozen, nearestSeeker);
   twoPlayerFx(dt, nearestSeeker);
+  if (dark) $('pointer').style.display = 'none';
   sbTimer += dt;
   if (sbTimer > 0.25 || boardDirty) { sbTimer = 0; boardDirty = false; renderBoard(); }
 }
 let finishSentAt = 0, boardDirty = true, beepT = 0, fallLockUntil = 0;
+
+// ---------- third person (setting) ----------
+// The camera sits behind your head along your view. A ray from your head finds the nearest wall
+// and the camera stops just short of it (snaps in at once, eases back out), so it never clips.
+const tpBack = new THREE.Vector3(), tpPivot = new THREE.Vector3();
+let tpDist = 0;
+function placeThirdPerson(dt) {
+  const want = 3.4 * Math.max(0.55, evScale());
+  tpPivot.copy(camera.position);
+  tpPivot.y += 0.3 * evScale();
+  camera.updateMatrixWorld();
+  camera.getWorldDirection(tpBack).negate();
+  const d = Math.max(0.1, Math.min(want, camRay(tpPivot, tpBack, want + 0.35) - 0.35));
+  tpDist = d < tpDist ? d : tpDist + (d - tpDist) * (1 - Math.exp(-5 * dt));
+  camera.position.copy(tpPivot).addScaledVector(tpBack, tpDist);
+}
+// distance along the ray to the first solid thing (boxes grown by the camera's radius, and ramps)
+function camRay(o, d, len) {
+  const R = 0.22;
+  let best = len;
+  const lo = (a, b) => Math.min(a, a + b * len), hi = (a, b) => Math.max(a, a + b * len);
+  const sx0 = lo(o.x, d.x), sx1 = hi(o.x, d.x), sy0 = lo(o.y, d.y), sy1 = hi(o.y, d.y), sz0 = lo(o.z, d.z), sz1 = hi(o.z, d.z);
+  for (const b of World.boxes) {
+    if (b.invisible || sx0 > b.max.x + R || sx1 < b.min.x - R || sy0 > b.max.y + R || sy1 < b.min.y - R || sz0 > b.max.z + R || sz1 < b.min.z - R) continue;
+    let ox = o.x, oz = o.z, dx = d.x, dz = d.z, x0 = b.min.x, x1 = b.max.x, z0 = b.min.z, z1 = b.max.z;
+    if (b.rot) {
+      const c = Math.cos(b.rot), s = Math.sin(b.rot), px = o.x - b.cx, pz = o.z - b.cz;
+      ox = px * c - pz * s; oz = px * s + pz * c;
+      dx = d.x * c - d.z * s; dz = d.x * s + d.z * c;
+      x0 = -b.hw; x1 = b.hw; z0 = -b.hd; z1 = b.hd;
+    }
+    const t = slabHit([ox, o.y, oz], [dx, d.y, dz], [x0 - R, b.min.y - R, z0 - R], [x1 + R, b.max.y + R, z1 + R]);
+    if (t >= 0 && t < best) best = t;
+  }
+  for (let t = 0.3; t < best; t += 0.2) {
+    const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+    for (const r of World.ramps) {
+      if (Math.abs(x - r.x) < r.w / 2 + R && Math.abs(z - r.z) < r.d / 2 + R && y > (r.base || 0) - R && y < rampHeight(r, x, z) + R) { best = t; break; }
+    }
+  }
+  return best;
+}
+// ray vs box: where it enters (-1 = misses, or starts inside - then it doesn't block)
+function slabHit(o, d, a, b) {
+  let t0 = 0, t1 = Infinity, inside = true;
+  for (let i = 0; i < 3; i++) {
+    if (o[i] < a[i] || o[i] > b[i]) inside = false;
+    if (Math.abs(d[i]) < 1e-9) { if (o[i] < a[i] || o[i] > b[i]) return -1; continue; }
+    let ta = (a[i] - o[i]) / d[i], tb = (b[i] - o[i]) / d[i];
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+    if (t0 > t1) return -1;
+  }
+  return inside ? -1 : t0;
+}
+// your own character, only drawn in third person
+let selfAv = null, selfKey = '';
+function updateSelfAvatar(dt, tp) {
+  if (!tp && !selfAv) return;
+  const key = settings.color + settings.eye;
+  if (!selfAv || key !== selfKey) {
+    if (selfAv) removeAvatar({ avatar: selfAv });
+    selfAv = makeAvatar({ name: '', color: settings.color, eye: settings.eye });
+    selfAv.label.visible = false;
+    selfKey = key;
+  }
+  const a = selfAv, show = tp && tpDist > 0.75;
+  a.root.visible = show;
+  a.blob.visible = false;
+  if (!show) return;
+  const k = 1 - Math.exp(-14 * dt), now = performance.now() / 1000, mode = me.mode(), playing = isPlaying();
+  a.root.position.copy(me.pos);
+  a.root.rotation.y = me.yaw;
+  a.root.scale.setScalar(evScale());
+  animateScamp(a.scamp, dt, now, me.hspeed(), mode, !me.grounded && Math.abs(me.vel.y) > 1.5 && mode !== 1, talkT > 0);
+  a.rig.rotation.x += ((mode === 1 ? 1.05 : 0) - a.rig.rotation.x) * k;
+  a.rig.scale.y += ((mode === 2 ? 0.62 : 1) - a.rig.scale.y) * k;
+  const cos = myCos();
+  setScampGhost(a.scamp, isOut(myId) ? 0.3 : cos && cos.ghost ? cos.ghostOp : 1);
+  applyCos(a.scamp, cos, now);
+  a.bomb.visible = playing && game.mode === 'bomb' && isIt(myId);
+  if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
+  a.crown.visible = playing && game.mode === 'koth' && isIt(myId);
+  a.ice.visible = isFrozen(myId);
+  const fy = World.floorBelow(me.pos.x, me.pos.y + 0.3, me.pos.z), up = me.pos.y - fy;
+  a.blob.visible = fy > -1e8 && up < 6;
+  if (a.blob.visible) {
+    a.blob.position.set(me.pos.x, fy + 0.02, me.pos.z);
+    a.blob.scale.setScalar((1 + up * 0.12) * evScale());
+    a.blob.material.opacity = 0.42 * (1 - up / 6);
+  }
+}
+
+// ---------- randomizer: lights out ----------
+const darkFog = new THREE.Fog(0x000000, 0.3, 1.6);
+let darkOn = false;
+function setDark(on) {
+  darkOn = on;
+  const m = World.map;
+  scene.fog = on ? darkFog : m.fogDensity ? fogExp : fogLin;
+  scene.background.set(on ? '#000000' : m.sky);
+  if (on) tone(160, 70, 0.12, 'square', 0.05);
+  else tone(90, 220, 0.1, 'square', 0.04);
+}
+
+// ---------- endless maps: players are drawn again on every copy of the tile around you ----------
+const onLayer1 = (o) => o.layers.enable(1);
+function drawWrapCopies() {
+  const W = World.map.wrap, list = [];
+  for (const p of players.values()) if (p.avatar && p.avatar.root.visible) list.push(p.avatar);
+  if (selfAv && selfAv.root.visible) list.push(selfAv);
+  if (!list.length) return;
+  for (const a of list) { a.root.traverse(onLayer1); a.blob.layers.enable(1); }
+  const bg = scene.background;
+  scene.background = null;   // a color background would wipe the frame
+  camera.layers.set(1);
+  renderer.autoClear = false;
+  const n = World.map.wrapRings || 1, cx = camera.position.x, cz = camera.position.z;
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+    if (!i && !j) continue;
+    const dx = i * W, dz = j * W;
+    if (!list.some((a) => Math.hypot(a.root.position.x + dx - cx, a.root.position.z + dz - cz) < 90)) continue;
+    for (const a of list) { a.root.position.x += dx; a.root.position.z += dz; a.blob.position.x += dx; a.blob.position.z += dz; }
+    renderer.render(scene, camera);
+    for (const a of list) { a.root.position.x -= dx; a.root.position.z -= dz; a.blob.position.x -= dx; a.blob.position.z -= dz; }
+  }
+  renderer.autoClear = true;
+  camera.layers.set(0);
+  scene.background = bg;
+}
 
 // you chatter by yourself after a near miss, and now and then during a close chase
 let chaseT = 0, autoTauntAt = 0, nearMiss = false;
@@ -2450,11 +2740,11 @@ function twoPlayerFx(dt, nearestSeeker) {
   // edge arrow to whoever you're after: duel opponent, the king (or the dropped crown),
   // or - holding the bomb - the closest player
   const ptr = $('pointer');
-  let target = null, label = '', color = '#c6ff3d';
+  let target = null, label = '', color = '#b6f27a';
   if (playing && game.rl <= 0 && !isOut(myId)) {
     if (game.mode === 'duel' && inDuel(myId)) {
       const o = players.get(game.duel.ids.find((i) => i !== myId));
-      if (o && o.avatar) { target = o.avatar.root.position; label = isIt(myId) ? 'RUNNER' : 'CHASER'; color = isIt(myId) ? '#c6ff3d' : '#ff3344'; }
+      if (o && o.avatar) { target = o.avatar.root.position; label = isIt(myId) ? 'RUNNER' : 'CHASER'; color = isIt(myId) ? '#b6f27a' : '#ff7b7b'; }
     } else if (game.mode === 'koth' && !isIt(myId)) {
       const k = game.it.length ? players.get(game.it[0]) : null;
       if (k && k.avatar) { target = k.avatar.root.position; label = 'KING'; color = '#ffd166'; }
@@ -2548,6 +2838,8 @@ function updateHud(hs, frozen, nearestSeeker) {
       urgent = go && game.tl <= 15;
     }
   } else if (game.phase === 'results') { phase = 'ROUND OVER'; timer = ''; }
+  if (playing && game.gp) phase = `GP ${game.gp.round}/${game.gp.of} · ${phase}`;
+  if (curEvent()) phase += ` · ${RANDOM_EVENTS[curEvent()].name} ${Math.ceil(game.rnd.left)}s`;
   setText('phaseText', phase);
   setText('timerText', timer);
   $('timerText').classList.toggle('urgent', urgent);
@@ -2675,6 +2967,8 @@ if (!settings.colorPicked || !isHex(settings.color)) {
   saveSettings();
 }
 if (!isHex(settings.eye)) settings.eye = '#ffffff';
+settings.color = pickColor(settings.color);
+settings.eye = pickEye(settings.eye);
 const preview = (() => {
   const canvas = $('preview');
   const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -2722,13 +3016,17 @@ function renderPreview(dt) { preview.render(dt); }
 // body + eye colors: one split bar - left half body, right half eyes. Click a half for the color picker.
 // label text flips dark/light so it's readable on any color
 const inkFor = (hex) => { const c = new THREE.Color(hex); return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.6 ? '#1f2433' : '#ffffff'; };
+let palFor = '';   // which half the swatch palette is open for: 'body' | 'eye' | ''
 const markColors = () => {
-  $('bodyColor').value = settings.color;
-  $('eyeColor').value = settings.eye;
   for (const [id, c] of [['bodySwatch', settings.color], ['eyeSwatch', settings.eye]]) {
     $(id).style.background = c;
     $(id).style.color = inkFor(c);
   }
+  $('bodySwatch').classList.toggle('open', palFor === 'body');
+  $('eyeSwatch').classList.toggle('open', palFor === 'eye');
+  const pal = $('palette'), list = palFor === 'eye' ? EYE_COLORS : COLORS, cur = palFor === 'eye' ? settings.eye : settings.color;
+  pal.classList.toggle('hidden', !palFor);
+  pal.innerHTML = palFor ? list.map((c) => `<button type="button" class="sw${c === cur ? ' on' : ''}" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('') : '';
 };
 const setColors = (body, eye) => {
   if (body) { settings.color = body; settings.colorPicked = true; }
@@ -2737,8 +3035,13 @@ const setColors = (body, eye) => {
   preview.set();
   markColors();
 };
-$('bodyColor').addEventListener('input', (e) => setColors(e.target.value, null));
-$('eyeColor').addEventListener('input', (e) => setColors(null, e.target.value));
+$('bodySwatch').onclick = () => { palFor = palFor === 'body' ? '' : 'body'; markColors(); };
+$('eyeSwatch').onclick = () => { palFor = palFor === 'eye' ? '' : 'eye'; markColors(); };
+$('palette').onclick = (e) => {
+  const b = e.target.closest('.sw');
+  if (!b) return;
+  if (palFor === 'eye') setColors(null, b.dataset.c); else setColors(b.dataset.c, null);
+};
 markColors();
 
 // --- the secret code: only its SHA-256 is stored here, so the code itself isn't in the source ---
@@ -2843,11 +3146,7 @@ function join() {
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
     enterGame();
-    const hello = { t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, cos: myCos() };
-    Net.send(hello);
-    // say hello again until the host answers (a hello sent too early can get lost)
-    let tries = 0;
-    const again = setInterval(() => { if (gotState || ++tries > 10 || !inGame) clearInterval(again); else Net.send(hello); }, 1000);
+    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, cos: myCos() });
   });
 }
 $('joinBtn').onclick = join;
@@ -2897,7 +3196,7 @@ if (urlCode) fillCode(urlCode); else syncCode();
 
 addEventListener('beforeunload', () => Net.destroy());
 // for automated tests: ?debug exposes the internals
-if (/[?&]debug\b/.test(location.search)) window.__dbg = { game, H, me, players, hostSetup, setupChanged, hostStartRound, CONFIG, World, raceToGo };
+if (/[?&]debug\b/.test(location.search)) window.__dbg = { game, H, me, players, hostSetup, setupChanged, hostStartRound, CONFIG, World, raceToGo, settings, addBot, pushState, hostEndRound, bots, camera, scene };
 
 requestAnimationFrame(frame);
 })();

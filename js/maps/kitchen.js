@@ -85,7 +85,7 @@ defineMap({
     drawers(-22, -17, 1, 'x');
     // toaster on the front of the counter: its slot throws you up onto the fridge
     k.box(3.5, H, -19, 3, 2.4, 3, BLUE);
-    k.pad(3.5, H + 2.4, -19, 1.4, 1.4, 17.5, { push: { x: 9.5, z: -2.2 }, color: YEL });
+    k.pad(3.8, H + 2.4, -19.1, 1.4, 1.4, 16, { push: { x: 11.2, z: -2.6 }, color: YEL });
     // plates + a jar on the counter (front half - the upper cabinets hang over the back half)
     k.box(-26, H, -19, 3, 1.2, 3, '#ffffff');
     k.box(-2, H, -19.2, 2, 3, 2, YEL);
