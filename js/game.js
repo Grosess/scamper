@@ -2108,9 +2108,9 @@ function frame(now) {
 function updateGame(dt) {
   const playing = isPlaying(), go = playing && game.rl <= 0, T = CONFIG.tag;
   // frozen: both duelists before each chase, and everyone on the start line of a race
-  const locked = performance.now() < fallLockUntil;   // just fell off: held in place for a moment
-  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId) || locked;
-  if (locked && me.grounded) { me.vel.x = 0; me.vel.z = 0; }
+  const fallHeld = performance.now() < fallLockUntil;   // just fell off: held in place for a moment
+  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId) || fallHeld;
+  if (fallHeld && me.grounded) { me.vel.x = 0; me.vel.z = 0; }
   if (isFrozen(myId)) { me.vel.x = 0; me.vel.z = 0; }
   const duelChaser = playing && game.mode === 'duel' && isIt(myId);
   // whoever does the chasing runs a little faster
