@@ -593,3 +593,7 @@ button { font-family: inherit; }
 .color-split .half > span { grid-column: 1; grid-row: 1; line-height: 1.1; }
 .color-split .half .cname { grid-column: 1; grid-row: 2; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .color-split .half::after { position: static; grid-column: 2; grid-row: 2; align-self: end; line-height: 1.1; }
+.color-split .half { padding: 6px 9px 5px 8px; row-gap: 0; }
+.color-split .half > span { font-size: 13px; }
+.color-split .half .cname { font-size: 11px; opacity: 0.8; }
+.color-split .half::after { font-size: 10px; }
