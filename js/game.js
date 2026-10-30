@@ -688,7 +688,7 @@ function ownedColors() {
   if (devOn()) return ITEMS.COLORS.map((c) => c.hex);
   return Account.me.inv.colors.map((id) => ITEMS.byId[id]).filter(Boolean).map((c) => c.hex);
 }
-const ownsCos = (id) => !!Account.me && (devOn() || Account.me.inv.cos.includes(id));
+const ownsCos = () => devOn();   // cosmetics (neon, ghost, glint, rainbow) are developer-only
 // keep your look to what you own; body and eyes are never the same color
 function fixLook() {
   if (!Account.me) { settings.color = GUEST.body; settings.eye = GUEST.eye; return; }

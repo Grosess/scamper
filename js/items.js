@@ -44,6 +44,7 @@ const ITEMS = (() => {
     ]),
     C('mythic', [['black', 'Black', '#111111'], ['white', 'White', '#ffffff']]),
   );
+  // cosmetics are developer-only: never in crates, only in developer mode
   const COSMETICS = [
     { id: 'neon', name: 'Neon Outline', tier: 'epic', kind: 'cos' },
     { id: 'ghost', name: 'Ghost', tier: 'legendary', kind: 'cos' },
@@ -71,7 +72,7 @@ const ITEMS = (() => {
     const order = [ti];
     for (let d = 1; d < TIERS.length; d++) { if (ti - d >= 0) order.push(ti - d); if (ti + d < TIERS.length) order.push(ti + d); }
     for (const i of order) {
-      const left = ALL.filter((it) => it.tier === TIERS[i].id && !have.has(it.id));
+      const left = COLORS.filter((it) => it.tier === TIERS[i].id && !have.has(it.id));
       if (left.length) return left[Math.floor(rnd() * left.length)];
     }
     return null;

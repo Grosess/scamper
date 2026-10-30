@@ -47,11 +47,11 @@ const Account = (() => {
     $('accName').textContent = me.name;
     $('accDev').classList.toggle('hidden', !me.dev);
     // the collection, tier by tier
-    const have = new Set(me.inv.colors.concat(me.inv.cos));
+    const have = new Set(me.inv.colors);
     $('accCollection').innerHTML = ITEMS.TIERS.map((t) => {
-      const all = ITEMS.ALL.filter((it) => it.tier === t.id), got = all.filter((it) => have.has(it.id)).length;
+      const all = ITEMS.COLORS.filter((it) => it.tier === t.id), got = all.filter((it) => have.has(it.id)).length;
       return `<div class="acc-tier"><span class="acc-tier-name" style="--tc:${t.color}">${t.name}</span><span class="acc-bar"><i style="width:${(got / all.length * 100).toFixed(1)}%;background:${t.color}"></i></span><b>${got}/${all.length}</b></div>`;
-    }).join('') + `<p class="note">${have.size} of ${ITEMS.ALL.length} collected. Win games against other people to unlock more.</p>`;
+    }).join('') + `<p class="note">${have.size} of ${ITEMS.COLORS.length} colors collected. Win games against other people to unlock more.</p>`;
   }
   // is the name free (and clean)? asked while you type
   function checkName() {

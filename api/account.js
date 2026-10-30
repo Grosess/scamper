@@ -183,7 +183,7 @@ module.exports = async (req, res) => {
         return res.json({
           name: user.name, dev,
           colors: dev ? ITEMS.COLORS.map((c) => c.hex) : user.inv.colors.map((id) => ITEMS.byId[id]).filter(Boolean).map((c) => c.hex),
-          cos: dev ? ITEMS.COSMETICS.map((c) => c.id) : user.inv.cos,
+          cos: dev ? ITEMS.COSMETICS.map((c) => c.id) : [],   // cosmetics are developer-only
         });
       }
 
