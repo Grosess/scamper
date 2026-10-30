@@ -514,3 +514,5 @@ button { font-family: inherit; }
 .reel-wrap.mythic { box-shadow: 0 0 0 3px #ffffff, 0 0 0 7px #000, 0 0 60px 22px #000; }
 .prize-name .pt.black { color: #fff; text-shadow: 0 0 6px #000, 0 0 14px #000, 0 0 2px #000; background: #111; padding: 2px 10px; display: inline-block; }
 .reel .it { border-top: 2px solid rgba(255, 255, 255, 0.06); }
+.name-hint a, .pal-msg a { color: var(--ink); font-weight: 700; text-decoration: underline; cursor: pointer; }
+.acc-head .privacy-link { padding: 4px 10px; background: rgba(255, 255, 255, 0.92); border: 2px solid var(--line-2); color: var(--ink); font-weight: 600; }
