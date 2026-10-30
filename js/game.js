@@ -2755,6 +2755,7 @@ async function openCrate() {
           last = at;
           tone(1100, 800, 0.025, 'square', 0.025);
           wrap.style.setProperty('--glow', tierOf(items[at]).color);
+          wrap.classList.toggle('mythic', items[at].tier === 'mythic');   // black glow, white rim
         }
         if (k < 1) requestAnimationFrame(f); else done();
       };
@@ -2764,7 +2765,7 @@ async function openCrate() {
     const t = tierOf(prize), rank = ITEMS.TIERS.indexOf(t);
     reel.children[WIN].classList.add('win');
     if (t.id === 'mythic') box.classList.add('mythic');
-    label.innerHTML = `<div class="pt" style="--tc:${t.color}">${t.name.toUpperCase()}</div><div class="pn">${esc(prize.name)}</div>`;
+    label.innerHTML = `<div class="pt${t.id === 'mythic' ? ' black' : ''}" style="--tc:${t.color}">${t.name.toUpperCase()}</div><div class="pn">${esc(prize.name)}</div>`;
     [523, 659, 784, 1046, 1318, 1568].slice(0, 2 + rank).forEach((f, i) => tone(f, f * 1.01, 0.18, 'triangle', 0.07, i * 0.09));
     for (let i = 0; i < 12 + rank * 18; i++) {
       const c = document.createElement('i');
