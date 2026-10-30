@@ -1110,7 +1110,8 @@ function beginRound(modeId, o) {
   game.duel = game.bomb = game.koth = game.race = game.freeze = null;
   game.it = [];
   game.rnd = null;
-  H.rndNext = 6 + Math.random() * 12;   // first happening some time after the release
+  H.rndNext = devFirst() ? 3 : 6 + Math.random() * 12;   // first happening some time after the release
+  H.rndCount = 0;
   H.lastTag = null;
   H.endIn = 0;
   H.immune = 0;
@@ -1234,7 +1235,9 @@ function hostRandomTick(dt) {
   // (no Teleport in a race: every spawn there is the start line)
   const skip = game.mode === 'race' ? ['shuffle'] : [];
   const pick = (no) => { const pool = Object.keys(RANDOM_EVENTS).filter((k) => !no.includes(k) && !skip.includes(k)); return pool[Math.floor(Math.random() * pool.length)]; };
-  const evs = [pick(H.rndLast)];
+  // developer setting: a chosen happening always comes first
+  const first = H.rndCount++ === 0 ? devFirst() : null;
+  const evs = [first || pick(H.rndLast)];
   if (Math.random() < 0.2 && !RANDOM_EVENTS[evs[0]].once) evs.push(pick(H.rndLast.concat(evs, ['swap', 'shuffle'])));
   H.rndLast = evs;
   game.rnd = { evs, left: Math.max(...evs.map((k) => RANDOM_EVENTS[k].secs)), seed: Math.random() };
@@ -2873,19 +2876,38 @@ async function openCrate(match, starter, preview) {
     crate.style.display = '';
     wrap.classList.add('hidden');
     reveal.classList.add('hidden');
-    // 1. the crate drops in, then shakes harder and harder
-    await wait(650);
-    crate.classList.add('shake');
-    for (let i = 0; i < 10; i++) tone(160 + i * 30, 120 + i * 30, 0.07, 'square', 0.03 + i * 0.004, i * 0.11);
+    const sparks = (n, colors, spread) => {
+      const r0 = crate.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+      for (let i = 0; i < n; i++) {
+        const c = document.createElement('i'), a = Math.random() * Math.PI * 2, r = spread * (0.4 + Math.random() * 0.8);
+        c.className = 'spark';
+        c.style.left = `${cx}px`;
+        c.style.top = `${cy}px`;
+        c.style.setProperty('--dx', `${Math.cos(a) * r}px`);
+        c.style.setProperty('--dy', `${Math.sin(a) * r}px`);
+        c.style.background = colors[i % colors.length];
+        c.style.animationDuration = `${0.5 + Math.random() * 0.6}s`;
+        document.body.appendChild(c);
+        setTimeout(() => c.remove(), 1300);
+      }
+    };
+    // 1. the crate drops in turning, with light already leaking out of its seams
     await wait(700);
+    // 2. it charges up: shakes harder and spins faster, the light gets brighter, it ticks louder
+    crate.classList.add('shake');
+    for (let i = 0; i < 14; i++) tone(150 + i * 28, 110 + i * 28, 0.06, 'square', 0.025 + i * 0.004, i * 0.09);
+    for (let i = 0; i < 3; i++) setTimeout(() => sparks(6, ['#ffd166', '#fff'], 90), 300 + i * 320);
+    await wait(800);
     crate.classList.add('hard');
-    await wait(450);
-    // 2. it bursts open
+    await wait(500);
+    // 3. it blows apart: every side flies outward, a pillar of light, sparks everywhere
     crate.classList.remove('shake', 'hard');
     crate.classList.add('open');
     flash('#ffffff');
-    tone(200, 1200, 0.3, 'triangle', 0.09);
-    await wait(420);
+    sparks(40, ['#ffd166', '#ffffff', '#ffb347'], 260);
+    tone(90, 40, 0.5, 'sawtooth', 0.07);
+    tone(300, 1400, 0.35, 'triangle', 0.09);
+    await wait(650);
     crate.style.display = 'none';
     // 3. the line: a flat strip of colors - common ones wide, rare ones thin - races past the marker
     // and slows to a stop on the prize. The marker and the glow take the rarity of what's under it.
@@ -2947,7 +2969,15 @@ async function openCrate(match, starter, preview) {
       document.body.appendChild(c);
       setTimeout(() => c.remove(), 2600);
     }
-    await wait(4200);
+    // stays until you press OK (or Enter), or after a while on its own
+    await new Promise((done) => {
+      const close = () => { clearTimeout(tm); removeEventListener('keydown', key, true); $('rvOk').onclick = null; done(); };
+      const key = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
+      const tm = setTimeout(close, 12000);
+      addEventListener('keydown', key, true);
+      $('rvOk').onclick = close;
+      $('rvOk').textContent = locked ? 'OK  (Enter)' : 'OK';
+    });
     box.classList.add('out');
     await wait(450);
     box.className = 'prize hidden';
@@ -3550,17 +3580,11 @@ $('devCrate').onclick = (e) => {
   const pick = b.dataset.t === 'random' ? ITEMS.roll([], Math.random) : list[Math.floor(Math.random() * list.length)];
   openCrate(null, false, pick.id);   // preview: nothing is won
 };
-$('devEvent').innerHTML = Object.keys(RANDOM_EVENTS).map((k) => `<option value="${k}">${RANDOM_EVENTS[k].name}</option>`).join('');
-$('devEventGo').onclick = () => {
-  if (!devOn() || !Net.isHost || !isPlaying()) { $('devEventNote').textContent = 'Host a game and start a round first.'; return; }
-  const k = $('devEvent').value;
-  game.rnd = { evs: [k], left: RANDOM_EVENTS[k].secs, seed: Math.random() };
-  if (k === 'swap') hostSwap();
-  if (k === 'shuffle') for (const id of players.keys()) if (!isOut(id) && !sitsOut(id)) teleportPlayer(id, randomSpawn());
-  hostFeed(`Randomizer: ${RANDOM_EVENTS[k].name}`);
-  pushState();
-  $('devEventNote').textContent = `Triggered ${RANDOM_EVENTS[k].name}.`;
-};
+// which happening comes first when you host with the Randomizer on (a setting, kept)
+$('devEvent').innerHTML = '<option value="">Random (normal)</option>' + Object.keys(RANDOM_EVENTS).map((k) => `<option value="${k}">${RANDOM_EVENTS[k].name}</option>`).join('');
+$('devEvent').value = RANDOM_EVENTS[settings.devFirstEv] ? settings.devFirstEv : '';
+$('devEvent').onchange = () => { settings.devFirstEv = $('devEvent').value; saveSettings(); };
+const devFirst = () => (devOn() && RANDOM_EVENTS[settings.devFirstEv] ? settings.devFirstEv : null);
 const renderDev = () => $('devPanel').classList.toggle('hidden', !devOn());
 
 // a new account opens its two welcome crates, one after the other
