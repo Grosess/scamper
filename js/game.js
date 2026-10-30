@@ -727,15 +727,44 @@ const RANDOM_EVENTS = {
     move: (b) => ({ walkSpeed: b.walkSpeed * 1.35, runSpeed: b.runSpeed * 1.35, maxSpeed: b.maxSpeed * 1.3, slideBoostCap: b.slideBoostCap * 1.3 }) },
   ice: { name: 'ICE RINK', sub: 'Every floor is slippery', secs: 13,
     move: (b) => ({ groundAccel: b.groundAccel * 0.3, groundFriction: b.groundFriction * 0.1, overspeedDecay: b.overspeedDecay * 0.15, coastDecay: b.coastDecay * 0.15, speedTurn: b.speedTurn * 0.35, slideFriction: b.slideFriction * 0.3 }) },
+  moon: { name: 'MOON SHOES', sub: 'Jump way, way higher', secs: 13,
+    move: (b) => ({ jumpSpeed: b.jumpSpeed * 1.65, wallKickUp: b.wallKickUp * 1.35, mantleMaxHeight: b.mantleMaxHeight * 1.5 }) },
+  slowmo: { name: 'SLOW MO', sub: 'Everything... slows... down...', secs: 10,
+    move: (b) => ({ walkSpeed: b.walkSpeed * 0.5, runSpeed: b.runSpeed * 0.5, maxSpeed: b.maxSpeed * 0.5, crouchSpeed: b.crouchSpeed * 0.6, gravity: b.gravity * 0.3, jumpSpeed: b.jumpSpeed * 0.55, maxFall: b.maxFall * 0.4, slideBoost: b.slideBoost * 0.5 }) },
+  flip: { name: 'UPSIDE DOWN', sub: 'Your screen flipped over', secs: 11 },
+  mirror: { name: 'MIRROR MODE', sub: 'Left is right, right is left', secs: 12 },
+  backwards: { name: 'BACKWARDS', sub: 'Forward goes back, back goes forward', secs: 11 },
+  woozy: { name: 'WOOZY', sub: 'Everything is swaying', secs: 12 },
+  tornado: { name: 'TORNADO', sub: 'You can\'t stop spinning', secs: 9 },
+  disco: { name: 'DISCO', sub: 'Party lights!', secs: 13 },
+  pixel: { name: '8-BIT', sub: 'Retro mode', secs: 12 },
+  fisheye: { name: 'FISHEYE', sub: 'Super wide view', secs: 12 },
+  invisible: { name: 'INVISIBLE', sub: 'Nobody can see anybody - watch the shadows', secs: 12 },
+  bigheads: { name: 'BIG HEADS', sub: 'Huge heads for everyone', secs: 13 },
+  impostors: { name: 'IMPOSTORS', sub: 'Everyone looks the same. Who\'s who?', secs: 13 },
+  xray: { name: 'X-RAY', sub: 'Everyone sees everyone through walls', secs: 12 },
+  wind: { name: 'WINDY', sub: 'A gale is blowing everyone sideways', secs: 12 },
+  bouncy: { name: 'BOUNCY FLOORS', sub: 'Every landing bounces you back up (hold crouch to stick)', secs: 13 },
+  rocket: { name: 'ROCKET JUMP', sub: 'Every jump launches you forward', secs: 12 },
+  quake: { name: 'EARTHQUAKE', sub: 'The ground is shaking you around', secs: 10 },
+  redlight: { name: 'RED LIGHT, GREEN LIGHT', sub: 'Freeze when the light goes red', secs: 14 },
+  swap: { name: 'SWAP!', sub: 'Everyone switched places', secs: 2, once: true },
+  shuffle: { name: 'TELEPORT', sub: 'Everyone got thrown somewhere random', secs: 2, once: true },
 };
-const curEvent = () => (isPlaying() && game.rnd && RANDOM_EVENTS[game.rnd.ev] ? game.rnd.ev : null);
-const evScale = () => { const e = RANDOM_EVENTS[curEvent()]; return e && e.scale ? e.scale : 1; };
-// lights-out blinks on the shared clock, so everyone's lights go out together
-const isDark = () => curEvent() === 'dark' && Math.floor(worldTime() / 2) % 2 === 0;
+const IMPOSTOR = '#c9ced6';
+const activeEvs = () => (isPlaying() && game.rnd ? game.rnd.evs : []);
+const hasEv = (k) => isPlaying() && !!game.rnd && game.rnd.evs.includes(k);
+const evScale = () => (hasEv('tiny') ? RANDOM_EVENTS.tiny.scale : 1);
+// blinking happenings run on the shared clock, so everyone's lights go out together
+const isDark = () => hasEv('dark') && Math.floor(worldTime() / 2) % 2 === 0;
+const isRedLight = () => hasEv('redlight') && worldTime() % 3.4 > 2.2;
+// a direction picked by the host for this happening (wind), the same on every screen
+const evAngle = () => ((game.rnd && game.rnd.seed) || 0) * Math.PI * 2;
 function applyMove() {
   if (!World.map) return;
-  const base = Object.assign({}, DEFAULT_MOVE, World.map.move || {}), e = RANDOM_EVENTS[curEvent()];
-  Object.assign(CONFIG.move, base, e && e.move ? e.move(base) : {});
+  const m = Object.assign({}, DEFAULT_MOVE, World.map.move || {});
+  for (const k of activeEvs()) if (RANDOM_EVENTS[k].move) Object.assign(m, RANDOM_EVENTS[k].move(m));
+  Object.assign(CONFIG.move, m);
   // growing back to full size under something low: stay crouched until there's room
   for (const p of [me, ...[...bots.values()].map((b) => b.p)]) if (p && !World.canStand(p)) p.crouching = true;
 }
@@ -762,6 +791,9 @@ function canTagPair(a, b) {
   if (game.mode === 'freeze') return isIt(a) ? !isIt(b) && !isFrozen(b) : !isFrozen(a) && isFrozen(b);
   return false;
 }
+// CPUs don't race: during a race they sit out (hidden, standing still, not ranked)
+const sitsOut = (id) => isPlaying() && game.mode === 'race' && !!(players.get(id) || {}).cpu;
+const racers = () => [...players.keys()].filter((id) => !(players.get(id) || {}).cpu);
 const isFrozen = (id) => isPlaying() && game.mode === 'freeze' && !!game.freeze && game.freeze.frozen.includes(id);
 
 function randomSpawn() { const sp = World.map.spawns; return sp[Math.floor(Math.random() * sp.length)]; }
@@ -831,7 +863,8 @@ function applyState(s) {
   game.koth = s.koth || null;
   game.race = s.race || null;
   game.freeze = s.freeze || null;
-  game.rnd = s.rnd && RANDOM_EVENTS[s.rnd.ev] ? { ev: s.rnd.ev, left: +s.rnd.left || 0 } : null;
+  const evs = s.rnd && Array.isArray(s.rnd.evs) ? s.rnd.evs.filter((k) => RANDOM_EVENTS[k]) : [];
+  game.rnd = evs.length ? { evs, left: +s.rnd.left || 0, seed: +s.rnd.seed || 0 } : null;
   game.rndOn = !!s.rndOn;
   game.gp = s.gp && typeof s.gp === 'object' ? s.gp : null;
   if (s.setup) game.setup = s.setup;
@@ -880,14 +913,15 @@ function applyState(s) {
   if (!wasOut && isOut(myId) && !started) showBanner('<div class="big">YOU\'RE OUT</div><div>Spectating - you can still run around</div>', 2.5);
 
   // randomizer happening started / ended
-  const ev = curEvent();
+  const ev = activeEvs().join('+') || null;
   if (ev !== seen.ev) {
     seen.ev = ev;
     applyMove();
+    evLook();
     if (ev) {
-      const e = RANDOM_EVENTS[ev];
+      const es = activeEvs().map((k) => RANDOM_EVENTS[k]);
       SFX.start();
-      showBanner(`<div class="sub">RANDOMIZER</div><div class="big gold">${e.name}</div><div>${esc(e.sub)}</div>`, 2.2);
+      showBanner(`<div class="sub">${es.length > 1 ? 'DOUBLE TROUBLE' : 'RANDOMIZER'}</div><div class="big gold">${es.map((e) => esc(e.name)).join(' + ')}</div><div>${es.map((e) => esc(e.sub)).join(' · ')}</div>`, 2.4);
     } else if (playing) addFeed('Randomizer: back to normal');
   }
 
@@ -938,7 +972,7 @@ function applySnap(m) {
 }
 
 // ---------- host: rules ----------
-const H = { rndNext: 0, rndLast: '', exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
+const H = { rndNext: 0, rndLast: [], exposed: {}, itSince: {}, timeLeft: 0, releaseLeft: 0, resultsLeft: 0, endIn: 0, fuse: 0, immune: 0, raceTime: 0, lastTag: null, snapAcc: 0, stateAcc: 0 };
 // random starting colors for new players: bright, readable bodies
 // the palette: every body and eye color comes from these soft pastels (eyes can also be white or ink)
 const COLORS = ['#ff8fa3', '#ffb3c6', '#ff9b9b', '#ffb37a', '#ffd166', '#ffe599', '#c8e6a0', '#9be3a8', '#7ed6c8',
@@ -966,7 +1000,7 @@ function buildState() {
   return {
     t: 'state', phase: game.phase, mode: game.mode, map: game.map, it: game.it.slice(), setup: game.setup,
     duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race, freeze: game.freeze, gp: game.gp, rndOn: game.rndOn,
-    rnd: game.rnd ? { ev: game.rnd.ev, left: r2(game.rnd.left) } : null,
+    rnd: game.rnd ? { evs: game.rnd.evs, left: r2(game.rnd.left), seed: game.rnd.seed } : null,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
     exposed: Object.fromEntries(Object.entries(H.exposed).map(([id, t]) => [id, Math.max(0, (t - performance.now()) / 1000)]).filter(([, s]) => s > 0)),
     scores: game.scores, result: game.result,
@@ -1039,7 +1073,7 @@ function beginRound(modeId, o) {
   game.duel = game.bomb = game.koth = game.race = game.freeze = null;
   game.it = [];
   game.rnd = null;
-  H.rndNext = 10 + Math.random() * 6;   // first happening after the release
+  H.rndNext = 6 + Math.random() * 12;   // first happening some time after the release
   H.lastTag = null;
   H.endIn = 0;
   H.immune = 0;
@@ -1091,17 +1125,29 @@ function gpFinal() {
 function hostRandomTick(dt) {
   if (game.rnd) {
     game.rnd.left -= dt;
-    if (game.rnd.left <= 0) { game.rnd = null; H.rndNext = 9 + Math.random() * 7; pushState(); }
+    if (game.rnd.left <= 0) { game.rnd = null; H.rndNext = 5 + Math.random() * 14; pushState(); }   // gaps vary: you never know when
     return;
   }
   H.rndNext -= dt;
   if (H.rndNext > 0) return;
-  const pool = Object.keys(RANDOM_EVENTS).filter((k) => k !== H.rndLast);
-  const ev = pool[Math.floor(Math.random() * pool.length)];
-  H.rndLast = ev;
-  game.rnd = { ev, left: RANDOM_EVENTS[ev].secs };
-  hostFeed(`Randomizer: ${RANDOM_EVENTS[ev].name}`);
+  // never the same one twice in a row; now and then two at once
+  const pick = (no) => { const pool = Object.keys(RANDOM_EVENTS).filter((k) => !no.includes(k)); return pool[Math.floor(Math.random() * pool.length)]; };
+  const evs = [pick(H.rndLast)];
+  if (Math.random() < 0.2 && !RANDOM_EVENTS[evs[0]].once) evs.push(pick(H.rndLast.concat(evs, ['swap', 'shuffle'])));
+  H.rndLast = evs;
+  game.rnd = { evs, left: Math.max(...evs.map((k) => RANDOM_EVENTS[k].secs)), seed: Math.random() };
+  hostFeed(`Randomizer: ${evs.map((k) => RANDOM_EVENTS[k].name).join(' + ')}`);
+  if (evs.includes('swap')) hostSwap();
+  if (evs.includes('shuffle')) for (const id of players.keys()) if (!isOut(id) && !sitsOut(id)) teleportPlayer(id, randomSpawn());
   pushState();
+}
+// everyone still in the round trades places with someone else
+function hostSwap() {
+  const ids = [...players.keys()].filter((id) => !isOut(id) && !sitsOut(id) && posOf(id));
+  if (ids.length < 2) return;
+  const spots = ids.map((id) => { const p = posOf(id); return [p.x, p.y + 0.05, p.z]; });
+  const k = 1 + Math.floor(Math.random() * (ids.length - 1));   // rotate, so nobody stays put
+  ids.forEach((id, i) => teleportPlayer(id, spots[(i + k) % ids.length], players.get(id) ? players.get(id).yaw : 0));
 }
 
 function startProblem(mode, n) {
@@ -1237,14 +1283,14 @@ function startRace(ids, o) {
 }
 function hostFinish(id) {
   const r = game.race;
-  if (!isPlaying() || game.mode !== 'race' || game.rl > 0 || !r || r.done[id] !== undefined) return;
+  if (!isPlaying() || game.mode !== 'race' || game.rl > 0 || !r || r.done[id] !== undefined || sitsOut(id)) return;
   const p = posOf(id), f = World.map.race.finish, s = 2.5;
   if (!p || Math.abs(p.x - f.x) > f.w / 2 + s || Math.abs(p.z - f.z) > f.d / 2 + s || p.y < f.y - s || p.y > f.y + f.h + s) return;
   r.done[id] = Math.round(H.raceTime * 10) / 10;
   r.order.push(id);
   hostFeed(`${nameOf(id)} finished ${ord(r.order.length)} - ${fmtRace(r.done[id])}`);
-  if (r.order.length === 1 && players.size > 1) H.timeLeft = Math.min(H.timeLeft, CONFIG.tag.raceAfterFirst);
-  if ([...players.keys()].every((x) => r.done[x] !== undefined)) H.endIn = 2;
+  if (r.order.length === 1 && racers().length > 1) H.timeLeft = Math.min(H.timeLeft, CONFIG.tag.raceAfterFirst);
+  if (racers().every((x) => r.done[x] !== undefined)) H.endIn = 2;
   pushState();
 }
 // meters left along the course for someone at p
@@ -1363,7 +1409,7 @@ function computeResult(sub) {
       lines: list.map((p) => `${p.name} - ${Math.floor(pts[p.id] || 0)} points, ${tags(p.id)} steals`) };
   }
   if (game.mode === 'race' && game.race) {
-    const r = game.race, rest = list.filter((p) => r.done[p.id] === undefined).sort((a, b) => raceToGo(posOf(a.id)) - raceToGo(posOf(b.id)));
+    const r = game.race, rest = list.filter((p) => !p.cpu).filter((p) => r.done[p.id] === undefined).sort((a, b) => raceToGo(posOf(a.id)) - raceToGo(posOf(b.id)));
     const lines = r.order.filter((id) => players.has(id)).map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${fmtRace(r.done[id])}`)
       .concat(rest.map((p) => `${p.name} - ${Math.round(raceToGo(posOf(p.id)))}m to go`));
     const w = r.order[0];
@@ -1468,7 +1514,19 @@ function hostHandle(from, m) {
     hostFell(from);
   } else if (m.t === 'finish') {
     hostFinish(from);
+  } else if (m.t === 'upd') {
+    hostUpdatePlayer(from, m);
   }
+}
+
+// someone changed their name / colors / cosmetics in the middle of a game
+function hostUpdatePlayer(id, m) {
+  const p = players.get(id);
+  if (!p || p.cpu) return;
+  const old = p.name, want = cleanName(m.name), name = want === old ? want : uniqueName(want);
+  ensurePlayer(id, name, pickColor(m.color), pickEye(m.eye), pickCos(m.cos));
+  if (name !== old) hostFeed(`${old} is now ${name}`);
+  pushState();
 }
 
 function hostOnLeave(id) {
@@ -1498,7 +1556,7 @@ function hostOnLeave(id) {
       if (!freezeRunners().length) { hostEndRound(`${name} left`); return; }
       hostCheckAllFrozen();
     }
-    if (game.mode === 'race' && players.size && [...players.keys()].every((x) => game.race.done[x] !== undefined)) H.endIn = 1;
+    if (game.mode === 'race' && racers().length && racers().every((x) => game.race.done[x] !== undefined)) H.endIn = 1;
     if (players.size < 1) { hostEndRound('Everyone left'); return; }
   }
   pushState();
@@ -1749,7 +1807,7 @@ addEventListener('mousemove', (e) => {
   if (mag > 250 && mag > mouseAvg * 10 + 40) { mouseAvg *= 0.5; return; }
   mouseAvg += (Math.min(mag, 400) - mouseAvg) * 0.2;
   const k = 0.0022 * settings.sens;
-  me.yaw -= e.movementX * k;
+  me.yaw -= e.movementX * k * (hasEv('mirror') ? -1 : 1);
   me.pitch = Math.max(-1.55, Math.min(1.55, me.pitch - e.movementY * k * (settings.invertY ? -1 : 1)));
 });
 
@@ -1854,9 +1912,34 @@ function updatePauseUI() {
       `${p.id === myId ? ' <span class="you">(you)</span>' : ''}${tag}${kick}</li>`;
   }).join('');
   $('cpuRow').classList.toggle('hidden', !Net.isHost);
+  renderMeEdit();
   $('cpuDiff').querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === cpuDiff));
   $('addCpu').disabled = players.size >= CONFIG.tag.maxPlayers;
 }
+
+// ---------- you: change name + colors mid-game (pause menu -> Lobby) ----------
+function renderMeEdit() {
+  if (document.activeElement !== $('pName')) $('pName').value = settings.name || 'bobo';
+  const sw = (list, cur) => list.map((c) => `<button type="button" class="sw${c === cur ? ' on' : ''}" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
+  $('pBody').innerHTML = sw(COLORS, settings.color);
+  $('pEye').innerHTML = sw(EYE_COLORS, settings.eye);
+}
+function sendMe() {
+  if (!inGame) return;
+  const m = { t: 'upd', name: cleanName(settings.name), color: settings.color, eye: settings.eye, cos: myCos() };
+  if (Net.isHost) hostUpdatePlayer(myId, m); else Net.send(m);
+}
+const meColor = (body, eye) => { setColors(body, eye); renderMeEdit(); sendMe(); };
+$('pBody').onclick = (e) => { const b = e.target.closest('.sw'); if (b) meColor(b.dataset.c, null); };
+$('pEye').onclick = (e) => { const b = e.target.closest('.sw'); if (b) meColor(null, b.dataset.c); };
+$('pName').addEventListener('change', () => {
+  settings.name = cleanName($('pName').value);
+  $('name').value = settings.name;
+  saveSettings();
+  renderMeEdit();
+  sendMe();
+});
+$('pName').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 
 // ---------- CPU players (host) ----------
 let cpuDiff = 'medium', cpuN = 0;
@@ -1933,11 +2016,6 @@ function botGoal(b) {
     const k = others.find((q) => isIt(q.id));
     return k ? { type: 'chase', pos: posOfP(k), vel: velOf(k) } : { type: 'wander' };
   }
-  if (game.mode === 'race' && World.map.race) {
-    if (game.race && game.race.done[id] !== undefined) return { type: 'wander' };
-    const f = World.map.race.finish;
-    return { type: 'go', pos: { x: f.x, y: f.y, z: f.z } };
-  }
   return { type: 'wander' };
 }
 // before the physics steps: decide, plan and press keys
@@ -1949,7 +2027,7 @@ function botsThink(dt) {
   }
   const T = CONFIG.tag, go = isPlaying() && game.rl <= 0;
   for (const b of bots.values()) {
-    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || game.mode === 'race' || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id) || performance.now() < (b.lockUntil || 0);
+    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || game.mode === 'race' || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id) || isRedLight() || sitsOut(b.id) || performance.now() < (b.lockUntil || 0);
     if (isFrozen(b.id)) { b.p.vel.x = 0; b.p.vel.z = 0; }
     b.p.speedMul = !go ? 1 : game.mode === 'duel' && isIt(b.id) ? T.duelChaserSpeed
       : game.mode === 'bomb' && isIt(b.id) ? T.bombSpeed : game.mode === 'koth' && !isIt(b.id) ? T.kothSpeed
@@ -1976,7 +2054,7 @@ function botsAfter() {
     p.pitch = 0;
     p.mode = b.p.mode();
     if (!isPlaying() || game.rl > 0) continue;
-    if (game.mode === 'race') { hostFinish(b.id); continue; }
+    if (game.mode === 'race') continue;
     const reach = CONFIG.tag.touchRange + (game.mode === 'duel' && isIt(b.id) ? CONFIG.tag.duelReachBonus : 0);
     for (const q of players.values()) {
       if (q.id === b.id || !canTagPair(b.id, q.id)) continue;
@@ -2000,7 +2078,7 @@ const MODES = [
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
   { id: 'koth', name: 'King of the Tag', kind: 'tag', min: 2, desc: 'Hold the crown to score a point every second. Run into the king to steal it. Most points wins.',
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
-  { id: 'race', name: 'Race', kind: 'race', min: 1, desc: 'Race to the finish. Fall off and you go back to the start - no checkpoints.',
+  { id: 'race', name: 'Race', kind: 'race', min: 1, desc: 'Race to the finish. Fall off and you go back to the start - no checkpoints. CPUs sit races out.',
     opts: [{ key: 'len', label: 'Time limit', vals: [[240, '4 min'], [360, '6 min'], [480, '8 min']], def: 360 }] },
   { id: 'gp', name: 'Grand Prix', kind: 'gp', min: 2, desc: 'A run of rounds, each a random mode on a random map. Every round gives points for your placing - most points at the end wins.',
     opts: [{ key: 'rounds', label: 'Rounds', vals: [[3, '3'], [5, '5'], [7, '7']], def: 5 }] },
@@ -2205,7 +2283,7 @@ let camFoot = 0, fovPunch = 0, pitchKick = 0, rollKick = 0, carve = 0, prevYaw =
 // watch frame times: drop the resolution when frames take clearly longer than the screen's refresh,
 // creep back up when there's room. res.best tracks the screen's refresh interval.
 function autoRes(raw) {
-  if (!(raw > 0 && raw < 0.25) || document.hidden) return;
+  if (!(raw > 0 && raw < 0.25) || document.hidden || hasEv('pixel')) return;
   res.avg += (raw - res.avg) * 0.05;
   res.best = Math.min(res.best * 1.0005, Math.max(1 / 240, res.avg));
   if (res.avg > res.best * 1.25) { res.slow += raw; res.fast = 0; }
@@ -2271,8 +2349,10 @@ function updateGame(dt) {
   const playing = isPlaying(), go = playing && game.rl <= 0, T = CONFIG.tag;
   // frozen: both duelists before each chase, and everyone on the start line of a race
   const fallHeld = performance.now() < fallLockUntil;   // just fell off: held in place for a moment
-  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId) || fallHeld;
-  if (fallHeld && me.grounded) { me.vel.x = 0; me.vel.z = 0; }
+  const red = isRedLight();
+  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId) || fallHeld || red;
+  if ((fallHeld || red) && me.grounded) { me.vel.x = 0; me.vel.z = 0; }
+  if (red !== wasRed) { wasRed = red; if (red) { flash('rgba(255,90,90,.45)'); tone(220, 160, 0.25, 'square', 0.06); } else if (hasEv('redlight')) tone(440, 660, 0.15, 'square', 0.05); }
   if (isFrozen(myId)) { me.vel.x = 0; me.vel.z = 0; }
   const duelChaser = playing && game.mode === 'duel' && isIt(myId);
   // whoever does the chasing runs a little faster
@@ -2282,6 +2362,11 @@ function updateGame(dt) {
     : game.mode === 'freeze' && isIt(myId) ? T.freezeSpeed : 1;
   const reachBonus = duelChaser ? T.duelReachBonus : 0;
   const inp = locked && !frozen ? readInput() : NO_INPUT;
+  if (inp !== NO_INPUT) {
+    if (hasEv('mirror')) inp.r = -inp.r;
+    if (hasEv('backwards')) inp.f = -inp.f;
+  }
+  if (hasEv('tornado') && !frozen) me.yaw += dt * 1.9;
   if (frozen) me.jumpBuf = 0;
 
   acc += dt;
@@ -2291,8 +2376,14 @@ function updateGame(dt) {
   while (acc >= STEP && n < 10) {
     wt += STEP;
     World.updateMovers(wt);
+    const g0 = me.grounded, v0 = me.vel.y;
     me.step(STEP, inp);
-    for (const b of bots.values()) b.p.step(STEP, b.inp);
+    if (game.rnd) evPhysics(me, g0, v0, inp);
+    for (const b of bots.values()) {
+      const g = b.p.grounded, v = b.p.vel.y;
+      b.p.step(STEP, b.inp);
+      if (game.rnd) evPhysics(b.p, g, v, b.inp);
+    }
     acc -= STEP;
     n++;
   }
@@ -2377,6 +2468,7 @@ function updateGame(dt) {
   // sliding rumbles harder the faster you go
   if (me.sliding && me.grounded) shake = Math.max(shake, Math.min(0.45, hs / 45));
   shake = Math.max(0, shake - dt * 1.4);
+  if (hasEv('quake')) shake = Math.max(shake, 0.6);
   const tr = shake * shake * C.shake * settings.shake, tt = performance.now() / 1000;
   const n1 = Math.sin(tt * 47.3) * 0.6 + Math.sin(tt * 23.1) * 0.4, n2 = Math.sin(tt * 39.7 + 1.3) * 0.6 + Math.sin(tt * 17.9) * 0.4, n3 = Math.sin(tt * 31.1 + 2.1);
   camera.position.set(me.pos.x + n1 * tr * 0.12, camFoot + eyeH + Math.sin(bob * 2) * C.bob * bobW + landOff + n2 * tr * 0.12, me.pos.z);
@@ -2398,16 +2490,30 @@ function updateGame(dt) {
     for (const m of [skinMat, sleeveMat]) { m.transparent = ghostHands; m.opacity = ghostHands ? 0.3 : 1; m.depthWrite = !ghostHands; m.needsUpdate = true; }
   }
   camera.rotation.set(me.pitch + pitchKick + n3 * tr * 0.02, me.yaw + (back ? Math.PI : 0) + n1 * tr * 0.012, (roll + rollKick) * (back ? -1 : 1) + n2 * tr * 0.025);
+  if (hasEv('woozy')) {
+    const t = performance.now() / 1000;
+    camera.rotation.z += Math.sin(t * 1.3) * 0.28;
+    camera.rotation.x += Math.sin(t * 0.9) * 0.1;
+    camera.rotation.y += Math.sin(t * 0.7) * 0.12;
+  }
+  if (hasEv('flip')) camera.rotation.z += Math.PI;
   if (tp) placeThirdPerson(dt); else tpDist = 0;
   updateSelfAvatar(dt, tp);
   // randomizer: lights out (only a meter or so of view, pitch black past it)
   const dark = isDark();
   if (dark !== darkOn || (dark && scene.fog !== darkFog)) setDark(dark);
   if (dark) darkFog.far = 1.6 + tpDist;
+  else if (hasEv('disco')) {
+    const h = (performance.now() / 1000 * 0.45) % 1;
+    scene.background.setHSL(h, 0.75, 0.72);
+    scene.fog.color.copy(scene.background);
+    ambient.color.setHSL((h + 0.5) % 1, 0.9, 0.72);
+  }
 
   const sp = Math.max(0, Math.min(1, (hs - M.walkSpeed) / (18 - M.walkSpeed)));
   fovPunch *= Math.exp(-5 * dt);
-  fovNow += (settings.fov + C.speedFov * sp + fovPunch - fovNow) * ease(10);
+  const evFov = (hasEv('fisheye') ? 50 : 0) + (hasEv('woozy') ? Math.sin(performance.now() / 600) * 12 : 0);
+  fovNow += (Math.min(160, settings.fov + C.speedFov * sp + fovPunch + evFov) - fovNow) * ease(10);
   setSpeedlines(Math.max(0, Math.min(0.85, (hs - 12) / 10)).toFixed(2));
   motionAudio(hs, onFoot);
   if (Math.abs(camera.fov - fovNow) > 0.01) { camera.fov = fovNow; camera.updateProjectionMatrix(); }
@@ -2449,6 +2555,7 @@ function updateGame(dt) {
     animateScamp(a.scamp, dt, performance.now() / 1000, a.spd, p.mode, Math.abs(a.vy) > 1.5 && p.mode !== 1, p.talk);
     a.root.rotation.y = lerpAngle(a.root.rotation.y, p.yaw, k);
     a.root.scale.setScalar(evScale());
+    a.scamp.head.scale.setScalar(hasEv('bigheads') ? 2.4 : 1);
     a.rig.rotation.x += ((p.mode === 1 ? 1.05 : 0) - a.rig.rotation.x) * k;
     a.rig.scale.y += ((p.mode === 2 ? 0.62 : 1) - a.rig.scale.y) * k;
     const it = isIt(p.id) && playing, dist = a.root.position.distanceTo(me.pos), now = performance.now() / 1000;
@@ -2458,9 +2565,12 @@ function updateGame(dt) {
     a.crown.visible = it && game.mode === 'koth';
     a.ice.visible = isFrozen(p.id);
     // knocked out in Bomb Tag: gone - nobody else can see them at all
-    a.root.visible = !isOut(p.id);
-    setScampGhost(a.scamp, p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
-    applyCos(a.scamp, p.cos, now);
+    a.root.visible = !isOut(p.id) && !sitsOut(p.id) && !hasEv('invisible');
+    // impostors: everyone the same plain color, no cosmetics, no names
+    const imp = hasEv('impostors');
+    setScampGhost(a.scamp, !imp && p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
+    applyCos(a.scamp, imp ? null : p.cos, now);
+    if (imp) a.scamp.fur.color.set(IMPOSTOR);
     a.label.material.opacity = isOut(p.id) ? 0.4 : 1;
     // see-through outline of whoever matters to you right now
     let xr = null;
@@ -2471,8 +2581,9 @@ function updateGame(dt) {
       else if (game.mode === 'freeze' && !isIt(myId) && isFrozen(p.id)) xr = '#7fe3ff';   // frozen teammates to rescue
       if (isExposed(p.id) && canTagPair(myId, p.id)) xr = '#ff7b7b';   // they fell: you can see them anywhere
     }
+    if (hasEv('xray') && playing && !xr) xr = '#ffffff';
     if (dark) xr = null;   // lights out: no outlines, no markers, no names
-    a.label.visible = !dark;
+    a.label.visible = !dark && !imp;
     setScampXray(a.scamp, xr);
     a.marker.visible = !!xr && (game.mode !== 'bomb' || it || isExposed(p.id));
     if (a.marker.visible) { a.marker.material.color.set(xr); a.marker.scale.set(0.45, 0.45, 1).multiplyScalar(0.8 + Math.min(1.6, dist / 18)); }
@@ -2483,7 +2594,7 @@ function updateGame(dt) {
       || (game.mode === 'koth' && isIt(myId)))) nearestSeeker = Math.min(nearestSeeker, dist);
     // blob shadow on whatever is under them, fading as they get higher
     const rp = a.root.position, fy = World.floorBelow(rp.x, rp.y + 0.3, rp.z), up = rp.y - fy;
-    a.blob.visible = fy > -1e8 && up < 6 && a.root.visible;
+    a.blob.visible = fy > -1e8 && up < 6 && !isOut(p.id) && !sitsOut(p.id);   // invisible players still cast a shadow
     if (a.blob.visible) {
       a.blob.position.set(rp.x, fy + 0.02, rp.z);
       a.blob.scale.setScalar((1 + up * 0.12) * evScale());
@@ -2517,7 +2628,44 @@ function updateGame(dt) {
   sbTimer += dt;
   if (sbTimer > 0.25 || boardDirty) { sbTimer = 0; boardDirty = false; renderBoard(); }
 }
-let finishSentAt = 0, boardDirty = true, beepT = 0, fallLockUntil = 0;
+let finishSentAt = 0, boardDirty = true, beepT = 0, fallLockUntil = 0, wasRed = false;
+
+// randomizer happenings that push bodies around (you, and the CPUs on the host), every physics step
+function evPhysics(p, wasGrounded, vyBefore, inp) {
+  if (hasEv('wind')) {
+    const a = evAngle();
+    p.vel.x += Math.cos(a) * 9 * STEP;
+    p.vel.z += Math.sin(a) * 9 * STEP;
+  }
+  // landed hard: bounce back up (unless you hold crouch)
+  if (hasEv('bouncy') && !wasGrounded && p.grounded && vyBefore < -4 && !inp.crouch) {
+    p.vel.y = Math.min(-vyBefore * 0.85, 22);
+    p.grounded = false;
+  }
+  // just jumped: shoot forward too
+  if (hasEv('rocket') && wasGrounded && !p.grounded && p.vel.y > 4 && vyBefore < 1) {
+    p.vel.x -= Math.sin(p.yaw) * 9;
+    p.vel.z -= Math.cos(p.yaw) * 9;
+  }
+  // the ground jolts you now and then
+  if (hasEv('quake') && p.grounded && Math.random() < STEP * 1.1) {
+    p.vel.y = 3.5 + Math.random() * 3;
+    p.vel.x += (Math.random() - 0.5) * 7;
+    p.vel.z += (Math.random() - 0.5) * 7;
+    p.grounded = false;
+  }
+}
+// looks that switch on/off with a happening (the per-frame parts are in updateGame)
+function evLook() {
+  const m = World.map;
+  if (!hasEv('disco') && !darkOn) {
+    scene.background.set(m.sky);
+    scene.fog.color.set(m.sky);
+    ambient.color.set(m.hemi[0]);
+  }
+  const pr = hasEv('pixel') ? 0.17 : res.now;
+  if (renderer.getPixelRatio() !== pr) { renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight); }
+}
 
 // ---------- third person (setting) ----------
 // The camera sits behind your head along your view. A ray from your head finds the nearest wall
@@ -2576,7 +2724,8 @@ function slabHit(o, d, a, b) {
 // your own character, only drawn in third person
 let selfAv = null, selfKey = '';
 function updateSelfAvatar(dt, tp) {
-  if (!tp && !selfAv) return;
+  const wrap = !!World.map.wrap;   // endless map: your copies on the other tiles, even in first person
+  if (!tp && !wrap && !selfAv) return;
   const key = settings.color + settings.eye;
   if (!selfAv || key !== selfKey) {
     if (selfAv) removeAvatar({ avatar: selfAv });
@@ -2586,24 +2735,27 @@ function updateSelfAvatar(dt, tp) {
   }
   const a = selfAv, show = tp && tpDist > 0.75;
   a.root.visible = show;
+  a.copyOnly = !show && wrap && !isOut(myId) && !hasEv('invisible');
   a.blob.visible = false;
-  if (!show) return;
+  if (!show && !a.copyOnly) return;
   const k = 1 - Math.exp(-14 * dt), now = performance.now() / 1000, mode = me.mode(), playing = isPlaying();
   a.root.position.copy(me.pos);
   a.root.rotation.y = me.yaw;
   a.root.scale.setScalar(evScale());
+  a.scamp.head.scale.setScalar(hasEv('bigheads') ? 2.4 : 1);
   animateScamp(a.scamp, dt, now, me.hspeed(), mode, !me.grounded && Math.abs(me.vel.y) > 1.5 && mode !== 1, talkT > 0);
   a.rig.rotation.x += ((mode === 1 ? 1.05 : 0) - a.rig.rotation.x) * k;
   a.rig.scale.y += ((mode === 2 ? 0.62 : 1) - a.rig.scale.y) * k;
-  const cos = myCos();
+  const imp = hasEv('impostors'), cos = imp ? null : myCos();
   setScampGhost(a.scamp, isOut(myId) ? 0.3 : cos && cos.ghost ? cos.ghostOp : 1);
   applyCos(a.scamp, cos, now);
+  if (imp) a.scamp.fur.color.set(IMPOSTOR);
   a.bomb.visible = playing && game.mode === 'bomb' && isIt(myId);
   if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
   a.crown.visible = playing && game.mode === 'koth' && isIt(myId);
   a.ice.visible = isFrozen(myId);
   const fy = World.floorBelow(me.pos.x, me.pos.y + 0.3, me.pos.z), up = me.pos.y - fy;
-  a.blob.visible = fy > -1e8 && up < 6;
+  a.blob.visible = fy > -1e8 && up < 6 && show;
   if (a.blob.visible) {
     a.blob.position.set(me.pos.x, fy + 0.02, me.pos.z);
     a.blob.scale.setScalar((1 + up * 0.12) * evScale());
@@ -2628,8 +2780,10 @@ const onLayer1 = (o) => o.layers.enable(1);
 function drawWrapCopies() {
   const W = World.map.wrap, list = [];
   for (const p of players.values()) if (p.avatar && p.avatar.root.visible) list.push(p.avatar);
-  if (selfAv && selfAv.root.visible) list.push(selfAv);
+  const selfCopy = selfAv && selfAv.copyOnly;   // first person: you're drawn on the other tiles only
+  if (selfAv && (selfAv.root.visible || selfCopy)) list.push(selfAv);
   if (!list.length) return;
+  if (selfCopy) selfAv.root.visible = true;
   for (const a of list) { a.root.traverse(onLayer1); a.blob.layers.enable(1); }
   const bg = scene.background;
   scene.background = null;   // a color background would wipe the frame
@@ -2647,6 +2801,7 @@ function drawWrapCopies() {
   renderer.autoClear = true;
   camera.layers.set(0);
   scene.background = bg;
+  if (selfCopy) selfAv.root.visible = false;
 }
 
 // you chatter by yourself after a near miss, and now and then during a close chase
@@ -2839,7 +2994,7 @@ function updateHud(hs, frozen, nearestSeeker) {
     }
   } else if (game.phase === 'results') { phase = 'ROUND OVER'; timer = ''; }
   if (playing && game.gp) phase = `GP ${game.gp.round}/${game.gp.of} · ${phase}`;
-  if (curEvent()) phase += ` · ${RANDOM_EVENTS[curEvent()].name} ${Math.ceil(game.rnd.left)}s`;
+  if (activeEvs().length) phase += ` · ${activeEvs().map((k) => RANDOM_EVENTS[k].name).join(' + ')} ${Math.ceil(game.rnd.left)}s`;
   setText('phaseText', phase);
   setText('timerText', timer);
   $('timerText').classList.toggle('urgent', urgent);
@@ -2875,8 +3030,9 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (playing && mode === 'bomb' && isOut(myId)) hint = 'You\'re out - spectating';
   if (playing && mode === 'freeze' && go && !isIt(myId)) hint = isFrozen(myId) ? 'Frozen - a teammate can thaw you by touching you' : game.freeze && game.freeze.frozen.length ? 'Touch frozen teammates to thaw them' : '';
   if (isExposed(myId)) hint = `EXPOSED - they can see you for ${((exposedUntil[myId] - now) / 1000).toFixed(1)}s`;
+  if (hasEv('redlight')) hint = isRedLight() ? 'RED LIGHT - FREEZE!' : 'GREEN LIGHT - GO GO GO';
   if (now < tagHintUntil) hint = tagHint;
-  if (frozen && !isFrozen(myId)) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
+  if (frozen && !isFrozen(myId) && !isRedLight()) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
   // held after a fall: a bar that empties as you wait
   const held = now < fallLockUntil;
   $('fallHold').classList.toggle('hidden', !held);
@@ -2934,7 +3090,7 @@ function boardRows() {
   if (mode === 'race' && game.race) {
     const r = game.race;
     const done = r.order.map((id) => players.get(id)).filter(Boolean);
-    const rest = list.filter((p) => r.done[p.id] === undefined).map((p) => ({ p, togo: raceToGo(p.id === myId ? me.pos : p.avatar ? p.avatar.root.position : p.tp) }))
+    const rest = list.filter((p) => !p.cpu && r.done[p.id] === undefined).map((p) => ({ p, togo: raceToGo(p.id === myId ? me.pos : p.avatar ? p.avatar.root.position : p.tp) }))
       .sort((a, b) => a.togo - b.togo);
     return { title: 'RACE', rows: done.map((p, i) => row(p, fmtRace(r.done[p.id]), ord(i + 1).toUpperCase(), i === 0 ? 'gold' : ''))
       .concat(rest.map((o) => row(o.p, `${Math.round(o.togo)}m`, '', ''))) };
@@ -3072,7 +3228,7 @@ function renderCos() {
   $('glintColor').value = c.glintColor;
   $('glintColor').classList.toggle('hidden', !c.glint);
 }
-const setCos = (k, v) => { settings.cos = Object.assign({}, COS_DEFAULT, settings.cos || {}, { [k]: v }); saveSettings(); renderCos(); };
+const setCos = (k, v) => { settings.cos = Object.assign({}, COS_DEFAULT, settings.cos || {}, { [k]: v }); saveSettings(); renderCos(); sendMe(); };
 $('cosPanel').addEventListener('click', (e) => {
   const b = e.target.closest('.pill'), g = b && b.closest('.pills[data-k]');
   if (!g) return;
