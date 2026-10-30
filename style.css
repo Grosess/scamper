@@ -655,3 +655,25 @@ button { font-family: inherit; }
 .rv-ok { pointer-events: auto; width: auto; margin-top: 8px; padding: 10px 34px; font-size: 16px; }
 .reveal, .rv-card { pointer-events: none; }
 .rv-card .rv-ok { pointer-events: auto; }
+/* loading placeholders (account info on its way) */
+.skel { position: relative; color: transparent !important; background: linear-gradient(90deg, #e3e8ef 25%, #f4f6f9 45%, #e3e8ef 65%) !important; background-size: 300% 100% !important;
+  animation: skel 1.1s ease-in-out infinite; border-color: transparent !important; user-select: none; }
+span.skel, b.skel { display: inline-block; min-width: 64px; }
+@keyframes skel { from { background-position: 100% 0; } to { background-position: 0 0; } }
+/* every swatch the same size, outlined in its rarity's color (mythic: black, so white shows too) */
+.palette .sw.t-common, .palette .sw.t-uncommon, .palette .sw.t-rare, .palette .sw.t-epic, .palette .sw.t-legendary, .palette .sw.t-mythic { grid-column: auto; border-width: 3px; box-shadow: none; outline: 0; }
+.palette .sw.t-common { border-color: #b4bcc8; }
+.palette .sw.t-uncommon { border-color: #5cc96b; }
+.palette .sw.t-rare { border-color: #4a8cff; }
+.palette .sw.t-epic { border-color: #ff4d4d; }
+.palette .sw.t-legendary { border-color: #ffc23d; }
+.palette .sw.t-mythic { border-color: #111111; }
+.palette .sw.on { outline: 3px solid var(--ink); outline-offset: 2px; }
+.palette .sw.locked { border-style: dashed; border-width: 2px; }
+/* the line: no glow, a plain white marker, rarity + chance underneath */
+.reel-wrap, .reel-wrap.mythic { box-shadow: none; }
+.reel-mark, .reel-wrap.mythic .reel-mark { background: #fff; outline: 2px solid var(--ink); }
+.reel-mark::before, .reel-wrap.mythic .reel-mark::before { border-top-color: #fff; }
+.reel-mark::after, .reel-wrap.mythic .reel-mark::after { border-bottom-color: #fff; }
+.reel-info { position: absolute; left: 0; right: 0; top: calc(100% + 26px); text-align: center; font: 600 15px Rubik, sans-serif; color: #fff; }
+.reel-info b { font: 800 13px Rubik, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; margin-right: 6px; background: var(--tc); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }

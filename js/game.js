@@ -2857,6 +2857,8 @@ function updateGame(dt) {
 }
 // ---------- prize crate: it shakes, pops open, and a reel of items spins and slows down on your prize ----------
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const TIER_TOTAL = ITEMS.TIERS.reduce((n, t) => n + t.weight, 0);
+const tierChance = (t) => { const p = t.weight / TIER_TOTAL * 100; return p >= 10 ? Math.round(p) : +p.toFixed(1); };
 let crateBusy = false;
 // starter = one of a new account's two welcome crates (title shows which one).
 // preview = the developer panel's test run: plays everything, but nothing is won or saved
@@ -2919,6 +2921,7 @@ async function openCrate(match, starter, preview) {
     for (let i = 0; i < N; i++) left.push(left[i] + W[items[i].tier]);
     reel.style.transform = 'translateX(0)';
     reel.style.filter = '';
+    $('reelInfo').innerHTML = '';
     wrap.classList.remove('hidden');
     const half = wrap.clientWidth / 2, w = W[prize.tier];
     const end = left[WIN] + w * (0.15 + Math.random() * 0.7) - half;   // stop somewhere inside the prize
@@ -2935,9 +2938,9 @@ async function openCrate(match, starter, preview) {
         if (at !== last) {
           last = at;
           tone(700 + 700 * k, 600 + 600 * k, 0.025, 'square', 0.025);   // ticks climb as it slows
-          const tc = tierOf(items[at]).color;
-          wrap.style.setProperty('--glow', tc);
-          wrap.classList.toggle('mythic', items[at].tier === 'mythic');
+          // under the line: the rarity of what the marker is on, and its chance
+          const tt = tierOf(items[at]);
+          $('reelInfo').innerHTML = `<b style="--tc:${tt.color}">${tt.name}</b> ${tierChance(tt)}% chance`;
         }
         if (k < 1) requestAnimationFrame(f); else done();
       };
@@ -3463,8 +3466,10 @@ function renderBoard() {
 // the name box shows who you are (your account name, or your guest name)
 function renderName() {
   $('name').value = myName();
+  $('name').classList.toggle('skel', Account.loading);
   $('nameHint').innerHTML = Account.me ? (devOn() ? 'Developer mode is on' : '') : 'Guest name. <a data-go="account">Create an account</a> to pick your own.';
 }
+document.addEventListener('account-loading', () => $('name').classList.toggle('skel', Account.loading));
 $('nameHint').onclick = $('qMsg').onclick = (e) => { if (e.target.dataset.go) { e.preventDefault(); showView($('menu'), e.target.dataset.go); } };
 
 // character preview + fur color on the main menu

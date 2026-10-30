@@ -15,6 +15,9 @@ const Account = (() => {
   let me = read(KEYS.me);   // { name, token, ticket, inv: { colors, cos }, dev, updated }
   if (me && (!me.token || !me.inv)) me = null;
   let online = null, saveTimer = 0, checkTimer = 0, tab = 'new', pendingSave = false;
+  // waiting on the server for who you are (page load with a saved log-in, or logging in right now):
+  // the name spots show shimmering placeholders until it answers
+  let loading = !!me, loggingIn = false;
   const listeners = [];
   const changed = () => { write(KEYS.me, me); render(); for (const f of listeners) f(); };
 
@@ -34,14 +37,18 @@ const Account = (() => {
   // ---- the Account page ----
   function status(t, bad) { const s = $('accStatus'); s.textContent = t; s.classList.toggle('bad', !!bad); }
   function render() {
-    const inn = !!me;
+    const inn = !!me, skel = loading || loggingIn;
     $('accOut').classList.toggle('hidden', inn);
     $('accIn').classList.toggle('hidden', !inn);
     $('accTab').textContent = inn ? me.name : 'Account';
+    $('accTab').classList.toggle('skel', skel);
     // the quick log-in box on the Play page
-    $('qForm').classList.toggle('hidden', inn);
-    $('qIn').classList.toggle('hidden', !inn);
-    if (inn) $('qName').textContent = me.name;
+    $('qForm').classList.toggle('hidden', inn || loggingIn);
+    $('qIn').classList.toggle('hidden', !inn && !loggingIn);
+    $('qName').textContent = inn ? me.name : 'loading';
+    $('qName').classList.toggle('skel', skel);
+    $('accName').classList.toggle('skel', skel);
+    document.dispatchEvent(new Event('account-loading'));
     $('accTabNew').classList.toggle('on', tab === 'new');
     $('accTabLogin').classList.toggle('on', tab === 'login');
     $('accConfirmRow').classList.toggle('hidden', tab !== 'new');
@@ -50,7 +57,11 @@ const Account = (() => {
     $('accNameHint').classList.toggle('hidden', tab !== 'new');
     if (!inn) return;
     $('accName').textContent = me.name;
-    $('accDev').classList.toggle('hidden', !me.dev);
+    $('accDev').classList.toggle('hidden', !me.dev || skel);
+    if (skel) {   // placeholder rows for the collection
+      $('accCollection').innerHTML = ITEMS.TIERS.map(() => '<div class="acc-tier"><span class="skel">rarity</span><span class="acc-bar skel"></span><b class="skel">0/0</b></div>').join('');
+      return;
+    }
     // the collection, tier by tier
     const have = new Set(me.inv.colors);
     $('accCollection').innerHTML = ITEMS.TIERS.map((t) => {
@@ -118,14 +129,19 @@ const Account = (() => {
     msg.textContent = 'Logging in…';
     msg.className = 'q-msg';
     $('qGo').disabled = true;
+    loggingIn = true;
+    render();
     try {
       const j = await call({ action: 'login', username, password });
+      loggingIn = false;
       take(j);
       write(KEYS.last, j.name);
       $('qPass').value = '';
       if (j.data && j.data.settings && Object.keys(j.data.settings).length) { write(KEYS.settings, j.data.settings); if (j.data.stats) write(KEYS.stats, j.data.stats); write(KEYS.me, me); location.reload(); return; }
       changed();
     } catch (err) { msg.textContent = err.message; msg.className = 'q-msg bad'; }
+    loggingIn = false;
+    render();
     $('qGo').disabled = false;
   };
   $('qOut').onclick = (e) => { e.preventDefault(); $('accLogout').onclick(); };
@@ -167,10 +183,11 @@ const Account = (() => {
     try {
       await call({ action: 'ping' });
       online = true;
-      if (!me) return;
+      if (!me) { loading = false; render(); return; }
       const j = await call({ action: 'load', token: me.token });
       const newer = j.updated > (me.updated || 0);
       take(j);
+      loading = false;
       if ((newer || !hadSettings) && j.data && j.data.settings && Object.keys(j.data.settings).length && !sessionStorage.getItem('scamper-synced')) {
         sessionStorage.setItem('scamper-synced', '1');
         write(KEYS.settings, j.data.settings || {});
@@ -185,10 +202,13 @@ const Account = (() => {
       if (e.status === 401) { me = null; changed(); }
       else online = false;
     }
+    loading = false;
+    render();
   })();
 
   return {
     get me() { return me; },
+    get loading() { return loading || loggingIn; },
     onChange(f) { listeners.push(f); },
     // the game saved settings or stats: send them up a few seconds later
     dirty() {
