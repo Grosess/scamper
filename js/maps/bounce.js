@@ -1,89 +1,97 @@
-// BOUNCE HOUSE - an indoor trampoline park. Plenty of plain floor; the trampolines are extras:
-//   center court   a 4x4 grid of red mats (playful ~3m hops), walkable strips between them
-//   launch pads    green pads throw you onto the decks (east deck 4.4, north balcony 8.8)
-//   foam pit       sunken pit on the west with yellow tramps up onto the west ledge (4.4)
-//   decks          west ledge -> south deck -> east deck at 4.4, a tower + north balcony at 8.8
-//   kick routes    two orange two-wall chimneys from the floor up to the balcony (8.8)
-//   ninja line     stepping pillars up to the south deck; vaults and slide bars on the floor
-// Ceiling 14 - the strongest pad tops out well under it.
+// BOUNCE HOUSE - a long indoor trampoline park with a Z-shaped hall: the west half is wider to the
+// north, the east half wider to the south, with angled corners where they meet.
+//   runway       a long line of red mats down the middle of the hall - bounce end to end
+//   west         a sunken foam pit (stepped foam blocks to climb out, a green tramp up to the
+//                west terrace) and terraces stepping up the north wall: 2.2 -> 4.4 -> 6.6
+//   east         terraces up the north wall (2.2 -> 4.4 -> 6.6), an 8.8 end balcony with an
+//                orange kick chimney up to it, and a long bridge back along the south wall
+//   middle       a bridge (4.4) across the runway from the west terraces to the south deck (4.4)
+// Loops: around the runway on the floor, and a figure-eight over the decks and bridges.
+// Ceiling 15 - the strongest launch tops out well below it.
 defineMap({
   id: 'bounce',
   accent: ['#e2463c', '#3b6fd4'],
   name: 'Bounce House',
-  blurb: 'An indoor trampoline park. Bounce court, launch pads to the decks, a foam pit, kick chimneys.',
+  blurb: 'A long trampoline park: a bounce runway, a foam pit, terraces stepping up both ends, launch pads.',
   env: 'indoor',
   sky: '#1f2742',
-  fog: [40, 110],
+  fog: [45, 120],
   hemi: ['#ffffff', '#8a93aa', 1.3],
   sun: [0.5, 4, 60, 6],
-  size: 28,
-  spotHeight: 13.6,
-  spots: [-16, 0, 16].flatMap((x) => [-12, 0, 12].map((z) => ({ x, z }))),
-  menuCam: { r: 18, y: 11 },
+  size: 40,
+  spotHeight: 14.6,
+  spots: [-28, -14, 0, 14, 28].flatMap((x) => [-6, 6].map((z) => ({ x, z }))),
+  menuCam: { path: [[-28, 8, 2], [26, 8, 2]] },
   spawns: [
-    [0, 0, -8.5], [0, 0, 8.5], [-8, 0, -9], [8, 0, -9], [-8, 0, 9], [8, 0, 9],
-    [18, 0, 0], [-4, 0, 19], [12, 0, -15], [-20, 0, -15],
-    [20, 4.4, 2], [-23, 4.4, 0], [0, 4.4, 19.5], [21, 8.8, -12], [0, 8.8, -19.5], [-14, -2.5, 2],
+    [-22, 0, -7], [-20, 0, 7], [-12, 0, -6], [-2, 0, -8], [2, 0, 8], [8, 0, -6], [16, 0, 7.5], [20, 0, -5],
+    [26, 0, 8], [-24, 6.6, -13.5], [-12, 4.4, -13.5], [0, 2.2, -13.5], [2, 4.4, 13.5], [31.5, 6.6, -9],
+    [36, 8.8, 6], [-22, 0, 9],
   ],
-  seekerSpawn: [0, 0, -8.5],
+  seekerSpawn: [0, 0, -6],
 
   build(k) {
-    const FLOOR = '#cfd5dd', WALL = '#2a3557', CEIL = '#1f2742', DECK = '#3b6fd4', BLOCK = '#f0b928',
-      MAT = '#e2463c', LAUNCH = '#2f9e6a', PAD = '#e9e4d8', POST = '#e9e4d8';
-    const D = { tex: 'none' };
+    const FLOOR = '#cfd5dd', WALL = '#2a3557', CEIL = '#1f2742', DECK = '#3b6fd4', DECK2 = '#5b8be0', BLOCK = '#f0b928',
+      MAT = '#e2463c', LAUNCH = '#2f9e6a', CREAM = '#e9e4d8';
+    const D = { tex: 'none' }, Q = Math.PI / 4;
 
-    // ---- floor (with the foam pit cut out of the west side), walls, ceiling ----
-    k.box(0, -3.7, -17, 50, 3.7, 10, FLOOR, D);          // north band
-    k.box(0, -3.7, 17, 50, 3.7, 10, FLOOR, D);           // south band
-    k.box(-23, -3.7, 0, 4, 3.7, 24, FLOOR, D);           // west strip (under the ledge)
-    k.box(6.5, -3.7, 0, 37, 3.7, 24, FLOOR, D);          // middle + east
-    k.box(-16.5, -3.7, 0, 9, 1.2, 24, BLOCK, D);         // foam pit floor (top -2.5)
-    enclose(k, 50, 44, 14, WALL, CEIL, D);
+    // ---- floor, with the foam pit sunk into the west end (pit x -36..-26, z -9..5, floor -2.5) ----
+    k.box(-37, -3.7, 0, 2, 3.7, 32, FLOOR, D);
+    k.box(-31, -3.7, -12.5, 10, 3.7, 7, FLOOR, D);
+    k.box(-31, -3.7, 10.5, 10, 3.7, 11, FLOOR, D);
+    k.box(6, -3.7, 0, 64, 3.7, 32, FLOOR, D);
+    k.box(-31, -3.7, -2, 10, 1.2, 14, BLOCK, D);
+    enclose(k, 76, 32, 15, WALL, CEIL, D);
 
-    // ---- center court: 4x4 red mats, walkable strips between ----
-    for (const x of [-3.9, -1.3, 1.3, 3.9]) for (const z of [-3.9, -1.3, 1.3, 3.9]) k.pad(x, 0, z, 2, 2, 13, { look: 'tramp', color: MAT });
-    // vaults either side of the court
-    k.box(-10.5, 0, 0, 0.6, 1, 4, PAD, D);
-    k.box(10.5, 0, 0, 0.6, 1, 2, PAD, D);
+    // ---- the Z-shaped footprint: solid strips fill the NE and SW, angled where they meet ----
+    k.box(24, 0, -13.5, 28, 15, 5, WALL, D);              // NE strip   x 10..38, z -16..-11
+    k.box(-24, 0, 13.5, 28, 15, 5, WALL, D);              // SW strip   x -38..-10, z 11..16
+    k.box(10, 0, -11, 3, 15, 3, WALL, { tex: 'none', rot: Q });
+    k.box(-10, 0, 11, 3, 15, 3, WALL, { tex: 'none', rot: Q });
+    for (const [x, z, s] of [[-38, -16, 9], [38, 16, 6], [38, -11, 6], [-38, 11, 6]]) k.box(x, 0, z, s, 15, s, WALL, { tex: 'none', rot: Q });
 
-    // ---- east deck (4.4) on posts, tower (8.8) at its north end ----
-    slab(k, 19, 4.4, 7.5, 10, 29, DECK, { t: 0.4, tex: 'none' });
-    posts(k, [[14.5, -6.5], [23.5, -6.5], [14.5, 7.5], [23.5, 7.5], [14.5, 21.5], [23.5, 21.5]], 0, 4.0, POST, 0.5);
-    k.box(21, 0, -12, 6, 8.8, 10, BLOCK, D);              // tower x 18..24, z -17..-7
-    k.pad(11, 0, -4, 1.6, 1.6, 17, { color: LAUNCH, push: { x: 5.5, z: 0 } });   // court -> east deck
-    k.pad(11, 0, 4, 1.6, 1.6, 17, { color: LAUNCH, push: { x: 5.5, z: 0 } });
-    k.pad(20, 4.4, -5.8, 1.6, 1.6, 16.5, { color: LAUNCH, push: { x: 0, z: -2 } });   // deck -> tower
-    k.box(12.5, 0, 7, 2, 1.2, 2, BLOCK, D);               // step blocks up onto the deck
-    k.box(12.5, 0, 9.5, 2, 2.4, 2, BLOCK, D);
+    // ---- the runway: red mats down the middle (gap under the bridge at x -6) ----
+    for (let x = -24; x <= 28; x += 2.8) {
+      if (x > -8.6 && x < -3.4) continue;
+      k.pad(x, 0, 0, 2.4, 3, 12, { look: 'tramp', color: MAT });
+    }
 
-    // ---- north balcony (8.8) and the two kick chimneys up to it ----
-    slab(k, -2.5, 8.8, -19.5, 41, 5, DECK, { t: 0.4, tex: 'none' });   // x -23..18, z -22..-17
-    posts(k, [[-14, -17.4], [0, -17.4], [9, -17.4]], 0, 8.4, POST, 0.5);
-    k.box(15, 0, -14.5, 0.5, 8.8, 5, '', { tex: 'kick' });        // east chimney: this wall + the tower's west face
-    k.box(-15, 0, -14.5, 0.5, 8.8, 5, '', { tex: 'kick' });       // west chimney: two orange walls
-    k.box(-18.5, 0, -14.5, 0.5, 8.8, 5, '', { tex: 'kick' });
-    k.pad(0, 0, -13, 1.6, 1.6, 22, { color: LAUNCH, push: { x: 0, z: -4.5 } });   // floor -> balcony
-    // floor clutter in the north lane: vaults and a slide bar
-    k.box(-7, 0, -11, 4, 1, 0.6, PAD, D);
-    k.box(7, 0, -11, 4, 1, 0.6, PAD, D);
-    k.box(0, 1.25, -9.6, 4, 0.35, 0.35, MAT, D);
-    posts(k, [[-2.2, -9.6], [2.2, -9.6]], 0, 1.6, POST, 0.4);
+    // ---- west: terraces up the north wall, the foam pit ----
+    k.box(-26, 0, -13.5, 16, 6.6, 5, DECK, D);            // 6.6  x -34..-18
+    k.box(-11, 0, -13.5, 14, 4.4, 5, DECK2, D);           // 4.4  x -18..-4
+    k.box(-1, 0, -13.5, 6, 2.2, 5, DECK, D);              // 2.2  x -4..2
+    // foam blocks: stepped way out of the pit, set at angles
+    for (const [x, z, r] of [[-27.4, -5, 0.4], [-27.6, 1.8, -0.3], [-33.5, 3.6, 0.7]]) k.box(x, -2.5, z, 2, 1.25, 2, BLOCK, { tex: 'none', rot: r });
+    k.pad(-31, -2.5, -6.5, 2, 2, 22.4, { look: 'tramp', color: LAUNCH, push: { x: 0, z: -6 } });   // pit -> 6.6 terrace
+    k.pad(-31, -2.5, -1, 2, 2, 13, { look: 'tramp', color: MAT });                                  // just for fun
 
-    // ---- foam pit (west, floor -2.5), its tramps and the west ledge (4.4) ----
-    for (const z of [-5, 5]) k.pad(-17, -2.5, z, 1.8, 1.8, 21, { look: 'tramp', color: LAUNCH, push: { x: -4.5, z: 0 } });
-    for (const [x, z] of [[-13.5, -8], [-13.5, 8], [-16, 0]]) k.box(x, -2.5, z, 2, 1.25, 2, BLOCK, D);   // foam blocks: way out
-    k.box(-23, 0, 0, 4, 4.4, 24, DECK, D);                 // west ledge x -25..-21
-    k.box(-23, 0, -14, 3, 2.2, 3, BLOCK, D);              // step up onto the ledge from the north
-    slab(k, -23, 4.4, 14.5, 4, 5, DECK, { t: 0.4, tex: 'none' });   // ledge -> south deck
+    // ---- middle: bridge over the runway (4.4) from the west terraces to the south deck (4.4) ----
+    slab(k, -6, 4.4, 0, 3, 22, DECK2, { t: 0.4, tex: 'none' });          // x -7.5..-4.5, z -11..11
+    slab(k, 2.25, 4.4, 13.5, 19.5, 5, DECK2, { t: 0.4, tex: 'none' });   // south deck x -7.5..12, z 11..16
+    posts(k, [[-6, -5], [-6, 5], [0, 11.4], [10, 11.4]], 0, 4.0, CREAM, 0.5);
+    k.pad(4, 0, 7.5, 1.6, 1.6, 17, { color: LAUNCH, push: { x: 0, z: 5 } });       // floor -> south deck
+    k.box(-2, 0, 7.8, 2, 1.2, 2, BLOCK, D);                                        // steps up to the deck
+    k.box(-2, 0, 9.9, 2, 2.4, 2, BLOCK, D);
 
-    // ---- south deck (4.4) and the ninja line up to it ----
-    slab(k, -5.5, 4.4, 19.5, 39, 5, DECK, { t: 0.4, tex: 'none' });   // x -25..14, z 17..22
-    posts(k, [[-14, 17.4], [-5, 17.4], [5, 17.4]], 0, 4.0, POST, 0.5);
-    k.box(-7, 0, 12, 2.5, 1.2, 2.5, BLOCK, D);
-    k.box(-3.5, 0, 12, 2.5, 2.4, 2.5, BLOCK, D);
-    k.box(-3.5, 0, 15.75, 2.5, 2.4, 2.5, BLOCK, D);
-    k.pad(6, 0, 12.5, 1.6, 1.6, 17, { color: LAUNCH, push: { x: 0, z: 4.5 } });   // floor -> south deck
-    k.box(10, 1.25, 10, 0.35, 0.35, 4, MAT, D);           // slide bar between court and deck stairs
-    posts(k, [[10, 7.8], [10, 12.2]], 0, 1.6, POST, 0.4);
+    // ---- east: terraces up the north side, the end balcony + chimney, the south bridge ----
+    k.box(21, 0, -9, 6, 2.2, 4, DECK, D);                 // 2.2  x 18..24, z -11..-7
+    k.box(26.5, 0, -9, 5, 4.4, 4, DECK2, D);              // 4.4  x 24..29
+    k.box(31.75, 0, -9, 5.5, 6.6, 4, DECK, D);            // 6.6  x 29..34.5
+    k.box(36.25, 0, 2.5, 3.5, 8.8, 27, DECK2, D);         // end balcony 8.8, x 34.5..38
+    k.box(34.25, 0, 3, 0.5, 8.8, 4, '', { tex: 'kick' }); // kick chimney: two orange walls 3m apart
+    k.box(30.75, 0, 3, 0.5, 8.8, 4, '', { tex: 'kick' });
+    slab(k, 23.25, 8.8, 14.5, 22.5, 3, DECK, { t: 0.4, tex: 'none' });   // south bridge x 12..34.5, z 13..16
+    posts(k, [[17, 14.5], [24, 14.5], [31, 14.5]], 0, 8.4, CREAM, 0.5);
+    // banked ramps against the south wall under the bridge (slide down them for speed)
+    k.ramp(20.5, 11.5, 3, 4, 0, 2.4, '+z', CREAM, D);
+    k.ramp(27.5, 11.5, 3, 4, 0, 2.4, '+z', CREAM, D);
+    k.pad(30.8, 0, 9, 1.6, 1.6, 23, { color: LAUNCH, push: { x: 3.8, z: 0 } });   // floor -> end balcony
+
+    // ---- floor: vaults and slide bars between the runway and the walls ----
+    k.box(-18, 0, -6, 4, 1, 0.6, CREAM, D);
+    k.box(12, 0, 5.5, 4, 1, 0.6, CREAM, D);
+    k.box(14, 1.25, -5, 0.35, 0.35, 4, MAT, D);
+    posts(k, [[14, -7.2], [14, -2.8]], 0, 1.6, CREAM, 0.4);
+    k.box(-16, 1.25, 6, 0.35, 0.35, 4, MAT, D);
+    posts(k, [[-16, 3.8], [-16, 8.2]], 0, 1.6, CREAM, 0.4);
   },
 });
