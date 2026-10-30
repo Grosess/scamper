@@ -65,6 +65,17 @@ const World = {
       if (map.outline !== false && o.outline !== false) edges.push(new THREE.EdgesGeometry(geo, 25));
     };
 
+    const pending = [];
+    const drawBox = ({ x, y, z, w, h, d, color, o, rot }) => {
+      const g = new THREE.BoxGeometry(w, h, d);
+      g.translate(x, y + h / 2, z);
+      if (rot) {
+        g.translate(-x, -(y + h / 2), -z);
+        g.rotateY(rot);
+        g.translate(x, y + h / 2, z);
+      }
+      mesh(g, mat(color, o), o);
+    };
     const kit = {
       // solid box: x/z = center, y = bottom
       // opts.rot = turn it around the vertical axis (radians) - collision follows
@@ -79,14 +90,8 @@ const World = {
             this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 }, noKick: o.tex === 'nokick' });
           }
         }
-        const g = new THREE.BoxGeometry(w, h, d);
-        g.translate(x, y + h / 2, z);
-        if (rot) {
-            g.translate(-x, -(y + h / 2), -z);
-          g.rotateY(rot);
-          g.translate(x, y + h / 2, z);
-        }
-        mesh(g, mat(color, o), o);
+        // drawn after the map is built, once flush faces have been nudged apart (see _unfight)
+        pending.push({ x, y, z, w, h, d, color, o, rot });
       },
       // invisible wall: collision only, nothing drawn (keeps people inside a map)
       wall: (x, y, z, w, h, d) => { this.boxes.push({ min: { x: x - w / 2, y, z: z - d / 2 }, max: { x: x + w / 2, y: y + h, z: z + d / 2 }, noKick: true, invisible: true }); },
@@ -215,6 +220,8 @@ const World = {
     };
 
     map.build(kit);
+    this._unfight(pending);
+    pending.forEach(drawBox);
 
     for (const { material, shadow, geos } of buckets.values()) {
       const m = new THREE.Mesh(mergeGeometries(geos), material);
@@ -244,6 +251,56 @@ const World = {
         }
       }
     }
+  },
+
+  // No z-fighting: faces that sit (almost) exactly on top of each other flicker. Only the drawing is
+  // touched, never collision: a decoration face that's flush with or just buried in a solid face
+  // gets pushed 1cm out in front of it; where two different-colored faces coincide, the smaller
+  // one is drawn 6mm inward (solids) or outward (decorations).
+  _unfight(list) {
+    const faces = { x: [], y: [], z: [] };
+    const box = [];
+    list.forEach((b, i) => {
+      if (b.rot && Math.abs(Math.sin(2 * b.rot)) > 1e-6) return;
+      const sw = b.rot && Math.abs(Math.sin(b.rot)) > 0.5;
+      const w = sw ? b.d : b.w, d = sw ? b.w : b.d;
+      const r = { lo: { x: b.x - w / 2, y: b.y, z: b.z - d / 2 }, hi: { x: b.x + w / 2, y: b.y + b.h, z: b.z + d / 2 }, b, sw, ghost: !!b.o.ghost, col: String(b.color).toLowerCase() };
+      box[i] = r;
+      for (const ax of ['x', 'y', 'z']) { faces[ax].push({ r, ax, dir: -1 }); faces[ax].push({ r, ax, dir: 1 }); }
+    });
+    const val = (f) => (f.dir > 0 ? f.r.hi[f.ax] : f.r.lo[f.ax]);
+    const others = { x: ['y', 'z'], y: ['x', 'z'], z: ['x', 'y'] };
+    const overlaps = (a, b, ax) => others[ax].every((o) => Math.min(a.hi[o], b.hi[o]) - Math.max(a.lo[o], b.lo[o]) > 0.01);
+    const area = (r, ax) => others[ax].reduce((s, o) => s * (r.hi[o] - r.lo[o]), 1);
+    for (const ax of ['x', 'y', 'z']) {
+      const L = faces[ax].sort((a, b) => val(a) - val(b));
+      for (let i = 0; i < L.length; i++) {
+        for (let j = i + 1; j < L.length && val(L[j]) - val(L[i]) < 0.03; j++) {
+          const a = L[i], b = L[j];
+          if (a.dir !== b.dir || a.r === b.r || (ax === 'y' && a.dir < 0) || !overlaps(a.r, b.r, ax)) continue;
+          const gap = Math.abs(val(a) - val(b));
+          const deco = a.r.ghost !== b.r.ghost ? (a.r.ghost ? a : b) : null, solid = deco === a ? b : a;
+          if (deco) {
+            // deco face flush with, or tucked just behind, the solid face -> bring it out in front
+            if ((val(deco) - val(solid)) * deco.dir < 0.004) {
+              const v = val(solid) + deco.dir * 0.01;
+              if (deco.dir > 0) deco.r.hi[ax] = v; else deco.r.lo[ax] = v;
+            }
+          } else if (gap < 0.003 && a.r.col !== b.r.col) {
+            const small = area(a.r, ax) <= area(b.r, ax) ? a : b;
+            const k = small.r.ghost ? 0.006 : -0.006;   // decos out, solids in
+            if (small.dir > 0) small.r.hi[ax] += k; else small.r.lo[ax] -= k;
+          }
+        }
+      }
+    }
+    // write the adjusted bounds back
+    box.forEach((r) => {
+      if (!r) return;
+      const b = r.b, w = r.hi.x - r.lo.x, d = r.hi.z - r.lo.z;
+      b.x = (r.lo.x + r.hi.x) / 2; b.z = (r.lo.z + r.hi.z) / 2; b.y = r.lo.y; b.h = r.hi.y - r.lo.y;
+      if (r.sw) { b.w = d; b.d = w; } else { b.w = w; b.d = d; }
+    });
   },
 
   // --- endless (wrap-around) maps: map.wrap = tile size, the tile spans -W/2..W/2 on x and z ---

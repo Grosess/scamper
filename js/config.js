@@ -68,6 +68,8 @@ const CONFIG = {
     noPassBack: 1.0,       // seconds before you can pass the bomb straight back
     kothSpeed: 1.06,       // King of the Tag: everyone chasing the king runs this much faster
     crownProtect: 2.0,     // the new king can't be robbed for this long
+    freezeSpeed: 1.08,     // Freeze Tag: seekers run this much faster
+    thawProtect: 1.5,      // a thawed runner can't be frozen again for this long
     duelRelease: 3,        // both duelists are frozen this long before each chase
     duelChaserSpeed: 1.12, // the duel chaser runs this much faster...
     duelReachBonus: 0.4,   // ...and tags from this much farther away

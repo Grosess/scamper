@@ -395,3 +395,5 @@ button { font-family: inherit; }
 .cpu-row .pill { padding: 5px 10px; font-size: 12px; }
 .player-list .tag.cpu { background: var(--lilac); }
 .cpu-x { margin-left: 6px; width: 22px; height: 22px; border: 2px solid var(--ink); background: #fff; font-weight: 800; cursor: pointer; line-height: 1; }
+.board-row.icy { background: #dff6ff; }
+.board-row.icy .btag { background: #3aa7d6; }

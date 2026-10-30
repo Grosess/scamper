@@ -485,13 +485,18 @@ function makeAvatar(p) {
   crown.position.set(0, 0.56, -0.15);   // sits on the head, and flips with it when they talk
   crown.visible = false;
   c.head.add(crown);
-  root.add(label, marker, bomb);
+  // Freeze Tag: a block of ice around frozen players
+  const ice = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.1, 0.8), new THREE.MeshBasicMaterial({ color: '#9fe6ff', transparent: true, opacity: 0.38, depthWrite: false }));
+  ice.position.y = 1.05;
+  ice.add(new THREE.LineSegments(new THREE.EdgesGeometry(ice.geometry), new THREE.LineBasicMaterial({ color: '#e8fbff' })));
+  ice.visible = false;
+  root.add(label, marker, bomb, ice);
   scene.add(root);
   const blob = new THREE.Mesh(blobGeo, new THREE.MeshBasicMaterial({ color: 0x000000, map: glowTex, transparent: true, opacity: 0.4, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   blob.rotation.x = -Math.PI / 2;
   scene.add(blob);
-  return { root, rig: c.rig, scamp: c, bodyMat: c.fur, label, marker, bomb, crown, blob, spd: 0, vy: 0 };
+  return { root, rig: c.rig, scamp: c, bodyMat: c.fur, label, marker, bomb, crown, ice, blob, spd: 0, vy: 0 };
 }
 
 // --- props: the bomb (blinks red faster and faster, fuse burns down) and the crown ---
@@ -717,8 +722,11 @@ function canTagPair(a, b) {
   if (game.mode === 'bomb') return isIt(a) && !isIt(b) && !isOut(a) && !isOut(b);
   if (game.mode === 'duel') return isIt(a) && inDuel(b);
   if (game.mode === 'koth') return !isIt(a) && isIt(b) && game.im <= 0;
+  // freeze: seekers freeze runners, free runners thaw frozen ones
+  if (game.mode === 'freeze') return isIt(a) ? !isIt(b) && !isFrozen(b) : !isFrozen(a) && isFrozen(b);
   return false;
 }
+const isFrozen = (id) => isPlaying() && game.mode === 'freeze' && !!game.freeze && game.freeze.frozen.includes(id);
 
 function randomSpawn() { const sp = World.map.spawns; return sp[Math.floor(Math.random() * sp.length)]; }
 function faceCenter(p) { return World.map.kind === 'race' ? World.map.race.yaw : Math.atan2(p[0], p[2]); }
@@ -787,6 +795,7 @@ function applyState(s) {
   game.bomb = s.bomb || null;
   game.koth = s.koth || null;
   game.race = s.race || null;
+  game.freeze = s.freeze || null;
   if (s.setup) game.setup = s.setup;
   game.lastTag = s.lastTag ? { from: s.lastTag.from, to: s.lastTag.to, at: performance.now() - s.lastTag.ago * 1000 } : null;
   exposedUntil = {};
@@ -807,6 +816,9 @@ function applyState(s) {
       : '<div class="big red">BOMB TAG</div><div>Someone gets the bomb in a few seconds. Run into people to pass it on!</div>', 3);
   } else if (started && game.mode === 'koth') {
     showBanner('<div class="big gold">KING OF THE TAG</div><div>The crown goes to someone in a few seconds. Steal it and hold it!</div>', 3);
+  } else if (started && game.mode === 'freeze') {
+    showBanner(isIt(myId) ? '<div class="big red">SEEKER</div><div>Freeze them all at once. Released in a few seconds...</div>'
+      : '<div class="big lime">FREEZE TAG</div><div>Don\'t get frozen - touch frozen teammates to thaw them</div>', 3);
   } else if (started && game.mode === 'race') {
     showBanner(`<div class="big">RACE</div><div>${esc(World.map.name)} · fall and you go back to the start</div>`, 3);
   }
@@ -891,7 +903,7 @@ function uniqueName(n) {
 function buildState() {
   return {
     t: 'state', phase: game.phase, mode: game.mode, map: game.map, it: game.it.slice(), setup: game.setup,
-    duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race,
+    duel: game.duel, bomb: game.bomb, koth: game.koth, race: game.race, freeze: game.freeze,
     lastTag: H.lastTag ? { from: H.lastTag.from, to: H.lastTag.to, ago: (performance.now() - H.lastTag.time) / 1000 } : null,
     exposed: Object.fromEntries(Object.entries(H.exposed).map(([id, t]) => [id, Math.max(0, (t - performance.now()) / 1000)]).filter(([, s]) => s > 0)),
     scores: game.scores, result: game.result,
@@ -950,7 +962,7 @@ function hostStartRound() {
   game.result = null;
   game.scores = {};
   ids.forEach((id) => (game.scores[id] = { tags: 0 }));
-  game.duel = game.bomb = game.koth = game.race = null;
+  game.duel = game.bomb = game.koth = game.race = game.freeze = null;
   game.it = [];
   H.lastTag = null;
   H.endIn = 0;
@@ -958,7 +970,8 @@ function hostStartRound() {
   game.im = 0;
   game.fz = 0;
   shuffle(ids);
-  if (mode.id === 'bomb') startBomb(ids, o);
+  if (mode.id === 'freeze') startFreeze(ids, o);
+  else if (mode.id === 'bomb') startBomb(ids, o);
   else if (mode.id === 'duel') startDuel(ids, o);
   else if (mode.id === 'koth') startKoth(ids, o);
   else startRace(ids, o);
@@ -1008,6 +1021,24 @@ function hostExplode() {
   if (b.alive.length <= 1) H.endIn = 2.5;
   else H.releaseLeft = 3.5;
   pushState();
+}
+
+// --- freeze tag: seekers freeze runners on contact, runners thaw each other; freeze everyone at
+//     once to win, or the runners win when time runs out ---
+function startFreeze(ids, o) {
+  const n = Math.max(1, Math.round(ids.length / 4));
+  game.freeze = { frozen: [] };
+  H.thawed = {};
+  setIt(ids.slice(0, n));
+  H.timeLeft = o.len;
+  H.releaseLeft = 4;
+  spreadOut(ids);
+  hostFeed(`Freeze Tag! ${game.it.map(nameOf).join(', ')} ${n > 1 ? 'are seekers' : 'is the seeker'}`);
+}
+function freezeRunners() { return [...players.keys()].filter((id) => !isIt(id)); }
+function hostCheckAllFrozen() {
+  const r = freezeRunners();
+  if (r.length && r.every((id) => game.freeze.frozen.includes(id))) H.endIn = 2;
 }
 
 // --- duel: 1v1, take turns chasing; tag = chaser scores, survive = runner scores ---
@@ -1143,6 +1174,14 @@ function hostFell(id) {
       hostFeed(`${nameOf(id)} fell - exposed for ${EXPOSE_SECS}s!`);
       pushState();
     } else teleportPlayer(id, randomSpawn());
+  } else if (game.mode === 'freeze') {
+    if (isIt(id)) teleportPlayer(id, farSpawn(pos(freezeRunners().filter((x) => !isFrozen(x)))));
+    else {
+      teleportPlayer(id, farSpawn(pos(game.it)));
+      H.exposed[id] = performance.now() + EXPOSE_SECS * 1000;
+      hostFeed(`${nameOf(id)} fell - exposed for ${EXPOSE_SECS}s!`);
+      pushState();
+    }
   } else teleportPlayer(id, randomSpawn());
 }
 
@@ -1168,6 +1207,14 @@ function computeResult(sub) {
     const w = b.alive.length === 1 ? b.alive[0] : null;
     return { mode: 'bomb', winners: w ? [w] : [], title: w ? `${nameOf(w)} survives!` : 'Game over', sub: sub || 'Last one standing wins',
       lines: order.map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${tags(id)} passes`) };
+  }
+  if (game.mode === 'freeze' && game.freeze) {
+    const seekers = list.filter((p) => isIt(p.id)), runners = list.filter((p) => !isIt(p.id));
+    const won = runners.length && runners.every((p) => game.freeze.frozen.includes(p.id)) ? 'seekers' : 'runners';
+    const w = won === 'seekers' ? seekers : runners;
+    return { mode: 'freeze', winners: w.map((p) => p.id), title: won === 'seekers' ? 'Seekers win!' : 'Runners win!',
+      sub: sub || (won === 'seekers' ? 'Everyone got frozen' : 'Not everyone was frozen'),
+      lines: seekers.map((p) => `${p.name} (seeker) - ${tags(p.id)} freezes`).concat(runners.map((p) => `${p.name} - ${tags(p.id)} thaws${game.freeze.frozen.includes(p.id) ? ' (frozen)' : ''}`)) };
   }
   if (game.mode === 'koth' && game.koth) {
     const pts = game.koth.pts;
@@ -1206,6 +1253,7 @@ function hostTryTag(tagger, target) {
   const now = performance.now();
   if (game.mode === 'bomb' && now - (H.itSince[tagger] || 0) < CONFIG.tag.bombPassDelay * 1000 - 150) return;
   if (game.mode === 'koth' && H.immune > 0) return;
+  if (game.mode === 'freeze' && isIt(tagger) && (H.thawed[target] || 0) > now) return;   // just thawed: safe for a moment
   // same allowance for every player, host included: contact range + room for lag
   const a = posOf(tagger), b = posOf(target);
   const reach = CONFIG.tag.touchRange + (game.mode === 'duel' ? CONFIG.tag.duelReachBonus : 0) + CONFIG.tag.lagSlack;
@@ -1215,6 +1263,23 @@ function hostTryTag(tagger, target) {
     Net.broadcast({ t: 'tagev', from: tagger, to: target });
     showTagEvent(tagger, target);
     duelPoint(tagger, 'tag');
+    return;
+  }
+  if (game.mode === 'freeze') {
+    const f = game.freeze;
+    if (isIt(tagger)) {
+      f.frozen.push(target);
+      hostFeed(`${nameOf(tagger)} froze ${nameOf(target)}`);
+      hostCheckAllFrozen();
+    } else {
+      f.frozen = f.frozen.filter((x) => x !== target);
+      H.thawed[target] = now + CONFIG.tag.thawProtect * 1000;
+      hostFeed(`${nameOf(tagger)} thawed ${nameOf(target)}`);
+    }
+    H.lastTag = { from: tagger, to: target, time: now };
+    pushState();
+    Net.broadcast({ t: 'tagev', from: tagger, to: target });
+    showTagEvent(tagger, target);
     return;
   }
   if (game.mode === 'bomb') {
@@ -1287,6 +1352,12 @@ function hostOnLeave(id) {
       }
     }
     if (game.mode === 'koth' && wasIt) { hostDropCrown(); return; }
+    if (game.mode === 'freeze') {
+      game.freeze.frozen = game.freeze.frozen.filter((x) => x !== id);
+      if (!game.it.length) { const r = freezeRunners().filter((x) => !isFrozen(x)); if (r.length) setIt([r[0]]); }
+      if (!freezeRunners().length) { hostEndRound(`${name} left`); return; }
+      hostCheckAllFrozen();
+    }
     if (game.mode === 'race' && players.size && [...players.keys()].every((x) => game.race.done[x] !== undefined)) H.endIn = 1;
     if (players.size < 1) { hostEndRound('Everyone left'); return; }
   }
@@ -1335,6 +1406,7 @@ function hostTick(dt) {
     if (H.timeLeft <= 0 && H.releaseLeft <= 0 && H.endIn <= 0 && isPlaying()) {
       if (game.mode === 'duel') duelPoint(game.duel.ids.find((i) => i !== game.it[0]), 'survived');
       else if (game.mode === 'koth') hostEndRound('Time!');
+      else if (game.mode === 'freeze') hostEndRound('Time! The runners held out');
       else if (game.mode === 'race') hostEndRound('Time!');
     }
     H.stateAcc += dt;
@@ -1467,6 +1539,11 @@ function showTagEvent(from, to) {
   } else if (game.mode === 'bomb') {
     if (from === myId) { SFX.pass(); showBanner(`<div class="big lime">PASSED!</div><div>${esc(nameOf(to))} has the bomb - get away!</div>`, 1.6); }
     else if (to === myId) showBanner(`<div class="big red">YOU HAVE THE BOMB</div><div>from ${esc(nameOf(from))} - pass it on!</div>`, 2);
+  } else if (game.mode === 'freeze') {
+    const thaw = !isIt(from);
+    if (to === myId && !thaw) { flash('rgba(140,220,255,.6)'); SFX.tagged(); showBanner(`<div class="big" style="background:#bfefff">FROZEN</div><div>by ${esc(nameOf(from))} - wait for a teammate</div>`, 2.2); }
+    else if (to === myId) { SFX.pass(); showBanner(`<div class="big lime">THAWED!</div><div>${esc(nameOf(from))} saved you</div>`, 1.6); }
+    else if (from === myId) { SFX.tag(); showBanner(thaw ? `<div class="big lime">THAWED</div><div>You saved ${esc(nameOf(to))}</div>` : `<div class="big" style="background:#bfefff">FROZE</div><div>${esc(nameOf(to))}</div>`, 1.4); }
   } else if (game.mode === 'koth') {
     if (from === myId) { SFX.crown(); showBanner('<div class="big gold">CROWN STOLEN!</div><div>Now hold it</div>', 1.6); }
     else if (to === myId) { flash('rgba(255,209,102,.45)'); SFX.tagged(); showBanner(`<div class="big red">CROWN LOST</div><div>${esc(nameOf(from))} took it - get it back!</div>`, 2); }
@@ -1689,6 +1766,17 @@ function botGoal(b) {
     if (!o) return { type: 'idle' };
     return isIt(id) ? { type: 'chase', pos: posOfP(o), vel: velOf(o) } : { type: 'flee', from: [posOfP(o)] };
   }
+  if (game.mode === 'freeze' && game.freeze) {
+    if (isFrozen(id)) return { type: 'idle' };
+    if (isIt(id)) {
+      const t = nearest(others.filter((q) => !isIt(q.id) && !isFrozen(q.id)));
+      return t ? { type: 'chase', pos: posOfP(t), vel: velOf(t) } : { type: 'wander' };
+    }
+    const seekers = others.filter((q) => isIt(q.id)), close = seekers.filter((q) => wrapDist(posOfP(q), b.p.pos) < 11);
+    const ice = nearest(others.filter((q) => isFrozen(q.id)));
+    if (ice && !close.length) return { type: 'chase', pos: posOfP(ice) };   // go thaw a teammate
+    return seekers.length ? { type: 'flee', from: seekers.map(posOfP) } : { type: 'wander' };
+  }
   if (game.mode === 'koth' && game.koth) {
     if (isIt(id)) {
       const near = others.map(posOfP).sort((a, c) => wrapDist(a, b.p.pos) - wrapDist(c, b.p.pos)).slice(0, 2);
@@ -1709,9 +1797,11 @@ function botsThink(dt) {
   }
   const T = CONFIG.tag, go = isPlaying() && game.rl <= 0;
   for (const b of bots.values()) {
-    const frozen = isPlaying() && game.rl > 0 && inDuel(b.id);
+    const frozen = (isPlaying() && game.rl > 0 && (inDuel(b.id) || (game.mode === 'freeze' && isIt(b.id)))) || isFrozen(b.id);
+    if (isFrozen(b.id)) { b.p.vel.x = 0; b.p.vel.z = 0; }
     b.p.speedMul = !go ? 1 : game.mode === 'duel' && isIt(b.id) ? T.duelChaserSpeed
-      : game.mode === 'bomb' && isIt(b.id) ? T.bombSpeed : game.mode === 'koth' && !isIt(b.id) ? T.kothSpeed : 1;
+      : game.mode === 'bomb' && isIt(b.id) ? T.bombSpeed : game.mode === 'koth' && !isIt(b.id) ? T.kothSpeed
+      : game.mode === 'freeze' && isIt(b.id) ? T.freezeSpeed : 1;
     b.think(botGoal(b), dt);
     b.drive(dt, frozen);
   }
@@ -1749,6 +1839,8 @@ const MODES = [
   { id: 'duel', name: 'Duel', kind: 'tag', min: 2, max: 2, desc: '1v1, taking turns to chase. Catch them before the timer ends to score, or survive to score. First to the target wins.',
     opts: [{ key: 'chase', label: 'Each chase', vals: [[30, '30 sec'], [45, '45 sec'], [60, '1 min']], def: 45 },
            { key: 'target', label: 'First to', vals: [[3, '3'], [5, '5'], [7, '7']], def: 5 }] },
+  { id: 'freeze', name: 'Freeze Tag', kind: 'tag', min: 2, desc: 'Seekers freeze runners by tagging them. Touch a frozen teammate to thaw them. Freeze everyone at once to win - or survive the clock.',
+    opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
   { id: 'koth', name: 'King of the Tag', kind: 'tag', min: 2, desc: 'Hold the crown to score a point every second. Run into the king to steal it. Most points wins.',
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
 ];
@@ -2012,12 +2104,14 @@ function frame(now) {
 function updateGame(dt) {
   const playing = isPlaying(), go = playing && game.rl <= 0, T = CONFIG.tag;
   // frozen: both duelists before each chase, and everyone on the start line of a race
-  const frozen = playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race');
+  const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId);
+  if (isFrozen(myId)) { me.vel.x = 0; me.vel.z = 0; }
   const duelChaser = playing && game.mode === 'duel' && isIt(myId);
   // whoever does the chasing runs a little faster
   me.speedMul = !go ? 1 : duelChaser ? T.duelChaserSpeed
     : game.mode === 'bomb' && isIt(myId) ? T.bombSpeed
-    : game.mode === 'koth' && !isIt(myId) ? T.kothSpeed : 1;
+    : game.mode === 'koth' && !isIt(myId) ? T.kothSpeed
+    : game.mode === 'freeze' && isIt(myId) ? T.freezeSpeed : 1;
   const reachBonus = duelChaser ? T.duelReachBonus : 0;
   const inp = locked && !frozen ? readInput() : NO_INPUT;
   if (frozen) me.jumpBuf = 0;
@@ -2181,6 +2275,7 @@ function updateGame(dt) {
     a.bomb.visible = it && game.mode === 'bomb';
     if (a.bomb.visible) animateBomb(a.bomb, now, game.bomb ? game.fz / game.bomb.fuseLen : 1);
     a.crown.visible = it && game.mode === 'koth';
+    a.ice.visible = isFrozen(p.id);
     setScampGhost(a.scamp, isOut(p.id) ? 0.25 : p.cos && p.cos.ghost ? p.cos.ghostOp : 1);
     applyCos(a.scamp, p.cos, now);
     a.label.material.opacity = isOut(p.id) ? 0.4 : 1;
@@ -2190,6 +2285,7 @@ function updateGame(dt) {
       if (game.mode === 'duel' && isIt(myId) && inDuel(p.id)) xr = '#c6ff3d';
       else if (game.mode === 'koth' && it && !isIt(myId)) xr = '#ffd166';
       else if (game.mode === 'bomb' && !isOut(myId) && !isOut(p.id) && dist < 30) xr = it ? '#ff4d3d' : isIt(myId) ? '#ffffff' : null;
+      else if (game.mode === 'freeze' && !isIt(myId) && isFrozen(p.id)) xr = '#7fe3ff';   // frozen teammates to rescue
       if (isExposed(p.id) && canTagPair(myId, p.id)) xr = '#ff4d3d';   // they fell: you can see them anywhere
     }
     setScampXray(a.scamp, xr);
@@ -2337,6 +2433,14 @@ function twoPlayerFx(dt, nearestSeeker) {
       const k = game.it.length ? players.get(game.it[0]) : null;
       if (k && k.avatar) { target = k.avatar.root.position; label = 'KING'; color = '#ffd166'; }
       else if (game.koth && game.koth.loose) { const c = crownSpot(); projV2.set(c[0], c[1], c[2]); target = projV2; label = 'CROWN'; color = '#ffd166'; }
+    } else if (game.mode === 'freeze' && !isFrozen(myId)) {
+      let best = Infinity;
+      for (const p of players.values()) {
+        if (p.id === myId || !p.avatar || (isIt(myId) ? isIt(p.id) || isFrozen(p.id) : !isFrozen(p.id))) continue;
+        const d = p.avatar.root.position.distanceTo(me.pos);
+        if (d < best) { best = d; target = p.avatar.root.position; }
+      }
+      label = isIt(myId) ? 'NEAREST' : 'FROZEN'; color = isIt(myId) ? '#ffffff' : '#7fe3ff';
     } else if (game.mode === 'bomb' && isIt(myId)) {
       let best = Infinity;
       for (const p of players.values()) {
@@ -2405,6 +2509,11 @@ function updateHud(hs, frozen, nearestSeeker) {
     } else if (mode === 'bomb' && game.bomb) {
       phase = `BOMB TAG · ${game.bomb.alive.length} LEFT`;
       timer = game.rl > 0 ? `Bomb drops in ${Math.ceil(game.rl)}` : game.it.length ? `${nameOf(game.it[0])} has it` : '';
+    } else if (mode === 'freeze' && game.freeze) {
+      const r = [...players.keys()].filter((id) => !isIt(id));
+      phase = `FREEZE TAG · ${r.filter((id) => game.freeze.frozen.includes(id)).length}/${r.length} FROZEN`;
+      timer = game.rl > 0 ? `Seekers in ${Math.ceil(game.rl)}` : fmtTime(game.tl);
+      urgent = go && game.tl <= 10;
     } else if (mode === 'koth') {
       timer = game.rl > 0 ? `Crown in ${Math.ceil(game.rl)}` : fmtTime(game.tl);
       urgent = go && game.tl <= 10;
@@ -2432,6 +2541,7 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (playing) {
     if (mode === 'duel') { if (inDuel(myId)) { roleText = isIt(myId) ? 'CHASER' : 'RUNNER'; roleCls = isIt(myId) ? 'it' : 'runner'; } }
     else if (mode === 'bomb') { roleText = isOut(myId) ? 'OUT' : isIt(myId) ? 'YOU HAVE THE BOMB' : 'RUN'; roleCls = isOut(myId) ? 'out' : isIt(myId) ? 'it' : 'runner'; }
+    else if (mode === 'freeze') { roleText = isFrozen(myId) ? 'FROZEN' : isIt(myId) ? 'SEEKER' : 'RUN'; roleCls = isFrozen(myId) ? 'out' : isIt(myId) ? 'it' : 'runner'; }
     else if (mode === 'koth') { roleText = isIt(myId) ? `KING · ${Math.floor(game.koth.pts[myId] || 0)}` : 'STEAL THE CROWN'; roleCls = isIt(myId) ? 'king' : 'it'; }
     else if (mode === 'race' && raceDone) { roleText = `FINISHED ${ord(game.race.order.indexOf(myId) + 1).toUpperCase()}`; roleCls = 'king'; }
   }
@@ -2445,9 +2555,10 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (playing && mode === 'bomb' && isIt(myId) && go && now < tagReadyAt) hint = 'Get ready to pass it…';
   if (playing && mode === 'race' && go && !raceDone) hint = `${Math.round(raceToGo(me.pos))}m to go`;
   if (playing && mode === 'bomb' && isOut(myId)) hint = 'You\'re out - spectating';
+  if (playing && mode === 'freeze' && go && !isIt(myId)) hint = isFrozen(myId) ? 'Frozen - a teammate can thaw you by touching you' : game.freeze && game.freeze.frozen.length ? 'Touch frozen teammates to thaw them' : '';
   if (isExposed(myId)) hint = `EXPOSED - they can see you for ${((exposedUntil[myId] - now) / 1000).toFixed(1)}s`;
   if (now < tagHintUntil) hint = tagHint;
-  if (frozen) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
+  if (frozen && !isFrozen(myId)) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
   else if (game.phase === 'lobby') {
     hint = Net.isHost
       ? (players.size < 2 ? `Warmup - tell friends the code ${Net.code}` : 'Warmup - press ENTER (or P → Start round) to play')
@@ -2481,6 +2592,14 @@ function boardRows() {
     for (const id of d.ids) { const p = players.get(id); if (p) rows.push(row(p, String(d.pts[id]), isIt(id) ? 'CHASER' : 'RUNNER', isIt(id) ? 'hot' : '')); }
     for (const p of list) if (!d.ids.includes(p.id)) rows.push(row(p, 'watching', '', 'dead'));
     return { title: `DUEL · FIRST TO ${d.target}`, rows };
+  }
+  if (mode === 'freeze' && game.freeze) {
+    const tg = (id) => String((game.scores[id] || { tags: 0 }).tags);
+    const seek = list.filter((p) => isIt(p.id)), run = list.filter((p) => !isIt(p.id));
+    run.sort((a, b) => game.freeze.frozen.includes(a.id) - game.freeze.frozen.includes(b.id));
+    const f = run.filter((p) => game.freeze.frozen.includes(p.id)).length;
+    return { title: `FREEZE TAG · ${f}/${run.length} FROZEN`, rows: seek.map((p) => row(p, tg(p.id), 'SEEKER', 'hot'))
+      .concat(run.map((p) => row(p, tg(p.id), game.freeze.frozen.includes(p.id) ? 'FROZEN' : '', game.freeze.frozen.includes(p.id) ? 'icy' : ''))) };
   }
   if (mode === 'koth' && game.koth) {
     const pts = game.koth.pts;
