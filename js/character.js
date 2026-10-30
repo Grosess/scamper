@@ -259,7 +259,10 @@ function setGlint(c, color) {
         '#include <begin_vertex>\nvGlint = (modelViewMatrix * vec4(transformed, 1.0)).xy - (viewMatrix * vec4(gCenter, 1.0)).xy;');
       sh.fragmentShader = 'uniform float gOff;\nuniform float gDark;\nvarying vec2 vGlint;\n' + sh.fragmentShader.replace('#include <map_fragment>',
         'vec2 gp = vec2(vGlint.x + vGlint.y, vGlint.y - vGlint.x) * 0.7071 * 0.22;\n' +
-        'float gl = texture2D(map, vec2(gp.x + gOff, gp.y)).r;\n' +
+        // the same image twice: the second turned 90 degrees and sliding the perpendicular way
+        'float gl1 = texture2D(map, vec2(gp.x + gOff, gp.y)).r;\n' +
+        'float gl2 = texture2D(map, vec2(gp.y + gOff + 0.5, -gp.x)).r;\n' +
+        'float gl = max(gl1, gl2);\n' +
         // light colors glow (added on top); dark colors paint dark streaks (blended over)
         'diffuseColor = gDark > 0.5 ? vec4(diffuse, smoothstep(0.36, 0.78, gl) * 0.85) : vec4(diffuse * gl, opacity);');
     };
