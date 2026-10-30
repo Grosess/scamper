@@ -1998,7 +1998,7 @@ function paletteHTML(part) {
 }
 function renderMeEdit() {
   $('pNameText').textContent = myName();
-  $('youSub').textContent = Account.me ? 'Change how you look - everyone sees it right away.' : 'You\'re a guest. Make an account from the main menu to pick your own name and colors.';
+  $('youSub').textContent = Account.me ? '' : 'Guests are always blue. Make an account from the main menu to get your own name and colors.';
   $('pBody').innerHTML = paletteHTML('body');
   $('pEye').innerHTML = paletteHTML('eye');
 }

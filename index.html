@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=38">
 </head>
 <body>
 
@@ -36,7 +36,6 @@
 
         <div class="play-layout">
           <div class="tile char-card">
-            <div class="char-top"><span class="char-hint">drag to spin · F to talk</span></div>
             <div class="stage">
               <canvas id="preview" aria-label="Your character"></canvas>
               <div class="stage-floor"></div>
@@ -87,12 +86,12 @@
       </section>
 
       <section class="view hidden" data-view="stats">
-        <header class="view-head"><h2>Stats</h2><p>Saved in this browser.</p></header>
+        <header class="view-head"><h2>Stats</h2></header>
         <div id="statsBody" class="stats-body"></div>
       </section>
 
       <section class="view hidden" data-view="account">
-        <header class="view-head"><h2>Account</h2><p>Pick your own name, win colors, keep your stats on any computer.</p></header>
+        <header class="view-head acc-head"><h2>Account</h2><a href="#" id="privacyLink" class="privacy-link">Privacy policy</a></header>
         <div class="acc-wrap">
           <div class="tile acc">
             <div id="accOut">
@@ -111,13 +110,12 @@
               <a href="#" id="accDelete" class="acc-delete">Delete my account</a>
             </div>
             <p id="accStatus" class="note"></p>
-            <a href="#" id="privacyLink" class="privacy-link">Privacy policy</a>
           </div>
         </div>
       </section>
 
       <section class="view hidden" data-view="settings">
-        <header class="view-head"><h2>Settings</h2><p>Saved on this device.</p></header>
+        <header class="view-head"><h2>Settings</h2></header>
         <div class="slot" data-panel="settings"></div>
       </section>
 
@@ -127,7 +125,7 @@
       </section>
 
       <section class="view hidden" data-view="howto">
-        <header class="view-head"><h2>How to play</h2><p>Don't get caught, or catch everyone.</p></header>
+        <header class="view-head"><h2>How to play</h2></header>
         <div class="howto">
           <div class="tile">
             <div class="tile-kicker">Mode</div>
@@ -231,7 +229,6 @@
         <button class="nav-btn" data-view="controls">Controls</button>
         <button id="leaveBtn" class="nav-btn danger">Leave game</button>
       </nav>
-      <div class="side-foot">Press P or Esc anytime to pause · hold R to look behind</div>
     </aside>
 
     <main class="content">
@@ -275,7 +272,7 @@
       </section>
 
       <section class="view hidden" data-view="you">
-        <header class="view-head"><h2>You</h2><p id="youSub">Change how you look - everyone sees it right away.</p></header>
+        <header class="view-head"><h2>You</h2><p id="youSub"></p></header>
         <div class="tile me-edit">
           <div id="pNameText" class="me-name"></div>
           <div class="me-lbl">Body</div><div id="pBody" class="palette"></div>
@@ -285,7 +282,7 @@
       </section>
 
       <section class="view hidden" data-view="settings">
-        <header class="view-head"><h2>Settings</h2><p>Saved on this device.</p></header>
+        <header class="view-head"><h2>Settings</h2></header>
         <div class="slot" data-panel="settings"></div>
       </section>
 
@@ -394,31 +391,31 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=37"></script>
-  <script src="js/config.js?v=37"></script>
-  <script src="js/map.js?v=37"></script>
-  <script src="js/maps/rooftops.js?v=37"></script>
-  <script src="js/maps/shipyard.js?v=37"></script>
-  <script src="js/maps/corridors.js?v=37"></script>
-  <script src="js/maps/fog.js?v=37"></script>
-  <script src="js/maps/playhouse.js?v=37"></script>
-  <script src="js/maps/moon.js?v=37"></script>
-  <script src="js/maps/kitchen.js?v=37"></script>
-  <script src="js/maps/clocktower.js?v=37"></script>
-  <script src="js/maps/lab.js?v=37"></script>
-  <script src="js/maps/skatepark.js?v=37"></script>
-  <script src="js/maps/bounce.js?v=37"></script>
-  <script src="js/maps/infinite.js?v=37"></script>
-  <script src="js/maps/climb.js?v=37"></script>
-  <script src="js/maps/chambers.js?v=37"></script>
-  <script src="js/maps/volcano.js?v=37"></script>
-  <script src="js/character.js?v=37"></script>
-  <script src="js/world.js?v=37"></script>
-  <script src="js/player.js?v=37"></script>
-  <script src="js/bots.js?v=37"></script>
-  <script src="js/net.js?v=37"></script>
-  <script src="js/items.js?v=37"></script>
-  <script src="js/account.js?v=37"></script>
-  <script src="js/game.js?v=37"></script>
+  <script src="js/look.js?v=38"></script>
+  <script src="js/config.js?v=38"></script>
+  <script src="js/map.js?v=38"></script>
+  <script src="js/maps/rooftops.js?v=38"></script>
+  <script src="js/maps/shipyard.js?v=38"></script>
+  <script src="js/maps/corridors.js?v=38"></script>
+  <script src="js/maps/fog.js?v=38"></script>
+  <script src="js/maps/playhouse.js?v=38"></script>
+  <script src="js/maps/moon.js?v=38"></script>
+  <script src="js/maps/kitchen.js?v=38"></script>
+  <script src="js/maps/clocktower.js?v=38"></script>
+  <script src="js/maps/lab.js?v=38"></script>
+  <script src="js/maps/skatepark.js?v=38"></script>
+  <script src="js/maps/bounce.js?v=38"></script>
+  <script src="js/maps/infinite.js?v=38"></script>
+  <script src="js/maps/climb.js?v=38"></script>
+  <script src="js/maps/chambers.js?v=38"></script>
+  <script src="js/maps/volcano.js?v=38"></script>
+  <script src="js/character.js?v=38"></script>
+  <script src="js/world.js?v=38"></script>
+  <script src="js/player.js?v=38"></script>
+  <script src="js/bots.js?v=38"></script>
+  <script src="js/net.js?v=38"></script>
+  <script src="js/items.js?v=38"></script>
+  <script src="js/account.js?v=38"></script>
+  <script src="js/game.js?v=38"></script>
 </body>
 </html>

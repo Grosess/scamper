@@ -422,8 +422,9 @@ button { font-family: inherit; }
 #accStatus.bad, .note.bad { color: var(--red-ink); }
 .note.good { color: #2f8f5a; }
 #accNameHint { margin: -8px 0 12px; font-size: 12px; }
-.tile.acc { position: relative; padding-bottom: 34px; }
-.privacy-link { position: absolute; right: 12px; bottom: 10px; font-size: 11px; color: var(--muted); text-decoration: none; }
+/* privacy link: level with the Account heading, at the right edge of the panel below */
+.acc-head { display: flex; align-items: center; justify-content: space-between; max-width: 440px; }
+.privacy-link { font-size: 12px; color: var(--muted); text-decoration: none; }
 .privacy-link:hover { color: var(--muted); text-decoration: underline; }
 .tile.privacy { max-width: 560px; max-height: 85vh; overflow-y: auto; font-size: 14px; line-height: 1.55; }
 .tile.privacy h2 { margin: 0; }

@@ -317,8 +317,8 @@ function neonScamp(c, t, rb) {
     c.halos = [];
     c.rig.traverse((o) => {
       if (!o.isMesh || o.material !== c.fur) return;
-      for (const [s, op] of [[1.1, 0.3], [1.28, 0.1]]) {   // two shells: a bright rim and a wide soft glow
-        const h = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: op, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+      for (const [s, op] of [[1.08, 0.45], [1.22, 0.18]]) {   // two shells: a bright rim and a wide soft glow
+        const h = new THREE.Mesh(o.geometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: op, side: THREE.BackSide, depthWrite: false }));
         h.scale.setScalar(s);
         h.userData.op = op;
         o.add(h);
