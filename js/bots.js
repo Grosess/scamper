@@ -12,9 +12,11 @@
 const NAV_WALK = 0, NAV_CRAWL = 1, NAV_DROP = 2, NAV_JUMP = 3, NAV_MANTLE = 4, NAV_GAP = 5, NAV_PAD = 6, NAV_KICK = 7;
 // moves: walk crawl drop jump mantle gap pad kick. Everyone sprints all the time.
 const BOT_SKILL = {
-  easy:   { think: 0.6, turn: 8, moves: [1, 1, 1, 1, 1, 0, 1, 0], wobble: 0.25, lead: 0.1, slide: 0, charge: 4 },
-  medium: { think: 0.3, turn: 16, moves: [1, 1, 1, 1, 1, 1, 1, 1], wobble: 0.08, lead: 0.35, slide: 1, charge: 7 },
-  hard:   { think: 0.12, turn: 60, moves: [1, 1, 1, 1, 1, 1, 1, 1], wobble: 0, lead: 0.6, slide: 2, charge: 10 },
+//   hop: 0 never, 1 when chasing/fleeing, 2 always (run, jump, slide on landing, jump out - the fastest way to move)
+//   smart: how much fleeing values escape routes and height
+  easy:   { think: 0.6, turn: 8, moves: [1, 1, 1, 1, 1, 0, 1, 0], wobble: 0.25, lead: 0.1, slide: 0, charge: 4, hop: 0, smart: 0.3, look: 40 },
+  medium: { think: 0.3, turn: 16, moves: [1, 1, 1, 1, 1, 1, 1, 1], wobble: 0.08, lead: 0.4, slide: 1, charge: 7, hop: 1, smart: 0.7, look: 60 },
+  hard:   { think: 0.12, turn: 60, moves: [1, 1, 1, 1, 1, 1, 1, 1], wobble: 0, lead: 0.75, slide: 2, charge: 10, hop: 2, smart: 1, look: 90 },
 };
 
 const Nav = {
@@ -172,6 +174,12 @@ const Nav = {
         }
       }
     });
+    // escape value: how many different spots you can reach in two moves from each spot
+    for (const n of this.nodes) {
+      const seen = new Set();
+      for (const e of n.e) { seen.add(e.to); for (const e2 of this.nodes[e.to].e) seen.add(e2.to); }
+      n.open = seen.size;
+    }
     // jump pads: simulate one launch to see where it lands
     for (const pd of W.pads) {
       const src = this.nodes.findIndex((n) => n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.6 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.6);
@@ -223,6 +231,22 @@ const Nav = {
     const path = [], types = [];
     for (let i = goal; i >= 0; i = res.prev[i]) { path.push(i); types.push(res.via[i]); }
     return { path: path.reverse(), types: types.reverse() };
+  },
+  // test-run a hop or mantle once with the real physics (the result is remembered on the edge)
+  check(n, m) {
+    const tp = this._tp || (this._tp = new LocalPlayer()), idle = { f: 0, r: 0, run: false, crouch: false }, go = { f: 1, r: 0, run: true, crouch: false };
+    const dx = m.x - n.x, dz = m.z - n.z;
+    tp.teleport([n.x - dx * 0.4, n.y + 0.02, n.z - dz * 0.4], Math.atan2(-dx, -dz));
+    for (let s = 0; s < 6; s++) tp.step(1 / 120, idle);
+    let jumped = false;
+    for (let s = 0; s < 170; s++) {
+      if (!jumped && Math.hypot(m.x - tp.pos.x, m.z - tp.pos.z) < 1.4) { tp.queueJump(); jumped = true; }
+      if (!tp.grounded && tp.wall) tp.yaw = Math.atan2(tp.wall.n.x, tp.wall.n.z);
+      tp.step(1 / 120, go);
+      if (tp.grounded && Math.abs(tp.pos.y - m.y) < 0.3 && Math.hypot(m.x - tp.pos.x, m.z - tp.pos.z) < 1.1) return true;
+      if (tp.pos.y < Math.min(n.y, m.y) - 1.5) return false;
+    }
+    return false;
   },
   // the edge used between two consecutive path nodes (for kick directions)
   edge(from, to, t) { return this.nodes[from].e.find((e) => e.to === to && e.t === t); },
@@ -290,17 +314,35 @@ class Bot {
     } else if (goal.type === 'flee') {
       // the chaser's travel time to everywhere vs. ours: run to a spot we reach well before them,
       // as far from them as possible (hard bots look further and value spots with many exits)
+      // Pick a spot we reach well before them, far from them, with lots of ways out (no corners),
+      // high up while they're far away (then drop off when they come), and keep moving: never
+      // settle on the spot we're already on.
       const threats = goal.from.map((q) => Nav.nearest(q, 4)).filter((i) => i >= 0);
-      const theirs = Nav.search(threats, BOT_SKILL.hard.moves, 120), mine = Nav.search([here], moves, this.diff === 'hard' ? 70 : 40, ban);
+      const theirs = Nav.search(threats, BOT_SKILL.hard.moves, 150), mine = Nav.search([here], moves, this.skill.look, ban);
+      const sk = this.skill, myN = Nav.nodes[here];
+      const hereT = theirs.dist[here] === Infinity ? 150 : theirs.dist[here];
+      const closeIn = hereT < 14;   // they're on us: getting away beats getting high
       let best = -1, bs = -Infinity;
       for (let i = 0; i < Nav.nodes.length; i++) {
         const m = mine.dist[i];
-        if (m === Infinity || i === here) continue;
-        const t = theirs.dist[i] === Infinity ? 140 : theirs.dist[i];
-        if (m > t * 0.85) continue;   // they'd get there first
-        let s = t - m * 0.6 + Math.random() * 2;
-        if (this.diff === 'hard') s += Nav.nodes[i].e.length * 0.4;
+        if (m === Infinity || m < 4) continue;
+        const n = Nav.nodes[i], t = theirs.dist[i] === Infinity ? 150 : theirs.dist[i];
+        if (m > t * 0.8) continue;   // they'd get there first
+        let s = t - m * 0.55;
+        s += Math.min(n.open, 40) * 0.25 * sk.smart;                      // escape routes
+        if (!closeIn) s += Math.max(0, n.y - myN.y) * 0.9 * sk.smart;     // height while it's safe
+        else s += Math.max(0, myN.y - n.y) * 0.4 * sk.smart;              // drop away when they're close
+        s += Math.random() * 3;
         if (s > bs) { bs = s; best = i; }
+      }
+      // nowhere clearly better: just keep moving away
+      if (best < 0) {
+        for (let i = 0; i < Nav.nodes.length; i++) {
+          const m = mine.dist[i], t = theirs.dist[i] === Infinity ? 150 : theirs.dist[i];
+          if (m === Infinity || m < 4) continue;
+          const sc = t - m * 0.3 + Math.random() * 2;
+          if (sc > bs) { bs = sc; best = i; }
+        }
       }
       if (best >= 0) this.setRoute(Nav.trace(mine, best));
     } else {
@@ -311,7 +353,58 @@ class Bot {
       if (opts.length) this.setRoute(Nav.trace(res, opts[Math.floor(Math.random() * opts.length)]));
     }
   }
+  // is the path ahead a clear, flat, straight-ish run with headroom (safe to bunny hop)?
+  hopRun() { return this.straightAhead() >= 7; }
+  // how many meters of clear, flat, straight running are ahead on the route (with headroom)
+  straightAhead() {
+    const R = this.route, p = this.p;
+    if (!R) return 0;
+    let len = 0;
+    for (let k = 1; k <= 10 && this.pi + k < R.path.length; k++) {
+      const end = Nav.nodes[R.path[this.pi + k]], t = R.types[this.pi + k];
+      if ((t !== NAV_WALK && t !== NAV_DROP) || end.low || Math.abs(end.y - p.pos.y) > 0.5) break;
+      const ex = end.x - p.pos.x, ez = end.z - p.pos.z, el = Math.hypot(ex, ez);
+      let ok = true;
+      for (let j = 0; j <= k && ok; j++) {
+        const n = Nav.nodes[R.path[this.pi + j]];
+        if (el > 0.1 && Math.abs((n.x - p.pos.x) * ez - (n.z - p.pos.z) * ex) / el > 1.0) ok = false;
+      }
+      if (!ok) break;
+      const steps = Math.ceil(el / 0.7);
+      for (let i = 1; i <= steps && ok; i++) if (Nav.overlap(p.pos.x + ex * i / steps, p.pos.y + 0.3, p.pos.z + ez * i / steps, CONFIG.move.standHeight + 1.5)) ok = false;
+      if (!ok) break;
+      len = el;
+    }
+    return len;
+  }
+  // steer at the furthest waypoint ahead we can run straight to (smooth, fast lines)
+  aimAhead() {
+    const R = this.route, p = this.p;
+    let best = this.pi;
+    for (let k = 1; k <= 5 && this.pi + k < R.path.length; k++) {
+      const t = R.types[this.pi + k];
+      if (t !== NAV_WALK && t !== NAV_CRAWL) break;
+      const n = Nav.nodes[R.path[this.pi + k]];
+      if (Math.abs(n.y - p.pos.y) > 0.5 || !Nav.lineClear(p.pos, n)) break;
+      best = this.pi + k;
+    }
+    return Nav.nodes[R.path[best]];
+  }
   setRoute(r) {
+    // make sure every hop / mantle on the way really works (checked once, then remembered)
+    for (let k = 1; k < r.path.length; k++) {
+      const t = r.types[k];
+      if (t !== NAV_MANTLE && t !== NAV_JUMP) continue;
+      const a = r.path[k - 1], b = r.path[k], e = Nav.edge(a, b, t);
+      if (!e) continue;
+      if (e.ok === undefined) e.ok = Nav.check(Nav.nodes[a], Nav.nodes[b]);
+      if (!e.ok) {
+        Nav.nodes[a].e = Nav.nodes[a].e.filter((x) => x !== e);
+        this.route = null;
+        this.thinkT = 0;
+        return;
+      }
+    }
     this.route = r;
     this.pi = Math.min(1, r.path.length - 1);
     this.stuckT = 0;
@@ -322,7 +415,19 @@ class Bot {
   drive(dt, frozen) {
     const p = this.p, inp = this.inp, sk = this.skill;
     inp.f = 0; inp.r = 0; inp.run = true; inp.crouch = false;
-    if (frozen || !this.goal || this.goal.type === 'idle') return inp;
+    if (frozen || !this.goal || this.goal.type === 'idle') { this.moveLog = null; return inp; }
+    // really stuck (barely moved in 2.5s while trying to)? ban the move we keep failing and go elsewhere
+    const now = performance.now();
+    if (!this.moveLog || now - this.moveLog.t > 2500) {
+      if (this.moveLog && Math.hypot(p.pos.x - this.moveLog.x, p.pos.y - this.moveLog.y, p.pos.z - this.moveLog.z) < 1.2 && this.route && this.pi < this.route.path.length) {
+        const R = this.route;
+        if (this.pi > 0) this.bans.set(R.path[this.pi - 1] * 65536 + R.path[this.pi], now + 20000);
+        for (let k = 1; k < 4 && this.pi + k < R.path.length; k++) if (R.types[this.pi + k] === NAV_MANTLE || R.types[this.pi + k] === NAV_KICK) this.bans.set(R.path[this.pi + k - 1] * 65536 + R.path[this.pi + k], now + 20000);
+        this.route = null;
+        this.thinkT = 0;
+      }
+      this.moveLog = { t: now, x: p.pos.x, y: p.pos.y, z: p.pos.z };
+    }
     let tx, tz, ty, type = NAV_WALK, next = null;
     const g = this.goal;
     // the one we're chasing is close, level and in the open: charge straight at them
@@ -353,6 +458,7 @@ class Bot {
       next = Nav.nodes[R.path[this.pi]];
       type = R.types[this.pi];
       tx = next.x; tz = next.z; ty = next.y;
+      if ((type === NAV_WALK || type === NAV_CRAWL) && p.grounded) { const a = this.aimAhead(); tx = a.x; tz = a.z; }
       // kick chimney: face a wall, jump, then keep kicking off whichever wall we touch toward
       // the other one until we're high enough to pull out onto the exit
       if (type === NAV_KICK && p.pos.y < next.y - 0.9) {
@@ -418,16 +524,26 @@ class Bot {
     }
     // slides: for the speed boost on straight runs (and hard ones hop out of them to keep it)
     this.slideT -= dt;
-    const straight = this.route && this.pi + 3 < this.route.path.length && [0, 1, 2].every((k) => {
-      const a = Nav.nodes[this.route.path[this.pi + k]], b = Nav.nodes[this.route.path[this.pi + k + 1]];
-      return this.route.types[this.pi + k + 1] === NAV_WALK && Math.abs(b.y - a.y) < 0.2 && ((b.x - a.x) * dx + (b.z - a.z) * dz) / Math.max(dist, 0.1) > 0.6;
-    });
+    const ahead = this.route ? this.straightAhead() : 0;
+    const straight = ahead >= 5 && !(this.hop && ahead >= 7);
     if (sk.slide && p.grounded && !p.sliding && this.slideT <= 0 && p.hspeed() > 8.5 && d < 0.3 && (straight || (g.type === 'chase' && gd > 2.5 && gd < 7))) {
       inp.crouch = true;
       this.slideT = 1.4;
     } else if (p.sliding && this.slideT > 0.8) inp.crouch = true;
     else if (p.sliding && sk.slide > 1 && p.grounded && this.slideT > 0.5 && this.slideT < 0.8) p.queueJump();
 
+    // bunny hop: on a clear flat run, jump, crouch as we land (slide boost), jump out of the slide,
+    // repeat - faster than running
+    const hopping = sk.hop === 2 || (sk.hop === 1 && (g.type === 'chase' || g.type === 'flee'));
+    if (hopping && next && this.route && this.hopRun()) {
+      if (p.grounded && !p.sliding && p.hspeed() > 8.5 && d < 0.3) { p.queueJump(); this.hop = 1; this.hopSlide = 0; }
+      else if (!p.grounded && this.hop && p.vel.y < 1) inp.crouch = true;                  // land crouched -> slide
+      else if (p.grounded && p.sliding && this.hop) {
+        inp.crouch = true;
+        this.hopSlide += dt;
+        if (this.hopSlide > 0.1) { p.queueJump(); this.hopSlide = 0; }                         // and jump straight out of it
+      }
+    } else if (p.grounded && !p.sliding) this.hop = 0;
     // stuck? hop, then rethink
     const prog = dist;
     if (prog < this.lastProgress - 0.15) { this.lastProgress = prog; this.stuckT = 0; }
