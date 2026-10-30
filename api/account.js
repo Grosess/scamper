@@ -11,7 +11,8 @@
 //  POST { action: 'load', token }                           -> profile + data
 //  POST { action: 'save', token, data }                     -> { updated }
 //  POST { action: 'matchStart', players: [tickets] }  (host, when a round goes live) -> { match, key }
-//  POST { action: 'matchEnd', match, key, winners: [names], moved: { name: meters } }  -> { eligible: [names] }
+//  POST { action: 'matchEnd', match, key, winners: [names], play: { name: { moved, active, jumps } }, together }
+//       -> { eligible: [names] }
 //  POST { action: 'claim', token, match }  (you won that match) -> { prize, inv, ticket }
 //  POST { action: 'verify', ticket } (a host checking a joiner) -> { name, colors, cos, dev }
 //  POST { action: 'logout', token }
@@ -38,6 +39,10 @@ const CLAIMS_PER_DAY = 60;
 // timed by this server (not the game), and the same two accounts can only farm each other so much
 const MATCH_MIN_SECS = 40;
 const MATCH_MIN_MOVED = 40;   // meters each counted player must have covered
+const MATCH_MIN_ACTIVE = 0.3; // ...spending at least this share of the round on the move
+const MATCH_MIN_JUMPS = 2;    // ...and jumping now and then (idle devices and walk-bots don't)
+const MATCH_TOGETHER = 0.3;   // share of the moving time where 2+ players move at once (one person
+                              // steering two devices can only move one of them at a time)
 const PAIR_PER_DAY = 3;
 
 async function redis(...cmd) {
@@ -212,11 +217,16 @@ module.exports = async (req, res) => {
         const m = JSON.parse(raw);
         if (b.key !== m.key) return res.status(403).json({ error: 'Not your match.' });
         if (m.done) return res.json({ eligible: m.eligible });
-        const moved = b.moved && typeof b.moved === 'object' ? b.moved : {};
-        const active = m.names.filter((n) => +moved[n] >= MATCH_MIN_MOVED);
-        const long = Date.now() - m.start >= MATCH_MIN_SECS * 1000;
+        // a player counts if they really played: moved far enough, were on the move a good part of
+        // the round, and jumped now and then. The round counts if at least two such players took
+        // part (not the whole lobby) AND people were moving at the same time - not one, then the other
+        const play = b.play && typeof b.play === 'object' ? b.play : {}, secs = (Date.now() - m.start) / 1000;
+        const real = (n) => { const p = play[n]; return !!p && +p.moved >= MATCH_MIN_MOVED && +p.active >= secs * MATCH_MIN_ACTIVE && +p.jumps >= MATCH_MIN_JUMPS; };
+        const active = m.names.filter(real);
+        const ok = secs >= MATCH_MIN_SECS && active.length >= 2 && +b.together >= MATCH_TOGETHER;
         const winners = (Array.isArray(b.winners) ? b.winners : []).map((n) => String(n).toLowerCase());
-        m.eligible = long && active.length >= 2 ? winners.filter((n) => active.includes(n)) : [];
+        // only two players need to pass the full check; any winner who took part (moved a bit) gets a crate
+        m.eligible = ok ? winners.filter((n) => m.names.includes(n) && +(play[n] || {}).moved >= MATCH_MIN_MOVED) : [];
         m.active = active;
         m.done = true;
         m.claimed = [];

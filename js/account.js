@@ -205,8 +205,8 @@ const Account = (() => {
       try { const j = await call({ action: 'matchStart', players: tickets }); return j.match ? { id: j.match, key: j.key } : null; } catch (e) { return null; }
     },
     // host: the round ended -> which account names earned a prize
-    async matchEnd(match, winners, moved) {
-      try { return (await call({ action: 'matchEnd', match: match.id, key: match.key, winners, moved })).eligible || []; } catch (e) { return []; }
+    async matchEnd(match, winners, play, together) {
+      try { return (await call({ action: 'matchEnd', match: match.id, key: match.key, winners, play, together })).eligible || []; } catch (e) { return []; }
     },
     async claim(match) {
       if (!me) return null;

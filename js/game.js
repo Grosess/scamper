@@ -1135,29 +1135,50 @@ function hostMatchStart() {
   H.match = null;
   H.moved = {};
   H.lastPos = {};
+  H.act = {};          // per player: seconds spent moving, jumps
+  H.together = 0;      // seconds with two or more real players moving at the same time
+  H.anyMoving = 0;     // seconds with at least one moving
   const tickets = [...players.values()].filter((p) => !p.cpu).map((p) => (p.id === myId ? Account.me && Account.me.ticket : p.ticket)).filter(Boolean);
   if (tickets.length < 2) return;
   const round = H.round = (H.round || 0) + 1;
   Account.matchStart(tickets).then((id) => { if (H.round === round) H.match = id; });
 }
-// distance each player really covers this round (teleports and respawns don't count)
-function hostTrackMoves() {
-  for (const id of players.keys()) {
+// how people really play this round: distance covered (teleports and respawns don't count), time
+// spent moving, jumps, and how often two or more people move at the same time. One person farming
+// with two devices can only steer one at a time, so the other just stands there.
+function hostTrackMoves(dt) {
+  let moving = 0;
+  for (const [id, pl] of players) {
     const p = posOf(id);
     if (!p) continue;
-    const l = H.lastPos[id];
-    if (l) { const d = wrapDist(p, l); if (d < 6) H.moved[id] = (H.moved[id] || 0) + d; }
+    const l = H.lastPos[id], a = H.act[id] || (H.act[id] = { t: 0, jumps: 0, up: false });
+    if (l && dt > 0) {
+      const d = wrapDist(p, l);
+      if (d < 6) {
+        H.moved[id] = (H.moved[id] || 0) + d;
+        if (Math.hypot(p.x - l.x, p.z - l.z) / dt > 1.5) { a.t += dt; if (!pl.cpu) moving++; }
+        const vy = (p.y - l.y) / dt;
+        if (vy > 3 && !a.up) { a.jumps++; a.up = true; } else if (vy <= 0) a.up = false;
+      }
+    }
     H.lastPos[id] = { x: p.x, y: p.y, z: p.z };
   }
+  if (moving >= 1) H.anyMoving += dt;
+  if (moving >= 2) H.together += dt;
 }
 function hostMatchEnd(r) {
   const match = H.match;
   H.match = null;
   if (!match) return;
   const acct = (id) => (players.get(id) || {}).name.toLowerCase();
-  const moved = {};
-  for (const id in H.moved) if (players.has(id)) moved[acct(id)] = Math.round(H.moved[id]);
-  Account.matchEnd(match, (r.winners || []).filter((id) => players.has(id)).map(acct), moved).then((eligible) => {
+  const play = {};
+  for (const id in H.moved) {
+    if (!players.has(id) || players.get(id).cpu) continue;
+    const a = H.act[id] || { t: 0, jumps: 0 };
+    play[acct(id)] = { moved: Math.round(H.moved[id]), active: Math.round(a.t), jumps: a.jumps };
+  }
+  const together = H.anyMoving > 0 ? Math.round(H.together / H.anyMoving * 100) / 100 : 0;
+  Account.matchEnd(match, (r.winners || []).filter((id) => players.has(id)).map(acct), play, together).then((eligible) => {
     if (!eligible.length) return;
     const m = { t: 'prize', match: match.id, names: eligible };
     Net.broadcast(m);
@@ -1701,7 +1722,7 @@ function hostTick(dt) {
       }
     } else {
       H.timeLeft -= dt;
-      hostTrackMoves();
+      hostTrackMoves(dt);
       if (game.rndOn) hostRandomTick(dt);
       if (game.mode === 'race') H.raceTime += dt;
       if (game.mode === 'bomb' && game.it.length) {
