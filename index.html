@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=34">
+  <link rel="stylesheet" href="style.css?v=35">
 </head>
 <body>
 
@@ -42,8 +42,9 @@
               <div class="stage-floor"></div>
             </div>
             <label class="field">Player name
-              <input id="name" maxlength="14" autocomplete="off" spellcheck="false">
+              <input id="name" maxlength="14" autocomplete="off" spellcheck="false" readonly>
             </label>
+            <p id="nameHint" class="note name-hint"></p>
             <div class="field">Colors</div>
             <div class="color-split">
               <button type="button" class="half" id="bodySwatch"><span>Body</span></button>
@@ -91,21 +92,27 @@
       </section>
 
       <section class="view hidden" data-view="account">
-        <header class="view-head"><h2>Account</h2><p>Log in to keep your settings and stats on any computer.</p></header>
-        <div class="tile acc">
-          <div id="accOut">
-            <label class="field">Username<input id="accUser" maxlength="16" autocomplete="username" spellcheck="false"></label>
-            <label class="field">Password<input id="accPass" type="password" maxlength="72" autocomplete="current-password"></label>
-            <div class="acc-btns"><button id="accLogin" class="btn primary">Log in</button><button id="accRegister" class="btn">Create account</button></div>
-            <p class="note">Usernames: 3-16 letters, numbers or _. Passwords: at least 6 characters. There's no password reset, so don't forget it.</p>
+        <header class="view-head"><h2>Account</h2><p>Pick your own name, win colors and cosmetics, keep your stats on any computer.</p></header>
+        <div class="acc-wrap">
+          <div class="tile acc">
+            <div id="accOut">
+              <div class="acc-tabs"><button id="accTabNew" class="pill on">Create account</button><button id="accTabLogin" class="pill">Log in</button></div>
+              <label class="field">Name<input id="accUser" maxlength="14" autocomplete="username" spellcheck="false"></label>
+              <p id="accNameHint" class="note"></p>
+              <label class="field">Password<input id="accPass" type="password" maxlength="72" autocomplete="new-password"></label>
+              <label class="field" id="accConfirmRow">Password again<input id="accPass2" type="password" maxlength="72" autocomplete="new-password"></label>
+              <button id="accGo" class="btn primary">Create account</button>
+              <p class="note">Without an account you play as a guest: a random name like bobo or kiki, and the guest blue. An account gets you your own name (one per account, forever), two starting colors, and a prize crate every time you win a game against other people. There's no password reset, so don't forget it.</p>
+            </div>
+            <div id="accIn" class="hidden">
+              <p class="acc-who">You're <b id="accName"></b> <span id="accDev" class="acc-dev hidden">DEV</span></p>
+              <div id="accCollection"></div>
+              <button id="accLogout" class="btn">Log out</button>
+              <a href="#" id="accDelete" class="acc-delete">Delete my account</a>
+            </div>
+            <p id="accStatus" class="note"></p>
           </div>
-          <div id="accIn" class="hidden">
-            <p class="acc-who">Logged in as <b id="accName"></b></p>
-            <p class="note" id="accSaved">Your settings and stats save to your account automatically.</p>
-            <button id="accLogout" class="btn">Log out</button>
-          </div>
-          <div id="accOff" class="hidden"><p class="note" id="accOffText">Accounts only work on the Vercel version of Scamper. Here your settings and stats are saved in this browser.</p></div>
-          <p id="accStatus" class="note"></p>
+          <a href="#" id="privacyLink" class="privacy-link">privacy</a>
         </div>
       </section>
 
@@ -219,6 +226,7 @@
       <nav class="nav" data-group="pause">
         <button id="resumeBtn" class="nav-btn resume">Resume</button>
         <button class="nav-btn active" data-view="lobby">Lobby</button>
+        <button class="nav-btn" data-view="you">You</button>
         <button class="nav-btn" data-view="settings">Settings</button>
         <button class="nav-btn" data-view="controls">Controls</button>
         <button id="leaveBtn" class="nav-btn danger">Leave game</button>
@@ -233,6 +241,7 @@
           <div class="tile setup">
             <div class="setup-step"><span class="step-num">1</span>Mode</div>
             <div id="modeCards" class="mode-cards"></div>
+            <p id="modeDesc" class="mode-desc"></p>
 
             <div class="setup-step"><span class="step-num">2</span>Map</div>
             <div id="mapCards" class="map-cards"></div>
@@ -257,16 +266,21 @@
             <div class="tile-kicker" id="playerCount"></div>
             <ul id="playerList" class="player-list"></ul>
             <div id="cpuRow" class="cpu-row hidden">
+              <span class="cpu-lbl">Add a CPU</span>
               <div class="pills" id="cpuDiff"><button class="pill" data-v="easy">Easy</button><button class="pill" data-v="medium">Medium</button><button class="pill" data-v="hard">Hard</button></div>
-              <button id="addCpu" class="btn small">Add CPU</button>
-            </div>
-            <div class="me-edit">
-              <div class="tile-kicker">You</div>
-              <input id="pName" maxlength="14" autocomplete="off" spellcheck="false" aria-label="Your name">
-              <div class="me-lbl">Body</div><div id="pBody" class="palette mini"></div>
-              <div class="me-lbl">Eyes</div><div id="pEye" class="palette mini"></div>
+              <button id="addCpu" class="btn small">+ Add</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="view hidden" data-view="you">
+        <header class="view-head"><h2>You</h2><p id="youSub">Change how you look - everyone sees it right away.</p></header>
+        <div class="tile me-edit">
+          <div id="pNameText" class="me-name"></div>
+          <div class="me-lbl">Body</div><div id="pBody" class="palette"></div>
+          <div class="me-lbl">Eyes</div><div id="pEye" class="palette"></div>
+          <div class="slot" data-panel="cos"></div>
         </div>
       </section>
 
@@ -304,8 +318,8 @@
         <label class="toggle"><input type="checkbox" id="perf"><span></span>Performance mode (no shadows, a bit less sharp, smoother)</label>
         <label class="toggle"><input type="checkbox" id="showFps"><span></span>Show frame rate</label>
         <label class="toggle"><input type="checkbox" id="thirdPerson"><span></span>Third person camera</label>
+        <label class="toggle hidden" id="devModeRow"><input type="checkbox" id="devMode"><span></span>Developer mode (every color and cosmetic; turn off to use your own collection)</label>
       </div>
-      <input id="secretCode" class="secret-code" maxlength="64" autocomplete="off" spellcheck="false" aria-hidden="true" tabindex="-1">
     </div>
 
     <div id="controlsPanel" class="tile">
@@ -326,32 +340,54 @@
     </div>
   </div>
 
+  <!-- prize crate: opens, then a reel of colors spins and stops on what you won -->
+  <div id="prize" class="prize hidden">
+    <div class="prize-title">YOU WON A CRATE</div>
+    <div id="crate" class="crate"><div class="crate-lid"></div><div class="crate-box"><span>SCAMPER</span></div></div>
+    <div id="reelWrap" class="reel-wrap hidden"><div class="reel-mark"></div><div id="reel" class="reel"></div></div>
+    <div id="prizeName" class="prize-name"></div>
+  </div>
+
+  <!-- privacy policy (Account page, bottom corner) -->
+  <div id="privacy" class="screen center hidden">
+    <div class="tile privacy">
+      <h2>Privacy</h2>
+      <p><b>Without an account</b>, Scamper keeps your settings and stats only in this browser (local storage). Nothing about you is sent anywhere except what other players in your game need to see: your guest name, your look and where you are.</p>
+      <p><b>With an account</b>, we store your name, a scrambled (salted scrypt hash) version of your password - never the password itself - your settings, stats, and the colors and cosmetics you've won. That's it: no email, no real name, no age, no location, no ads, no tracking, and nothing is sold or shared.</p>
+      <p><b>Playing online</b>: games connect players' browsers directly (WebRTC, through the free PeerJS matchmaking server), so the people in your game can see your network address the way any direct connection does. The host's game checks your account name and colors with our server.</p>
+      <p><b>Where it lives</b>: the site is hosted on Vercel and GitHub Pages; account data is in an Upstash database. They keep normal server logs.</p>
+      <p><b>Deleting</b>: Account → "Delete my account" removes your account and everything stored with it, right away. Logging out removes it from this computer.</p>
+      <p class="note">Last updated October 2026.</p>
+      <button id="privacyClose" class="btn">Close</button>
+    </div>
+  </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=34"></script>
-  <script src="js/config.js?v=34"></script>
-  <script src="js/map.js?v=34"></script>
-  <script src="js/maps/rooftops.js?v=34"></script>
-  <script src="js/maps/shipyard.js?v=34"></script>
-  <script src="js/maps/corridors.js?v=34"></script>
-  <script src="js/maps/fog.js?v=34"></script>
-  <script src="js/maps/playhouse.js?v=34"></script>
-  <script src="js/maps/moon.js?v=34"></script>
-  <script src="js/maps/kitchen.js?v=34"></script>
-  <script src="js/maps/clocktower.js?v=34"></script>
-  <script src="js/maps/lab.js?v=34"></script>
-  <script src="js/maps/skatepark.js?v=34"></script>
-  <script src="js/maps/bounce.js?v=34"></script>
-  <script src="js/maps/infinite.js?v=34"></script>
-  <script src="js/maps/climb.js?v=34"></script>
-  <script src="js/maps/chambers.js?v=34"></script>
-  <script src="js/maps/volcano.js?v=34"></script>
-  <script src="js/character.js?v=34"></script>
-  <script src="js/world.js?v=34"></script>
-  <script src="js/player.js?v=34"></script>
-  <script src="js/bots.js?v=34"></script>
-  <script src="js/net.js?v=34"></script>
-  <script src="js/account.js?v=34"></script>
-  <script src="js/game.js?v=34"></script>
+  <script src="js/look.js?v=35"></script>
+  <script src="js/config.js?v=35"></script>
+  <script src="js/map.js?v=35"></script>
+  <script src="js/maps/rooftops.js?v=35"></script>
+  <script src="js/maps/shipyard.js?v=35"></script>
+  <script src="js/maps/corridors.js?v=35"></script>
+  <script src="js/maps/fog.js?v=35"></script>
+  <script src="js/maps/playhouse.js?v=35"></script>
+  <script src="js/maps/moon.js?v=35"></script>
+  <script src="js/maps/kitchen.js?v=35"></script>
+  <script src="js/maps/clocktower.js?v=35"></script>
+  <script src="js/maps/lab.js?v=35"></script>
+  <script src="js/maps/skatepark.js?v=35"></script>
+  <script src="js/maps/bounce.js?v=35"></script>
+  <script src="js/maps/infinite.js?v=35"></script>
+  <script src="js/maps/climb.js?v=35"></script>
+  <script src="js/maps/chambers.js?v=35"></script>
+  <script src="js/maps/volcano.js?v=35"></script>
+  <script src="js/character.js?v=35"></script>
+  <script src="js/world.js?v=35"></script>
+  <script src="js/player.js?v=35"></script>
+  <script src="js/bots.js?v=35"></script>
+  <script src="js/net.js?v=35"></script>
+  <script src="js/items.js?v=35"></script>
+  <script src="js/account.js?v=35"></script>
+  <script src="js/game.js?v=35"></script>
 </body>
 </html>

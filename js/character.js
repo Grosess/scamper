@@ -237,7 +237,7 @@ const GLINT_TEX = (() => {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   const img = new Image();
   img.onload = () => { t.image = img; t.needsUpdate = true; };
-  if (location.protocol !== 'file:') img.src = 'assets/glint.png';
+  if (location.protocol !== 'file:') img.src = 'assets/glint.png?v=2';
   return t;
 })();
 // The glint is projected onto the head + body from the camera's point of view: one image across

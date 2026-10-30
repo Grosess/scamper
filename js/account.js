@@ -1,59 +1,96 @@
 // ============================================================
-//  ACCOUNT - optional log in (username + password). Your settings and stats are saved to your
-//  account, so they follow you to any computer. Needs the server part (api/account.js), which
-//  only exists when the game is hosted on Vercel - anywhere else the Account page says so.
+//  ACCOUNT - log in to pick your own (unique) name, collect colors + cosmetics by winning, and
+//  keep your settings and stats on any computer. Without an account you're a guest: a cute
+//  random name and the same blue look as every other guest.
+//  The server part is api/account.js on Vercel; every copy of the game (Vercel, GitHub Pages,
+//  a local file) talks to that one.
 // ============================================================
 const Account = (() => {
   const $ = (id) => document.getElementById(id);
-  const API = 'api/account';
+  const API = /vercel\.app$/.test(location.hostname) ? 'api/account' : 'https://sirishpande.vercel.app/api/account';
   const KEYS = { settings: 'scamper-settings', stats: 'scamper-stats', me: 'scamper-account' };
   const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) || null; } catch (e) { return null; } };
   const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-  let me = read(KEYS.me);   // { name, token, updated }
-  let online = null;        // is the server there? (null = don't know yet)
-  let saveTimer = 0;
+  let me = read(KEYS.me);   // { name, token, ticket, inv: { colors, cos }, dev, updated }
+  if (me && (!me.token || !me.inv)) me = null;
+  let online = null, saveTimer = 0, checkTimer = 0, tab = 'new';
+  const listeners = [];
+  const changed = () => { write(KEYS.me, me); render(); for (const f of listeners) f(); };
 
   async function call(body) {
     let r;
     try { r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
-    catch (e) { throw new Error('Could not reach the server.'); }
+    catch (e) { const err = new Error('Could not reach the account server.'); err.net = true; throw err; }
     let j = null;
     try { j = await r.json(); } catch (e) {}
-    if (!j) throw new Error('Accounts only work on the Vercel version of Scamper.');
+    if (!j) { const err = new Error('The account server isn\'t answering.'); err.net = true; throw err; }
     if (!r.ok) { const err = new Error(j.error || 'Something went wrong.'); err.status = r.status; throw err; }
     return j;
   }
   const local = () => ({ settings: read(KEYS.settings) || {}, stats: read(KEYS.stats) || {} });
-  // put the account's saved data on this device, then reload so the game picks it up
-  function apply(data, updated) {
-    if (data && data.settings) write(KEYS.settings, data.settings);
-    if (data && data.stats) write(KEYS.stats, data.stats);
-    me.updated = updated;
-    write(KEYS.me, me);
-    location.reload();
-  }
+  const take = (j) => { me = { name: j.name, token: j.token || (me && me.token), ticket: j.ticket, inv: j.inv, dev: !!j.dev, updated: j.updated }; };
+
+  // ---- the Account page ----
   function status(t, bad) { const s = $('accStatus'); s.textContent = t; s.classList.toggle('bad', !!bad); }
   function render() {
     const inn = !!me;
-    $('accOut').classList.toggle('hidden', inn || online === false);
+    $('accOut').classList.toggle('hidden', inn);
     $('accIn').classList.toggle('hidden', !inn);
-    $('accOff').classList.toggle('hidden', online !== false);
-    if (inn) $('accName').textContent = me.name;
     $('accTab').textContent = inn ? me.name : 'Account';
+    $('accTabNew').classList.toggle('on', tab === 'new');
+    $('accTabLogin').classList.toggle('on', tab === 'login');
+    $('accConfirmRow').classList.toggle('hidden', tab !== 'new');
+    $('accGo').textContent = tab === 'new' ? 'Create account' : 'Log in';
+    $('accPass').autocomplete = tab === 'new' ? 'new-password' : 'current-password';
+    $('accNameHint').classList.toggle('hidden', tab !== 'new');
+    if (!inn) return;
+    $('accName').textContent = me.name;
+    $('accDev').classList.toggle('hidden', !me.dev);
+    // the collection, tier by tier
+    const have = new Set(me.inv.colors.concat(me.inv.cos));
+    $('accCollection').innerHTML = ITEMS.TIERS.map((t) => {
+      const all = ITEMS.ALL.filter((it) => it.tier === t.id), got = all.filter((it) => have.has(it.id)).length;
+      return `<div class="acc-tier"><span class="acc-tier-name" style="--tc:${t.color}">${t.name}</span><span class="acc-bar"><i style="width:${(got / all.length * 100).toFixed(1)}%;background:${t.color}"></i></span><b>${got}/${all.length}</b></div>`;
+    }).join('') + `<p class="note">${have.size} of ${ITEMS.ALL.length} collected. Win games against other people to unlock more.</p>`;
   }
-  async function enter(action) {
-    const username = $('accUser').value.trim(), password = $('accPass').value;
-    status(action === 'login' ? 'Logging in…' : 'Creating your account…');
+  // is the name free (and clean)? asked while you type
+  function checkName() {
+    clearTimeout(checkTimer);
+    const n = $('accUser').value.trim(), hint = $('accNameHint');
+    if (tab !== 'new' || !n) { hint.textContent = '3-14 of a-z, 0-9 or _. This is your name in every game, and it can\'t be changed.'; hint.className = 'note'; return; }
+    const local = ITEMS.nameProblem(n);
+    if (local) { hint.textContent = local; hint.className = 'note bad'; return; }
+    hint.textContent = 'Checking…';
+    hint.className = 'note';
+    checkTimer = setTimeout(async () => {
+      try {
+        const j = await call({ action: 'check', username: n });
+        if ($('accUser').value.trim() !== n) return;
+        hint.textContent = j.ok ? `"${n}" is free!` : j.problem;
+        hint.className = j.ok ? 'note good' : 'note bad';
+      } catch (e) { hint.textContent = e.message; hint.className = 'note bad'; }
+    }, 350);
+  }
+  async function go() {
+    const username = $('accUser').value.trim().toLowerCase(), password = $('accPass').value;
+    if (tab === 'new') {
+      const p = ITEMS.nameProblem(username);
+      if (p) { status(p + '.', true); return; }
+      if (password.length < 6) { status('Passwords need at least 6 characters.', true); return; }
+      if (password !== $('accPass2').value) { status('The passwords don\'t match.', true); return; }
+    }
+    status(tab === 'new' ? 'Creating your account…' : 'Logging in…');
+    $('accGo').disabled = true;
     try {
-      const j = await call({ action, username, password, data: local() });
-      me = { name: j.name, token: j.token, updated: j.updated };
-      write(KEYS.me, me);
-      $('accPass').value = '';
-      // logging in on a new device: take the account's settings + stats
-      if (action === 'login' && j.data && Object.keys(j.data.settings || {}).length) { apply(j.data, j.updated); return; }
-      status('');
-      render();
+      const j = await call({ action: tab === 'new' ? 'register' : 'login', username, password, data: local() });
+      take(j);
+      $('accPass').value = $('accPass2').value = '';
+      // logging in on another computer: bring your settings + stats along
+      if (j.data && j.data.settings && Object.keys(j.data.settings).length) { write(KEYS.settings, j.data.settings); if (j.data.stats) write(KEYS.stats, j.data.stats); write(KEYS.me, me); location.reload(); return; }
+      status(tab === 'new' ? 'Welcome! You got two colors to start with.' : '');
+      changed();
     } catch (e) { status(e.message, true); }
+    $('accGo').disabled = false;
   }
   async function save() {
     if (!me) return;
@@ -61,49 +98,90 @@ const Account = (() => {
       const j = await call({ action: 'save', token: me.token, data: local() });
       me.updated = j.updated;
       write(KEYS.me, me);
-      $('accSaved').textContent = 'Saved to your account.';
-    } catch (e) {
-      if (e.status === 401) { me = null; localStorage.removeItem(KEYS.me); render(); }
-      $('accSaved').textContent = e.message;
-    }
+    } catch (e) { if (e.status === 401) { me = null; changed(); } }
   }
 
-  // the game calls this whenever it saves settings or stats
-  function dirty() {
-    if (!me || online === false) return;
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 4000);
-  }
-
-  $('accLogin').onclick = () => enter('login');
-  $('accRegister').onclick = () => enter('register');
-  $('accPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') enter('login'); });
+  $('accTabNew').onclick = () => { tab = 'new'; status(''); render(); checkName(); };
+  $('accTabLogin').onclick = () => { tab = 'login'; status(''); render(); checkName(); };
+  // names are a-z, 0-9 and _ only: lowercase as you type and drop anything else
+  $('accUser').addEventListener('input', () => {
+    const el = $('accUser'), v = el.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (v !== el.value) el.value = v;
+    checkName();
+  });
+  $('accGo').onclick = go;
+  for (const id of ['accUser', 'accPass', 'accPass2']) $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   $('accLogout').onclick = async () => {
     const t = me && me.token;
     me = null;
-    localStorage.removeItem(KEYS.me);
-    render();
+    changed();
     try { await call({ action: 'logout', token: t }); } catch (e) {}
   };
+  $('accDelete').onclick = async (e) => {
+    e.preventDefault();
+    const password = prompt('This deletes your account, your name and everything you\'ve won, forever. Type your password to confirm:');
+    if (!password || !me) return;
+    try {
+      await call({ action: 'delete', token: me.token, password });
+      me = null;
+      changed();
+      status('Your account was deleted.');
+    } catch (err) { status(err.message, true); }
+  };
+  $('privacyLink').onclick = (e) => { e.preventDefault(); $('privacy').classList.remove('hidden'); };
+  $('privacyClose').onclick = () => $('privacy').classList.add('hidden');
   render();
-  // is the server there? Logged in: also pick up anything saved from another computer
+  checkName();
+
+  // refresh from the server (new prizes from another computer, a fresh ticket)
   (async () => {
     try {
       await call({ action: 'ping' });
       online = true;
-      if (me) {
-        const j = await call({ action: 'load', token: me.token });
-        if (j.updated > (me.updated || 0) && !sessionStorage.getItem('scamper-synced')) {
-          sessionStorage.setItem('scamper-synced', '1');
-          apply(j.data, j.updated);
-        }
+      if (!me) return;
+      const j = await call({ action: 'load', token: me.token });
+      const newer = j.updated > (me.updated || 0);
+      take(j);
+      if (newer && j.data && !sessionStorage.getItem('scamper-synced')) {
+        sessionStorage.setItem('scamper-synced', '1');
+        write(KEYS.settings, j.data.settings || {});
+        write(KEYS.stats, j.data.stats || {});
+        write(KEYS.me, me);
+        location.reload();
+        return;
       }
+      changed();
     } catch (e) {
-      if (e.status === 401) { me = null; localStorage.removeItem(KEYS.me); }
-      else if (!e.status || e.status === 503) online = false;
-      if (e.status === 503) $('accOffText').textContent = e.message;
+      if (e.status === 401) { me = null; changed(); }
+      else online = false;
     }
-    render();
   })();
-  return { dirty };
+
+  return {
+    get me() { return me; },
+    onChange(f) { listeners.push(f); },
+    // the game saved settings or stats: send them up a few seconds later
+    dirty() {
+      if (!me || online === false) return;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(save, 4000);
+    },
+    // you won: ask the server for a prize. Resolves to the prize's id, or null
+    async claim() {
+      if (!me) return null;
+      try {
+        const j = await call({ action: 'claim', token: me.token });
+        me.inv = j.inv;
+        me.ticket = j.ticket;
+        changed();
+        return j.prize;
+      } catch (e) { return null; }
+    },
+    // host: what does the player holding this ticket really own? (null = not a real account)
+    async verify(ticket) {
+      if (!ticket) return null;
+      try { return await call({ action: 'verify', ticket }); }
+      catch (e) { return e.net ? 'offline' : null; }
+    },
+  };
 })();

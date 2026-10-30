@@ -46,6 +46,7 @@ const stats = (() => {
       if ([...players.values()].some((p) => p.id !== myId && !p.cpu)) {
         d.pvp.games++; mode(r.mode).pg++;
         if (won) { d.pvp.wins++; mode(r.mode).pw++; }
+        if (won && Account.me) setTimeout(openCrate, 2200);   // winners get a prize crate
       }
       if (r.mode === 'koth' && game.koth) d.kothBest = Math.max(d.kothBest, Math.floor(game.koth.pts[myId] || 0));
       save();
@@ -675,7 +676,37 @@ function pickCos(c) {
     glintColor: isHex(c.glintColor) ? c.glintColor : '#8f5bff',
   };
 }
-const myCos = () => (settings.unlocked ? pickCos(Object.assign({}, COS_DEFAULT, settings.cos || {})) : null);
+
+// ---------- who you are: an account (its unique name + what it has won) or a guest ----------
+// guests all look the same (blue, dark eyes) and get a cute random name - make an account for more
+const GUEST = ITEMS.GUEST;
+if (!ITEMS.GUEST_NAMES.includes(settings.guestName)) settings.guestName = ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)];
+const devOn = () => !!(Account.me && Account.me.dev && settings.devMode);   // developer mode: everything unlocked
+const myName = () => (Account.me ? Account.me.name : settings.guestName);
+function ownedColors() {
+  if (!Account.me) return [];
+  if (devOn()) return ITEMS.COLORS.map((c) => c.hex);
+  return Account.me.inv.colors.map((id) => ITEMS.byId[id]).filter(Boolean).map((c) => c.hex);
+}
+const ownsCos = (id) => !!Account.me && (devOn() || Account.me.inv.cos.includes(id));
+// keep your look to what you own; body and eyes are never the same color
+function fixLook() {
+  if (!Account.me) { settings.color = GUEST.body; settings.eye = GUEST.eye; return; }
+  const own = ownedColors();
+  if (!own.length) return;
+  if (!own.includes(settings.color)) settings.color = own[0];
+  if (!own.includes(settings.eye) || settings.eye === settings.color) settings.eye = own.find((h) => h !== settings.color) || own[0];
+}
+// cosmetics you haven't won are switched off
+function limitCos(c, owns) {
+  if (!c) return null;
+  if (!owns('rainbow')) c.rb = 'off';
+  if (!owns('ghost')) c.ghost = false;
+  if (!owns('neon')) c.neon = false;
+  if (!owns('glint')) c.glint = false;
+  return c;
+}
+const myCos = () => (Account.me ? limitCos(pickCos(Object.assign({}, COS_DEFAULT, settings.cos || {})), ownsCos) : null);
 function ensurePlayer(id, name, color, eye = '#ffffff', cos = null) {
   let p = players.get(id);
   if (p) p.cos = cos;
@@ -977,7 +1008,7 @@ const H = { rndNext: 0, rndLast: [], exposed: {}, itSince: {}, timeLeft: 0, rele
 // the palette: every body and eye color comes from these soft pastels (eyes can also be white or ink)
 const COLORS = ['#ff8fa3', '#ffb3c6', '#ff9b9b', '#ffb37a', '#ffd166', '#ffe599', '#c8e6a0', '#9be3a8', '#7ed6c8',
   '#a8dcef', '#8fb4ff', '#b8c0ff', '#c3a6ff', '#e0b0ff', '#f4a6ff', '#d9c2a7', '#c9ced6', '#f7f3ea'];
-const EYE_COLORS = ['#ffffff', '#1f2433', '#ff8fa3', '#ffb37a', '#ffd166', '#9be3a8', '#7ed6c8', '#a8dcef', '#8fb4ff', '#c3a6ff', '#f4a6ff', '#e0b0ff'];
+const ALL_HEX = ITEMS.COLORS.map((c) => c.hex).concat([GUEST.body, GUEST.eye]);
 // any other color snaps to the closest one in the palette
 function nearestIn(list, hex) {
   const c = new THREE.Color(hex), q = new THREE.Color();
@@ -987,8 +1018,8 @@ function nearestIn(list, hex) {
 }
 
 const isHex = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
-function pickColor(want) { return isHex(want) ? nearestIn(COLORS, want.toLowerCase()) : COLORS[Math.floor(Math.random() * COLORS.length)]; }
-const pickEye = (want) => (isHex(want) ? nearestIn(EYE_COLORS, want.toLowerCase()) : '#ffffff');
+function pickColor(want) { return isHex(want) ? nearestIn(ALL_HEX, want.toLowerCase()) : COLORS[Math.floor(Math.random() * COLORS.length)]; }
+const pickEye = (want) => (isHex(want) ? nearestIn(ALL_HEX, want.toLowerCase()) : '#ffffff');
 function cleanName(n) { return String(n || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 14) || 'bobo'; }
 function uniqueName(n) {
   const taken = new Set([...players.values()].map((p) => p.name));
@@ -1496,8 +1527,10 @@ function hostHandle(from, m) {
       setTimeout(() => Net.kick(from), 300);
       return;
     }
-    const name = uniqueName(cleanName(m.name));
-    ensurePlayer(from, name, pickColor(m.color), pickEye(m.eye), pickCos(m.cos));
+    // guests show up as guests straight away; an account's name + colors are checked with the server
+    const L = lookFor(m.ticket ? 'trust' : null, m), name = uniqueName(L.name);
+    ensurePlayer(from, name, L.color, L.eye, L.cos);
+    if (m.ticket) hostVerify(from, m);
     game.scores[from] = { tags: 0 };
     if (isPlaying() && game.mode === 'koth') game.koth.pts[from] = 0;
     if (game.gp) game.gp.pts[from] = game.gp.pts[from] || 0;
@@ -1519,14 +1552,47 @@ function hostHandle(from, m) {
   }
 }
 
-// someone changed their name / colors / cosmetics in the middle of a game
-function hostUpdatePlayer(id, m) {
+// what someone may look like. acct: what the account server says they own, null = a guest,
+// 'trust' = couldn't check (the server is unreachable), so take their word for it
+function lookFor(acct, m) {
+  if (acct === 'trust') return { name: cleanName(m.name), color: pickColor(m.color), eye: pickEye(m.eye), cos: pickCos(m.cos) };
+  if (!acct) {
+    const g = String(m.name || '').toLowerCase();
+    return { name: ITEMS.GUEST_NAMES.includes(g) ? g : ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)], color: GUEST.body, eye: GUEST.eye, cos: null };
+  }
+  const own = acct.colors, color = own.includes(m.color) ? m.color : own[0];
+  const eye = own.includes(m.eye) && m.eye !== color ? m.eye : own.find((h) => h !== color) || own[0];
+  return { name: acct.name, color, eye, cos: limitCos(pickCos(m.cos), (k) => acct.cos.includes(k)) };
+}
+function hostApplyLook(id, m, acct) {
   const p = players.get(id);
   if (!p || p.cpu) return;
-  const old = p.name, want = cleanName(m.name), name = want === old ? want : uniqueName(want);
-  ensurePlayer(id, name, pickColor(m.color), pickEye(m.eye), pickCos(m.cos));
+  const L = lookFor(acct, m), old = p.name, name = L.name === old ? old : uniqueName(L.name);
+  ensurePlayer(id, name, L.color, L.eye, L.cos);
   if (name !== old) hostFeed(`${old} is now ${name}`);
   pushState();
+}
+// ask the account server what this player's ticket really owns (cached until their ticket changes)
+function hostVerify(id, m) {
+  const p = players.get(id);
+  if (!p) return;
+  if (p.ticket === m.ticket && p.acct !== undefined) { hostApplyLook(id, m, p.acct); return; }
+  p.ticket = m.ticket;
+  Account.verify(m.ticket).then((v) => {
+    const q = players.get(id);
+    if (!q || q.ticket !== m.ticket) return;
+    q.acct = v === 'offline' ? 'trust' : v;
+    hostApplyLook(id, m, q.acct);
+  });
+}
+// someone changed their colors / cosmetics in the middle of a game
+function hostUpdatePlayer(id, m) {
+  if (id === myId) {   // the host's own look comes from its own account
+    ensurePlayer(myId, myName(), settings.color, settings.eye, myCos());
+    pushState();
+    return;
+  }
+  if (m.ticket) hostVerify(id, m); else hostApplyLook(id, m, null);
 }
 
 function hostOnLeave(id) {
@@ -1869,6 +1935,7 @@ function renderStats() {
 // ---------- menus (main + escape share the Settings / Controls panels) ----------
 function showView(root, name) {
   cancelRebind();
+  if (name === 'you') renderMeEdit();
   if (name === 'stats') renderStats();
   root.querySelectorAll('.nav-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   root.querySelectorAll('.view').forEach((v) => v.classList.toggle('hidden', v.dataset.view !== name));
@@ -1917,29 +1984,41 @@ function updatePauseUI() {
   $('addCpu').disabled = players.size >= CONFIG.tag.maxPlayers;
 }
 
-// ---------- you: change name + colors mid-game (pause menu -> Lobby) ----------
+// ---------- you: colors + cosmetics, also mid-game (pause menu -> You) ----------
+// every color by rarity: the ones you own you can click, the rest are locked "?" tiles
+function paletteHTML(part) {
+  if (!Account.me) return `<div class="pal-msg">Guests are always blue. ${inGame ? 'Make an account from the main menu' : '<a data-go="account">Create an account</a>'} to get your own colors.</div>`;
+  const own = new Set(ownedColors()), cur = part === 'eye' ? settings.eye : settings.color, other = part === 'eye' ? settings.color : settings.eye;
+  return ITEMS.TIERS.map((t) => {
+    const list = ITEMS.COLORS.filter((c) => c.tier === t.id);
+    return `<div class="tier-row" style="--tc:${t.color}">${t.name}</div>` + list.map((c) => (own.has(c.hex)
+      ? `<button type="button" class="sw${c.hex === cur ? ' on' : ''}${c.hex === other ? ' taken' : ''}" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}${c.hex === other ? ` (already your ${part === 'eye' ? 'body' : 'eyes'})` : ''}"></button>`
+      : `<button type="button" class="sw locked" style="--tc:${t.color}" title="${t.name} - win games to unlock" disabled></button>`)).join('');
+  }).join('');
+}
 function renderMeEdit() {
-  if (document.activeElement !== $('pName')) $('pName').value = settings.name || 'bobo';
-  const sw = (list, cur) => list.map((c) => `<button type="button" class="sw${c === cur ? ' on' : ''}" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
-  $('pBody').innerHTML = sw(COLORS, settings.color);
-  $('pEye').innerHTML = sw(EYE_COLORS, settings.eye);
+  $('pNameText').textContent = myName();
+  $('youSub').textContent = Account.me ? 'Change how you look - everyone sees it right away.' : 'You\'re a guest. Make an account from the main menu to pick your own name and colors.';
+  $('pBody').innerHTML = paletteHTML('body');
+  $('pEye').innerHTML = paletteHTML('eye');
 }
 function sendMe() {
   if (!inGame) return;
-  const m = { t: 'upd', name: cleanName(settings.name), color: settings.color, eye: settings.eye, cos: myCos() };
+  const m = { t: 'upd', name: myName(), color: settings.color, eye: settings.eye, cos: myCos(), ticket: Account.me ? Account.me.ticket : null };
   if (Net.isHost) hostUpdatePlayer(myId, m); else Net.send(m);
 }
-const meColor = (body, eye) => { setColors(body, eye); renderMeEdit(); sendMe(); };
-$('pBody').onclick = (e) => { const b = e.target.closest('.sw'); if (b) meColor(b.dataset.c, null); };
-$('pEye').onclick = (e) => { const b = e.target.closest('.sw'); if (b) meColor(null, b.dataset.c); };
-$('pName').addEventListener('change', () => {
-  settings.name = cleanName($('pName').value);
-  $('name').value = settings.name;
-  saveSettings();
+// pick a color (ignores locked ones and the color your other half already has)
+function pickSwatch(e, part) {
+  const b = e.target.closest('.sw');
+  if (e.target.dataset.go) showView($('menu'), e.target.dataset.go);
+  if (!b || b.disabled || b.classList.contains('locked') || b.classList.contains('taken')) return false;
+  if (part === 'eye') setColors(null, b.dataset.c); else setColors(b.dataset.c, null);
   renderMeEdit();
   sendMe();
-});
-$('pName').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+  return true;
+}
+$('pBody').onclick = (e) => pickSwatch(e, 'body');
+$('pEye').onclick = (e) => pickSwatch(e, 'eye');
 
 // ---------- CPU players (host) ----------
 let cpuDiff = 'medium', cpuN = 0;
@@ -2130,7 +2209,10 @@ function renderSetup() {
     c.disabled = !edit;
     const m = modeInfo(c.dataset.id), why = startProblem(m, players.size);
     c.querySelector('.warn').textContent = why && players.size > 0 ? why.split('.')[0] : '';
+    c.classList.toggle('bad', !!why);
   });
+  const why = startProblem(mode, players.size);
+  $('modeDesc').innerHTML = esc(mode.desc) + (why ? `<span class="warn">${esc(why)}</span>` : '');
   const gp = mode.kind === 'gp', maps = gp ? [] : MAPS.filter((m) => (m.kind === 'race') === race);
   const html = maps.map((m) => {
     const [a, b] = m.accent || ['#333', '#555'];
@@ -2196,6 +2278,7 @@ bindToggle('showSpeed', 'showSpeed', applySpeedVis);
 bindToggle('perf', 'perfMode', applyPerf);
 bindToggle('showFps', 'showFps', () => $('fps').classList.toggle('hidden', !settings.showFps));
 bindToggle('thirdPerson', 'thirdPerson');
+bindToggle('devMode', 'devMode', () => onAccount());
 $('fps').classList.toggle('hidden', !settings.showFps);
 applySpeedVis();
 
@@ -2628,6 +2711,75 @@ function updateGame(dt) {
   sbTimer += dt;
   if (sbTimer > 0.25 || boardDirty) { sbTimer = 0; boardDirty = false; renderBoard(); }
 }
+// ---------- prize crate: it shakes, pops open, and a reel of items spins and slows down on your prize ----------
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+let crateBusy = false;
+async function openCrate() {
+  if (crateBusy) return;
+  crateBusy = true;
+  try {
+    const id = await Account.claim(), prize = id && ITEMS.byId[id];
+    if (!prize) return;
+    const box = $('prize'), crate = $('crate'), wrap = $('reelWrap'), reel = $('reel'), label = $('prizeName');
+    const tierOf = (it) => ITEMS.tier(it.tier);
+    box.className = 'prize';
+    crate.className = 'crate';
+    crate.style.display = '';
+    wrap.classList.add('hidden');
+    label.innerHTML = '';
+    crate.classList.add('shake');
+    for (let i = 0; i < 6; i++) tone(180 + i * 40, 140 + i * 40, 0.08, 'square', 0.04, i * 0.17);
+    await wait(1100);
+    crate.classList.remove('shake');
+    crate.classList.add('open');
+    tone(300, 900, 0.25, 'triangle', 0.08);
+    await wait(500);
+    crate.style.display = 'none';
+    // the reel: random items (by rarity), with the prize at slot WIN
+    const N = 58, WIN = 50, items = [];
+    for (let i = 0; i < N; i++) items.push(i === WIN ? prize : ITEMS.roll([], Math.random));
+    reel.innerHTML = items.map((it) => `<div class="it" style="--tc:${tierOf(it).color}">${it.kind === 'cos' ? `<div class="cos">${esc(it.name.toUpperCase())}</div>` : `<div class="sw" style="background:${it.hex}"></div>`}</div>`).join('');
+    reel.style.transform = 'translateX(0)';
+    wrap.classList.remove('hidden');
+    const step = 114, half = wrap.clientWidth / 2;
+    const end = WIN * step + 52 - half + (Math.random() - 0.5) * 80;   // stop somewhere on the prize tile
+    const T = 5800, t0 = performance.now();
+    let last = -1;
+    await new Promise((done) => {
+      const f = (now) => {
+        const k = Math.min(1, (now - t0) / T), x = end * (1 - Math.pow(1 - k, 4));
+        reel.style.transform = `translateX(${-x}px)`;
+        const at = Math.floor((x + half) / step);
+        if (at !== last && items[at]) {   // tick + the glow takes the color of what's under the line
+          last = at;
+          tone(1100, 800, 0.025, 'square', 0.025);
+          wrap.style.setProperty('--glow', tierOf(items[at]).color);
+        }
+        if (k < 1) requestAnimationFrame(f); else done();
+      };
+      requestAnimationFrame(f);
+    });
+    // the reveal: bigger the rarer it is
+    const t = tierOf(prize), rank = ITEMS.TIERS.indexOf(t);
+    reel.children[WIN].classList.add('win');
+    if (t.id === 'mythic') box.classList.add('mythic');
+    label.innerHTML = `<div class="pt" style="--tc:${t.color}">${t.name.toUpperCase()}</div><div class="pn">${esc(prize.name)}</div>`;
+    [523, 659, 784, 1046, 1318, 1568].slice(0, 2 + rank).forEach((f, i) => tone(f, f * 1.01, 0.18, 'triangle', 0.07, i * 0.09));
+    for (let i = 0; i < 12 + rank * 18; i++) {
+      const c = document.createElement('i');
+      c.className = 'confetti';
+      c.style.left = `${Math.random() * 100}vw`;
+      c.style.background = Math.random() < 0.5 ? t.color : prize.hex || t.color;
+      c.style.animationDuration = `${1.6 + Math.random() * 1.6}s`;
+      c.style.animationDelay = `${Math.random() * 0.4}s`;
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 3800);
+    }
+    await wait(3600);
+    box.classList.add('hidden');
+  } finally { crateBusy = false; }
+}
+
 let finishSentAt = 0, boardDirty = true, beepT = 0, fallLockUntil = 0, wasRed = false;
 
 // randomizer happenings that push bodies around (you, and the CPUs on the host), every physics step
@@ -3107,24 +3259,16 @@ function renderBoard() {
 }
 
 // ---------- menu ----------
-const ADJ = ['Swift', 'Sly', 'Zippy', 'Turbo', 'Sneaky', 'Bouncy', 'Rapid', 'Slick', 'Wild', 'Lucky'];
-const NOUN = ['Fox', 'Gecko', 'Otter', 'Hare', 'Ferret', 'Lynx', 'Newt', 'Moth', 'Weasel', 'Frog'];
-// default name is bobo (old auto-generated names like "RapidFox" get replaced too)
-const autoName = (n) => ADJ.some((a) => n.startsWith(a)) && NOUN.some((w) => n.endsWith(w));
-$('name').value = !settings.name || autoName(settings.name) ? 'bobo' : settings.name;
+// the name box shows who you are (your account name, or your guest name)
+function renderName() {
+  $('name').value = myName();
+  $('nameHint').innerHTML = Account.me ? (devOn() ? 'Developer mode is on' : '') : 'Guest name. <a data-go="account">Create an account</a> to pick your own.';
+}
+$('nameHint').onclick = (e) => { if (e.target.dataset.go) showView($('menu'), e.target.dataset.go); };
 
 // character preview + fur color on the main menu
 // first time here: a random body color (eyes that stand out on it), kept from then on
-if (!settings.colorPicked || !isHex(settings.color)) {
-  settings.color = COLORS[Math.floor(Math.random() * COLORS.length)];
-  const c = new THREE.Color(settings.color);
-  settings.eye = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b > 0.6 ? '#1f2433' : '#ffffff';
-  settings.colorPicked = true;
-  saveSettings();
-}
-if (!isHex(settings.eye)) settings.eye = '#ffffff';
-settings.color = pickColor(settings.color);
-settings.eye = pickEye(settings.eye);
+fixLook();
 const preview = (() => {
   const canvas = $('preview');
   const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -3154,7 +3298,8 @@ const preview = (() => {
     render(dt) {
       if (inGame || !canvas.offsetParent) return;
       const w = canvas.clientWidth, h = canvas.clientHeight;
-      if (canvas.width !== Math.round(w * r.getPixelRatio())) { r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+      // keep the camera's shape matched to the box (it crops around the middle, never stretches)
+      if (canvas.width !== Math.round(w * r.getPixelRatio()) || canvas.height !== Math.round(h * r.getPixelRatio())) { r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
       t += dt;
       if (!dragging) spin += (Math.sin(t * 0.6) * 0.6 - spin) * Math.min(1, dt * 1.5);
       c.rig.rotation.y = spin;
@@ -3180,9 +3325,9 @@ const markColors = () => {
   }
   $('bodySwatch').classList.toggle('open', palFor === 'body');
   $('eyeSwatch').classList.toggle('open', palFor === 'eye');
-  const pal = $('palette'), list = palFor === 'eye' ? EYE_COLORS : COLORS, cur = palFor === 'eye' ? settings.eye : settings.color;
+  const pal = $('palette');
   pal.classList.toggle('hidden', !palFor);
-  pal.innerHTML = palFor ? list.map((c) => `<button type="button" class="sw${c === cur ? ' on' : ''}" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('') : '';
+  pal.innerHTML = palFor ? paletteHTML(palFor) : '';
 };
 const setColors = (body, eye) => {
   if (body) { settings.color = body; settings.colorPicked = true; }
@@ -3193,38 +3338,20 @@ const setColors = (body, eye) => {
 };
 $('bodySwatch').onclick = () => { palFor = palFor === 'body' ? '' : 'body'; markColors(); };
 $('eyeSwatch').onclick = () => { palFor = palFor === 'eye' ? '' : 'eye'; markColors(); };
-$('palette').onclick = (e) => {
-  const b = e.target.closest('.sw');
-  if (!b) return;
-  if (palFor === 'eye') setColors(null, b.dataset.c); else setColors(b.dataset.c, null);
-};
+$('palette').onclick = (e) => pickSwatch(e, palFor);
 markColors();
 
-// --- the secret code: only its SHA-256 is stored here, so the code itself isn't in the source ---
-const SECRET = '36b7c813e30a3c4aae7a1a04ff35c32125eb0836f1fed7b5b77df06e8f229d7a';
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
-}
-// the box is invisible and gives no feedback: type the code into it and the Cosmetics panel appears
-$('secretCode').addEventListener('input', async (e) => {
-  const v = e.target.value.trim();
-  if (v.length > 40) e.target.value = '';
-  if (!v || !window.crypto || !crypto.subtle) return;
-  if (await sha256(v) !== SECRET) return;
-  e.target.value = '';
-  settings.unlocked = true;
-  saveSettings();
-  renderCos();
-});
+// the Cosmetics panel only lists what you've won (or everything in developer mode)
+const COS_ITEM = { rb: 'rainbow', ghost: 'ghost', neon: 'neon', glint: 'glint' };
 function renderCos() {
-  $('cosPanel').classList.toggle('hidden', !settings.unlocked);
+  $('cosPanel').classList.toggle('hidden', !Object.values(COS_ITEM).some(ownsCos));
+  $('cosPanel').querySelectorAll('.pills[data-k]').forEach((g) => { if (COS_ITEM[g.dataset.k]) g.closest('.cos-row').classList.toggle('hidden', !ownsCos(COS_ITEM[g.dataset.k])); });
   const c = Object.assign({}, COS_DEFAULT, settings.cos || {});
   $('cosPanel').querySelectorAll('.pills[data-k]').forEach((g) => g.querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === String(c[g.dataset.k]))));
   $('ghostOp').value = Math.round(c.ghostOp * 100);
   $('ghostOpVal').textContent = `${Math.round(c.ghostOp * 100)}%`;
-  $('ghostOpRow').classList.toggle('hidden', !c.ghost);
-  $('rbStyleRow').classList.toggle('hidden', c.rb === 'off');
+  $('ghostOpRow').classList.toggle('hidden', !c.ghost || !ownsCos('ghost'));
+  $('rbStyleRow').classList.toggle('hidden', c.rb === 'off' || !ownsCos('rainbow'));
   $('glintColor').value = c.glintColor;
   $('glintColor').classList.toggle('hidden', !c.glint);
 }
@@ -3239,12 +3366,23 @@ $('ghostOp').addEventListener('input', (e) => setCos('ghostOp', Math.max(0.2, +e
 $('glintColor').addEventListener('input', (e) => setCos('glintColor', e.target.value));
 renderCos();
 
-function getName() {
-  const n = cleanName($('name').value);
-  settings.name = n;
+// your account loaded / changed (logged in or out, won something, developer mode)
+function onAccount() {
+  fixLook();
   saveSettings();
-  return n;
+  preview.set();
+  markColors();
+  renderCos();
+  renderName();
+  renderMeEdit();
+  $('devModeRow').classList.toggle('hidden', !(Account.me && Account.me.dev));
+  sendMe();
 }
+Account.onChange(onAccount);
+renderName();
+$('devModeRow').classList.toggle('hidden', !(Account.me && Account.me.dev));
+
+function getName() { return myName(); }
 function setStatus(t, bad) {
   $('menuStatus').textContent = t;
   $('menuStatus').className = bad ? 'bad' : '';
@@ -3302,7 +3440,7 @@ function join() {
     const sp = randomSpawn();
     me.teleport(sp, faceCenter(sp));
     enterGame();
-    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, cos: myCos() });
+    Net.send({ t: 'hello', v: CONFIG.version, name, color: settings.color, eye: settings.eye, cos: myCos(), ticket: Account.me ? Account.me.ticket : null });
   });
 }
 $('joinBtn').onclick = join;
@@ -3352,7 +3490,7 @@ if (urlCode) fillCode(urlCode); else syncCode();
 
 addEventListener('beforeunload', () => Net.destroy());
 // for automated tests: ?debug exposes the internals
-if (/[?&]debug\b/.test(location.search)) window.__dbg = { game, H, me, players, hostSetup, setupChanged, hostStartRound, CONFIG, World, raceToGo, settings, addBot, pushState, hostEndRound, bots, camera, scene };
+if (/[?&]debug\b/.test(location.search)) window.__dbg = { game, H, me, players, hostSetup, setupChanged, hostStartRound, CONFIG, World, raceToGo, settings, addBot, pushState, hostEndRound, bots, camera, scene, openCrate };
 
 requestAnimationFrame(frame);
 })();
