@@ -397,3 +397,7 @@ button { font-family: inherit; }
 .cpu-x { margin-left: 6px; width: 22px; height: 22px; border: 2px solid var(--ink); background: #fff; font-weight: 800; cursor: pointer; line-height: 1; }
 .board-row.icy { background: #dff6ff; }
 .board-row.icy .btag { background: #3aa7d6; }
+/* held in place after falling off: an emptying bar */
+#fallHold { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); width: 260px; text-align: center; padding: 7px 12px 10px; background: rgba(255, 255, 255, 0.95); border: 2px solid var(--ink); box-shadow: var(--shadow); color: var(--ink); }
+#fallHold .fuse-head { margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.14em; color: var(--muted); }
+#fallBar { height: 100%; background: var(--pink); transform-origin: left; }

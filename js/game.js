@@ -1141,10 +1141,10 @@ function raceToGo(p) {
 }
 
 // someone fell into the void
-// Seekers come back as far from the runners as the map allows (the void is never a shortcut).
-// Runners come back away from the danger but EXPOSED for a few seconds: whoever hunts them sees
-// their outline through walls. (Duel: falling still scores for the other side; a king who
-// falls drops the crown.)
+// Falling off during a round: seekers come straight back as far from the runners as the map
+// allows; runners come back NEAR the seekers (but not on top of them), are held in place for a
+// few seconds, and are exposed (outline through walls) for a few more. Duel: the other side also
+// scores; King of the Tag: the king drops the crown.
 const EXPOSE_SECS = 6;
 function farSpawn(from) {
   let best = randomSpawn(), bd = -1;
@@ -1155,34 +1155,46 @@ function farSpawn(from) {
   }
   return best;
 }
+function nearSpawn(from) {
+  let best = randomSpawn(), bd = Infinity;
+  for (const sp of World.map.spawns) {
+    let d = Infinity;
+    for (const q of from) d = Math.min(d, wrapDist({ x: sp[0], y: sp[1], z: sp[2] }, q));
+    if (d >= 6 && d < bd) { bd = d; best = sp; }
+  }
+  return best;
+}
+// is this player one of the runners right now? (the ones being chased)
+function isRunner(id) {
+  if (!isPlaying()) return false;
+  if (game.mode === 'bomb') return !isIt(id) && !isOut(id);
+  if (game.mode === 'duel') return inDuel(id) && !isIt(id);
+  if (game.mode === 'koth') return isIt(id);
+  if (game.mode === 'freeze') return !isIt(id) && !isFrozen(id);
+  return false;
+}
+// who's chasing the runners
+function seekerIds() {
+  if (game.mode === 'koth') return [...players.keys()].filter((x) => !isIt(x));
+  return game.it.slice();
+}
 function hostFell(id) {
   if (!isPlaying()) { teleportPlayer(id, randomSpawn()); return; }
   const pos = (ids) => ids.filter((x) => x !== id && players.has(x)).map(posOf).filter(Boolean);
+  const runner = isRunner(id);
+  if (runner) {
+    teleportPlayer(id, nearSpawn(pos(seekerIds())));
+    H.exposed[id] = performance.now() + (CONFIG.tag.fallLock + EXPOSE_SECS) * 1000;
+  } else teleportPlayer(id, farSpawn(pos([...players.keys()].filter(isRunner))));
   if (game.mode === 'duel') {
     const d = game.duel;
-    if (!d.ids.includes(id) || H.releaseLeft > 0) { teleportPlayer(id, randomSpawn()); return; }
-    duelPoint(d.ids.find((i) => i !== id), id === game.it[0] ? 'the chaser fell' : 'fell into the void');
-  } else if (game.mode === 'koth') {
-    if (isIt(id)) { hostDropCrown(); teleportPlayer(id, randomSpawn()); }
-    else teleportPlayer(id, farSpawn(pos(game.it)));   // a chaser: far from the king
-  } else if (game.mode === 'bomb') {
-    const alive = game.bomb ? game.bomb.alive : [];
-    if (isIt(id)) teleportPlayer(id, farSpawn(pos(alive)));
-    else if (alive.includes(id)) {
-      teleportPlayer(id, farSpawn(pos(game.it)));
-      H.exposed[id] = performance.now() + EXPOSE_SECS * 1000;
-      hostFeed(`${nameOf(id)} fell - exposed for ${EXPOSE_SECS}s!`);
-      pushState();
-    } else teleportPlayer(id, randomSpawn());
-  } else if (game.mode === 'freeze') {
-    if (isIt(id)) teleportPlayer(id, farSpawn(pos(freezeRunners().filter((x) => !isFrozen(x)))));
-    else {
-      teleportPlayer(id, farSpawn(pos(game.it)));
-      H.exposed[id] = performance.now() + EXPOSE_SECS * 1000;
-      hostFeed(`${nameOf(id)} fell - exposed for ${EXPOSE_SECS}s!`);
-      pushState();
-    }
-  } else teleportPlayer(id, randomSpawn());
+    if (d.ids.includes(id) && H.releaseLeft <= 0) { duelPoint(d.ids.find((i) => i !== id), id === game.it[0] ? 'the chaser fell' : 'fell into the void'); return; }
+  } else if (game.mode === 'koth' && runner) {
+    hostDropCrown();
+    return;
+  }
+  if (runner) hostFeed(`${nameOf(id)} fell off!`);
+  pushState();
 }
 
 function hostEndRound(sub) {
@@ -1814,7 +1826,7 @@ function botsAfter() {
     World.wrapPos(b.p.pos);
     if (b.p.pos.y < World.map.killY) {
       b.p.teleport(randomSpawn());
-      if (isPlaying() && !isOut(b.id)) b.lockUntil = now + CONFIG.tag.fallLock * 1000;
+      if (isRunner(b.id)) b.lockUntil = now + CONFIG.tag.fallLock * 1000;
       hostFell(b.id);
     }
     const p = players.get(b.id);
@@ -2146,7 +2158,7 @@ function updateGame(dt) {
     flash('rgba(0,0,0,.9)');
     SFX.fall();
     // jumping off isn't an escape: you're stuck for a moment when you come back
-    if (playing && World.map.kind !== 'race' && !isOut(myId)) fallLockUntil = performance.now() + CONFIG.tag.fallLock * 1000;
+    if (World.map.kind !== 'race' && isRunner(myId)) fallLockUntil = performance.now() + CONFIG.tag.fallLock * 1000;
     if (World.map.kind === 'race') {
       if (playing && game.mode === 'race') { stats.fell(); if (!raceDone) showBanner('<div class="big red">BACK TO THE START</div>', 1.2); }
     } else if (playing) { if (Net.isHost) hostFell(myId); else Net.send({ t: 'fell' }); }
@@ -2573,7 +2585,13 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (isExposed(myId)) hint = `EXPOSED - they can see you for ${((exposedUntil[myId] - now) / 1000).toFixed(1)}s`;
   if (now < tagHintUntil) hint = tagHint;
   if (frozen && !isFrozen(myId)) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
-  if (now < fallLockUntil) hint = `You fell - back in ${((fallLockUntil - now) / 1000).toFixed(1)}s`;
+  // held after a fall: a bar that empties as you wait
+  const held = now < fallLockUntil;
+  $('fallHold').classList.toggle('hidden', !held);
+  if (held) {
+    if (hint === 'Get ready…') hint = '';
+    $('fallBar').style.transform = `scaleX(${((fallLockUntil - now) / (CONFIG.tag.fallLock * 1000)).toFixed(3)})`;
+  }
   else if (game.phase === 'lobby') {
     hint = Net.isHost
       ? (players.size < 2 ? `Warmup - tell friends the code ${Net.code}` : 'Warmup - press ENTER (or P → Start round) to play')
