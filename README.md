@@ -55,6 +55,7 @@ Orange walls are wall-kick routes.
 | The Test Lab | indoor | White test chambers around a frosted-glass atrium you can't wall-kick, crossed by bridges at two heights |
 | The Clocktower | indoor | Spinning gears you ride (they turn your view), a pendulum, lifts, bells and glowing clock faces |
 | The Skatepark | outdoor (walled) | A seaside skatepark: a big funbox with a slide tunnel, towers, corner platforms, ramps, containers |
+| Bounce House | indoor | A trampoline park: a court of mats, launch pads up to decks at 4.4 and 8.8, a foam pit, kick chimneys |
 | The Loop | fog | Endless: the map repeats forever - walk off one edge and you come in the other side |
 
 Level features: **jump pads** (glowing squares), **moving platforms** you can ride, **spinning bars** that shove you, and **kick walls** (always bright orange-red).
