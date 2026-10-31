@@ -2931,10 +2931,8 @@ async function openCrate(match, starter, preview) {
     let last = -1, lastX = 0;
     await new Promise((done) => {
       const f = (now) => {
-        const k = Math.min(1, (now - t0) / T), x = end * (1 - Math.pow(1 - k, 4)), v = x - lastX;
-        lastX = x;
+        const k = Math.min(1, (now - t0) / T), x = end * (1 - Math.pow(1 - k, 4));
         reel.style.transform = `translateX(${-x}px)`;
-        reel.style.filter = v > 12 ? `blur(${Math.min(3, v / 14).toFixed(1)}px)` : '';   // motion blur while it's flying
         let at = last < 0 ? 0 : last;
         while (at < N - 1 && left[at + 1] <= x + half) at++;
         if (at !== last) {
