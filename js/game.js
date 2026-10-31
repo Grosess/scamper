@@ -2930,7 +2930,11 @@ async function openCrate(match, starter, preview) {
     const tease = (minRank) => ofTier(ranks[Math.min(5, minRank + Math.floor(Math.random() * (6 - minRank)))]);
     if (Math.random() < 0.75) items[WIN + 1] = tease(Math.max(3, rankOf(prize) + 1));   // just past the prize: something better
     if (Math.random() < 0.5) items[WIN - 1] = tease(Math.max(2, rankOf(prize)));
-    reel.innerHTML = items.map((it) => `<i style="width:${SW}px;background:${tierOf(it).color}"></i>`).join('');
+    // every rarity the same size - except mythic, a thin sliver
+    const wOf = (it) => (it.tier === 'mythic' ? 12 : SW);
+    reel.innerHTML = items.map((it) => `<i style="width:${wOf(it)}px;background:${tierOf(it).color}"></i>`).join('');
+    const left = [0];
+    for (let i = 0; i < N; i++) left.push(left[i] + wOf(items[i]));
     reel.style.transform = 'translateX(0)';
     reel.style.filter = '';
     $('reelInfo').innerHTML = '';
@@ -2939,7 +2943,7 @@ async function openCrate(match, starter, preview) {
     const half = wrap.clientWidth / 2;
     // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
     const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
-    const end = WIN * SW + SW * frac - half;
+    const end = left[WIN] + wOf(prize) * (prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : frac) - half;
     // fast at first, then a long, slow crawl at the end
     const T = 8200, t0 = performance.now(), ease = (k) => 1 - Math.pow(1 - k, 5);
     let last = -1, tense = false;
@@ -2952,7 +2956,8 @@ async function openCrate(match, starter, preview) {
           wrap.classList.add('tense');
           tone(70, 140, 2.2, 'sawtooth', 0.035);
         }
-        const at = Math.max(0, Math.min(N - 1, Math.floor((x + half) / SW)));
+        let at = last < 0 ? 0 : last;
+        while (at < N - 1 && left[at + 1] <= x + half) at++;
         if (at !== last) {
           last = at;
           tone(700 + 700 * k, 600 + 600 * k, k > 0.72 ? 0.05 : 0.025, 'square', k > 0.72 ? 0.05 : 0.025);   // ticks climb, and get heavier at the end
