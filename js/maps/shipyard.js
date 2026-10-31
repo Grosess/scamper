@@ -86,7 +86,7 @@ defineMap({
     k.box(13.5, 19.4, 0, 3, 1.6, 2.6, '#c0392b');
     k.box(13.5, 12, 0, 0.14, 7.4, 0.14, '#222222', { tex: 'none' });
     k.box(13.5, 11.4, 0, 4.4, 0.6, 2.6, '#c0392b');
-    k.pad(4.5, 18.2, 3, 1.2, 1.2, 15, { push: { x: 0, z: -2.5 } });
+    k.pad(4.5, 18.2, 3, 1.2, 1.2, 15, {});
     // kick towers just past each end of the beam: wall-kick up from the dock, step onto the beam
     for (const s of [-1, 1]) kickShaft(k, s * 23.5, 0, 'x', 3, 0, 21.8, Y);
 

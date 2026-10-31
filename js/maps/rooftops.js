@@ -114,9 +114,9 @@ defineMap({
     k.ramp(-21, -13, 1.2, 5, 4, 8, '-z', WOOD, { base: 3.8 });   // E -> A
 
     // --- launch pads for the big height jumps ---
-    k.pad(10.6, 16, -7, 1.4, 1.4, 22, { push: { x: -11.5, z: 0 } });   // G -> the 24 tower F
-    k.pad(10, 4, -17.5, 1.4, 1.4, 26, { push: { x: 0, z: 6 } });     // C -> G
-    k.pad(-21, 4, 25.4, 1.4, 1.4, 23, { push: { x: 0, z: -11.5 } });    // M -> I
+    k.pad(10.6, 16, -7, 1.4, 1.4, 22, {});   // G -> the 24 tower F
+    k.pad(10, 4, -17.5, 1.4, 1.4, 26, {});     // C -> G
+    k.pad(-21, 4, 25.4, 1.4, 1.4, 23, {});    // M -> I
 
     // --- fire escapes: landings 1.1m deep stepping diagonally up a facade, 2.4m apart at most.
     // None is above another: run to the end of one, bump into the next one's face, jump, pull up.
@@ -168,7 +168,7 @@ defineMap({
       k.deco(x, y + 6, z, 2.8, 0.6, 2.8, '#6b4422', NO);
     };
     waterTower(21, 16, -21);
-    k.pad(17.5, 16, -21, 1.4, 1.4, 21, { push: { x: 2.5, z: 0 } });
+    k.pad(17.5, 16, -21, 1.4, 1.4, 21, {});
     waterTower(-9.5, 16, 23.5);
 
     // --- kick perch on K: a sign box and a wall 2.5m apart - kick up, pull onto the box (26) ---

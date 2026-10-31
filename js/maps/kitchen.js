@@ -85,7 +85,7 @@ defineMap({
     drawers(-22, -17, 1, 'x');
     // toaster on the front of the counter: its slot throws you up onto the fridge
     k.box(3.5, H, -19, 3, 2.4, 3, BLUE);
-    k.pad(3.8, H + 2.4, -19.1, 1.4, 1.4, 16, { push: { x: 11.2, z: -2.6 }, color: YEL });
+    k.pad(3.8, H + 2.4, -19.1, 1.4, 1.4, 16, { color: YEL });
     // plates + a jar on the counter (front half - the upper cabinets hang over the back half)
     k.box(-26, H, -19, 3, 1.2, 3, '#ffffff');
     k.box(-2, H, -19.2, 2, 3, 2, YEL);
@@ -147,7 +147,7 @@ defineMap({
     k.ramp(0.5, 4, 3.02, 1.4, 6.4, 8.4, '+x', STEEL, { base: 6.0 });   // a spoon resting from the table up onto the island
     k.deco(-12, 6.4, 9.5, 2.6, 0.12, 2.6, '#ffffff');                    // plates
     k.deco(-3.5, 6.4, 4, 2.6, 0.12, 2.6, '#ffffff');
-    k.pad(-12, 6.4, 6, 1.4, 1.4, 18.5, { push: { x: 4, z: 1 }, color: YEL });   // up onto the lamp
+    k.pad(-12, 6.4, 6, 1.4, 1.4, 18.5, { color: YEL });   // up onto the lamp
     // the lamp over the table
     k.box(-8, 10.4, 7, 3, 1.4, 3, YEL, { emissive: '#6a5000' });
     k.deco(-8, 11.8, 7, 0.12, 7.2, 0.12, DARK);

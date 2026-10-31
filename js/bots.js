@@ -180,16 +180,25 @@ const Nav = {
       for (const e of n.e) { seen.add(e.to); for (const e2 of this.nodes[e.to].e) seen.add(e2.to); }
       n.open = seen.size;
     }
-    // jump pads: simulate one launch to see where it lands
+    // jump pads have no direction: you fly the way you run onto them. Try a running launch in 8
+    // directions and keep each one that lands somewhere new
     for (const pd of W.pads) {
       const src = this.nodes.findIndex((n) => n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.6 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.6);
       if (src < 0) continue;
-      const p = new LocalPlayer();
-      p.teleport([pd.x, pd.y + 0.05, pd.z]);
-      const idle = { f: 0, r: 0, run: false, crouch: false };
-      for (let s = 0; s < 360; s++) { p.step(1 / 120, idle); if (s > 30 && p.grounded) break; }
-      const to = this.nearest(p.pos, 2);
-      for (const n of this.nodes) if (n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.6 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.6 && to >= 0) n.e.push({ to, t: NAV_PAD, c: 3, pad: [pd.x, pd.z] });
+      const idle = { f: 0, r: 0, run: false, crouch: false }, seenTo = new Set();
+      for (let a = 0; a < 8; a++) {
+        const dx = Math.cos(a * Math.PI / 4), dz = Math.sin(a * Math.PI / 4);
+        const p = new LocalPlayer();
+        p.teleport([pd.x, pd.y + 0.05, pd.z]);
+        p.vel.set(dx * M.runSpeed, 0, dz * M.runSpeed);
+        let up = false;
+        for (let s = 0; s < 420; s++) { p.step(1 / 120, idle); if (p.pos.y > pd.y + 1) up = true; if (up && p.grounded) break; if (p.pos.y < W.map.killY) break; }
+        if (!up || !p.grounded) continue;
+        const to = this.nearest(p.pos, 2), src2 = this.nearest({ x: pd.x, y: pd.y, z: pd.z }, 2);
+        if (to < 0 || to === src2 || seenTo.has(to) || Math.abs(this.nodes[to].y - pd.y) < 0.5 && Math.hypot(this.nodes[to].x - pd.x, this.nodes[to].z - pd.z) < 4) continue;
+        seenTo.add(to);
+        for (const n of this.nodes) if (n.pad && Math.abs(n.x - pd.x) <= pd.w / 2 + 0.6 && Math.abs(n.z - pd.z) <= pd.d / 2 + 0.6) n.e.push({ to, t: NAV_PAD, c: 4, pad: [pd.x, pd.z, dx, dz] });
+      }
     }
     this.ms = Math.round(performance.now() - t0);
   },
@@ -503,11 +512,19 @@ class Bot {
       // big drop: come to a near stop at the edge, then step off, so we land where we meant to
       if (from && from.y - next.y > 1.2 && p.grounded) { inp.run = false; if (dist < 2.2 && p.hspeed() > 2.5) inp.f = 0; }
     }
-    // a pad: walk to its middle, then let it carry us (the landing was worked out without steering)
+    // a pad: get behind it, then run straight over it the way we want to fly (no steering in the air)
     if (type === NAV_PAD) {
       const e = Nav.edge(this.route.path[this.pi - 1], this.route.path[this.pi], NAV_PAD);
       if (!p.grounded) inp.f = 0;
-      else if (e && e.pad) { p.yaw = Math.atan2(-(e.pad[0] - p.pos.x), -(e.pad[1] - p.pos.z)); inp.f = 1; inp.run = false; }
+      else if (e && e.pad) {
+        const [px, pz, dx, dz] = e.pad, back = { x: px - dx * 2.2, z: pz - dz * 2.2 };
+        const along = (p.pos.x - px) * dx + (p.pos.z - pz) * dz, side = Math.abs((p.pos.x - px) * dz - (p.pos.z - pz) * dx);
+        const lined = along < -0.3 && side < 0.5;   // behind the pad, on its line
+        const aim = lined ? { x: px + dx * 3, z: pz + dz * 3 } : back;
+        p.yaw = Math.atan2(-(aim.x - p.pos.x), -(aim.z - p.pos.z));
+        inp.f = 1;
+        inp.run = lined;
+      }
     }
     // mantles and hops: square up to the wall once we're touching it
     if ((type === NAV_MANTLE || type === NAV_JUMP) && !p.grounded && p.wall) { p.yaw = Math.atan2(p.wall.n.x, p.wall.n.z); inp.f = 1; }

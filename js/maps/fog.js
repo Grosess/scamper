@@ -156,7 +156,7 @@ defineMap({
     // ---- north yards ----
     k.box(-20, 0, -20, 2.4, 2.6, 2.4, WOOD);                     // shed
     k.box(-16.5, 0, -21.5, 1, 0.4, 3, TRUNK);                    // garden bed
-    k.pad(-0.7, 0, -22.3, 1.6, 1.6, 16, { look: 'tramp', color: BLUE, push: { x: -8.8, z: 8.8 } });
+    k.pad(-0.7, 0, -22.3, 1.6, 1.6, 16, { look: 'tramp', color: BLUE });
     k.box(-1.8, 0, -20, 1.8, 0.75, 0.9, WOOD);                    // picnic table + benches
     k.box(-1.8, 0, -21, 1.8, 0.45, 0.35, WOOD);
     k.box(-1.8, 0, -19, 1.8, 0.45, 0.35, WOOD);
@@ -177,7 +177,7 @@ defineMap({
     k.water(-9.5, 0.92, 19.5, 4.4, 4.4, '#6fa8c8', 0.85);
     k.box(9.25, 0, 21, 4.5, 3.0, 5, CURB);                         // detached garage
     k.deco(9.25, 0, 18.46, 3.4, 2.4, 0.08, FENCE);
-    k.pad(17.2, 0, 18.6, 1.6, 1.6, 16, { look: 'tramp', color: RED, push: { x: 0, z: -4.5 } });
+    k.pad(17.2, 0, 18.6, 1.6, 1.6, 16, { look: 'tramp', color: RED });
     k.box(22.4, 0, 21.5, 1.2, 1.0, 1.4, BRICK);                    // doghouse
 
     // ---- the park (between the south houses): fort + slide, lookout deck, kick tower, tree ----

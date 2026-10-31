@@ -189,7 +189,7 @@ defineMap({
       const h = H.E;
       hallBase(h, OR);
       const [px, pz] = lpos(h, 2.5, 9);
-      k.pad(px, 0, pz, 1.6, 1.6, 17, { push: h.push(0, -4.2), color: BL });
+      k.pad(px, 0, pz, 1.6, 1.6, 17, { color: BL });
       lbox(h, -5, -4.7, 7.5, D, 0, TOP, null, GLASS);                 // partitions: see through, can't pass or kick
       lbox(h, 0, 0.3, 11.5, D, 0, TOP, null, GLASS);
       lbox(h, 5, W2, 12.5, 12.8, 0, TOP, null, GLASS);
@@ -216,8 +216,8 @@ defineMap({
     slab(k, (6 + A) / 2, L1, -4.25, A - 6, 3.5, UPPER, { t: 0.4 });
     for (const s of [-1, 1]) k.deco(4.25 + s * 1.78, L1 - 0.3, 0, 0.04, 0.16, 2 * A - 0.4, OR, { emissive: '#663000' });
     // floor: launch plates (onto the bridges), vaults, laser bars, juke posts
-    k.pad(-6.5, 0, -20.7, 1.6, 1.6, 20.5, { push: { x: 0, z: 11.5 }, color: OR });
-    k.pad(7.5, 0, 6.5, 1.6, 1.6, 18, { push: { x: -2.6, z: 0 }, color: OR });
+    k.pad(-6.5, 0, -20.7, 1.6, 1.6, 20.5, { color: OR });
+    k.pad(7.5, 0, 6.5, 1.6, 1.6, 18, { color: OR });
     k.box(-6, 0, 1.5, 3, 1.0, 0.6, OR);
     k.box(-0.5, 0, -6.5, 0.6, 1.0, 3, OR);
     laser('x', -2, 6.3, 4.5);
@@ -239,7 +239,7 @@ defineMap({
     k.box(18.1, 0, -16, 0.6, L1 - 0.4, 5, null, KICK);
     // SE: launch plate under a hole
     corner(1, 1, [14, 18, 14, 18], BL);
-    k.pad(16, 0, 16.6, 1.6, 1.6, 15.5, { push: { x: 0, z: -3.7 }, color: BL });
+    k.pad(16, 0, 16.6, 1.6, 1.6, 15.5, { color: BL });
     // SW: step blocks under a hole (1.2 -> 2.4 -> pull up onto the upper room)
     corner(-1, 1, [-18.5, -13.5, 13.5, 18.5], OR);
     k.box(-14.5, 0, 15, 2, 2.4, 2, PANEL);

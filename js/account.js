@@ -197,7 +197,7 @@ const Account = (() => {
         return;
       }
       changed();
-      if (pendingSave) { pendingSave = false; saveTimer = setTimeout(save, 4000); }
+      if (pendingSave) { pendingSave = false; saveTimer = setTimeout(save, 15000); }
     } catch (e) {
       if (e.status === 401) { me = null; changed(); }
       else online = false;
@@ -210,14 +210,14 @@ const Account = (() => {
     get me() { return me; },
     get loading() { return loading || loggingIn; },
     onChange(f) { listeners.push(f); },
-    // the game saved settings or stats: send them up a few seconds later
+    // the game saved settings or stats: send them up a bit later (batched, to go easy on the server)
     dirty() {
       if (!me || online === false) return;
       // wait until this computer has loaded the account first, so old local data can't
       // overwrite newer data saved from another computer
       if (online !== true) { pendingSave = true; return; }
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(save, 4000);
+      saveTimer = setTimeout(save, 15000);
     },
     // you won: ask the server for a prize. Resolves to the prize's id, or null
     // host: a round went live with these players' tickets -> a match id (null = doesn't count)

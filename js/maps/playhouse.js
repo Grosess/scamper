@@ -127,7 +127,7 @@ defineMap({
     plug(4.5, 8.5, -21, -18, BLUE);
 
     // ---- trampolines at two alley crossings ----
-    k.pad(5.8, 0, -5.8, 1.6, 1.6, 27.5, { look: 'tramp', color: BLUE, push: { x: 2.4, z: -2.4 } });  // -> the blue lookout (13.2)
-    k.pad(-6.5, 0, 6.5, 1.6, 1.6, 24, { look: 'tramp', color: RED, push: { x: 1.9, z: 1.9 } });     // -> the blue tower roof (8.8)
+    k.pad(5.8, 0, -5.8, 1.6, 1.6, 27.5, { look: 'tramp', color: BLUE });  // -> the blue lookout (13.2)
+    k.pad(-6.5, 0, 6.5, 1.6, 1.6, 24, { look: 'tramp', color: RED });     // -> the blue tower roof (8.8)
   },
 });

@@ -134,7 +134,7 @@ defineMap({
     span(3, 22, 30, -1.65, 0.5, 14.5, 5.5, C1, KICK);
     span(3, 30, 38, 0, 3, 13.5, 4.5, C1);
     corner(0, 12);                                                        // lap 1 ends above the start
-    k.pad(-21.5, 12, R, 1.4, 1.4, 16, { push: { x: 6, z: 0 } });          // up to lap 2
+    k.pad(-21.5, 12, R, 1.4, 1.4, 16, {});          // up to lap 2
 
     // ================= LAP 2 (blue) =================
     const C2 = LAP[1];
@@ -209,7 +209,7 @@ defineMap({
     mov(0, 8, 0, 0.45, 6, 44, 0.6, PINK, { type: 'spin', speed: 2.5 });
     mov(0, 14, 0, 0.45, 6, 44, 0.6, PINK, { type: 'spin', speed: -3, phase: 1 });
     k.box(0, 43, R, 6, 1, 6, GOLD);                                       // cannon platform
-    k.pad(0, 44, 20.5, 1.6, 1.6, 22, { push: { x: 0, z: -14.5 }, color: '#ff6bd6' });
+    k.pad(0, 44, 20.5, 1.6, 1.6, 22, { color: '#ff6bd6' });
     // parapet around the far sides of the spire top, so the cannon can't fling you off
     k.box(0, 52, -5.4, 10.8, 1, 0.8, GOLD);
     k.box(-5.4, 52, 0.4, 0.8, 1, 9.2, GOLD);

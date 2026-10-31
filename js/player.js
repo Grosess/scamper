@@ -201,7 +201,10 @@ class LocalPlayer {
     const pad = World.padAt(this);
     if (pad) {
       v.y = pad.power;
-      if (pad.push) { v.x = pad.push.x; v.z = pad.push.z; }
+      // pads have no direction of their own: you fly the way you were already moving, at least a
+      // bit faster than running (standing still = straight up)
+      const hs = Math.hypot(v.x, v.z);
+      if (hs > 1) { const k = Math.max(hs, CONFIG.move.runSpeed * 1.1) / hs; v.x *= k; v.z *= k; }
       this.grounded = false;
       this.coyote = 0;
       this.lastKickN = null;

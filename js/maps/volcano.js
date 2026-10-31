@@ -113,7 +113,7 @@ defineMap({
     k.mover(-6, -3, 11, 2, 12, 2, BASALT, { type: 'slide', dy: 2, period: 3.4, phase: 0 });
     k.mover(-3, -3, 11, 2, 12, 2, BASALT, { type: 'slide', dy: 2, period: 3.4, phase: 0.5 });
     // geyser: blasts you up onto the lap 3 shoulder
-    k.pad(6, 10, 12, 1.6, 1.6, 30, { push: { x: 0, z: -2.4 }, color: '#ff8a3d' });
+    k.pad(6, 10, 12, 1.6, 1.6, 30, { color: '#ff8a3d' });
 
     // ===== LAP 3 =====
     // two rotating rock platforms across the east chasm (they turn you as they spin)

@@ -78,8 +78,8 @@ defineMap({
     k.box(-15.2, 0, 4.9, 2.4, 1.4, 2.4, CRATE);
     k.box(-15.2, 0, 7.3, 2.4, 2.8, 2.4, CRATE);
     // pads by the towers: straight up onto the tower top
-    k.pad(2.5, 0, -22.5, 1.4, 1.4, 24, { push: { x: -8.1, z: 8.1 } });
-    k.pad(-2.5, 0, 22.5, 1.4, 1.4, 24, { push: { x: 8.1, z: -8.1 } });
+    k.pad(2.5, 0, -22.5, 1.4, 1.4, 24, {});
+    k.pad(-2.5, 0, 22.5, 1.4, 1.4, 24, {});
 
     // ---- the middle: four juke posts and a slide table ----
     for (const [x, z] of [[2.6, 2.6], [-2.6, 2.6], [2.6, -2.6], [-2.6, -2.6]]) k.box(x, 0, z, 1.2, 3.2, 1.2, YEL);

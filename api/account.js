@@ -136,8 +136,8 @@ module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (!DB_URL || !DB_TOKEN) return res.status(503).json({ error: 'Accounts are not switched on for this server yet.' });
-  // the public game list. Vercel's edge caches this answer for 10s, so however many people are
-  // looking at the list, the database is read at most about 6 times a minute
+  // the public game list. Vercel's edge caches this answer for a few seconds, so however many
+  // people are looking at the list, the database is read at most about 10 times a minute
   if (req.method === 'GET') {
     try {
       const all = (await redis('HGETALL', 'lobbies')) || [], now = Date.now(), list = [], stale = [];
@@ -146,7 +146,7 @@ module.exports = async (req, res) => {
       }
       if (stale.length) await redis('HDEL', 'lobbies', ...stale);
       list.sort((a, b) => b.n - a.n);
-      res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=20');
+      res.setHeader('Cache-Control', 'public, s-maxage=6, stale-while-revalidate=6');
       return res.json({ lobbies: list.slice(0, 40) });
     } catch (e) { return res.status(500).json({ error: 'Server error.' }); }
   }
