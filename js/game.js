@@ -2950,24 +2950,17 @@ async function openCrate(match, starter, preview) {
     const tease = (minRank) => ofTier(ranks[Math.min(5, minRank + Math.floor(Math.random() * (6 - minRank)))]);
     if (Math.random() < 0.75) items[WIN + 1] = tease(Math.max(3, rankOf(prize) + 1));   // just past the prize: something better
     if (Math.random() < 0.5) items[WIN - 1] = tease(Math.max(2, rankOf(prize)));
-    // staged moments, just for drama (the prize itself was already decided by the server). At most
-    // one per crate, each only now and then:
-    //   myth     a mythic sliver right next to your prize: it creeps just past it, or stops just short
-    //   legend   the same with a legendary
-    //   fakeout  a legendary right before yours, and it stops just barely past it
-    //   stairs   the rarities climb right before yours: uncommon, rare, epic, legendary
-    // (the developer panel can force one for previews)
+    // staged moments, just for drama: only WHERE things sit on the line changes - never how the
+    // wheel moves or where it stops (the server already picked the prize). Now and then a mythic
+    // (1 in 25) or a legendary (1 in 20) sits right before your prize, so the wheel rolls over it
+    // and lands on yours. (The developer panel can force one for previews.)
     const roll = Math.random(), pr = rankOf(prize), forced = preview && $('devTrick').value;
-    let stage = prize.tier === 'mythic' ? 'none' : roll < 0.04 ? 'myth' : roll < 0.09 ? 'legend' : roll < 0.14 ? 'fakeout' : roll < 0.18 ? 'stairs' : 'none';
-    if (forced && forced !== 'random') stage = prize.tier === 'mythic' ? 'none' : forced;
-    if (pr >= 4 && (stage === 'legend' || stage === 'stairs' || stage === 'fakeout')) stage = 'myth';
+    let stage = roll < 0.04 ? 'myth' : roll < 0.09 ? 'legend' : 'none';
+    if (forced && forced !== 'random') stage = forced;
+    if (pr >= ranks.indexOf(stage === 'myth' ? 'mythic' : 'legendary')) stage = 'none';   // only ever tease something better
     const keep = new Set([WIN]), put = (i, tier) => { items[i] = ofTier(tier); keep.add(i); };
-    const side = Math.random() < 0.5 ? -1 : 1;
-    if (stage === 'myth') put(WIN + side, 'mythic');
-    if (stage === 'legend') put(WIN + side, 'legendary');
-    if (stage === 'fakeout') put(WIN - 1, 'legendary');
-    if (stage === 'stairs') ['uncommon', 'rare', 'epic', 'legendary'].forEach((tid, k) => put(WIN - 4 + k, tid));
-    const myth = stage === 'myth' || stage === 'legend' ? side : 0;   // which side the near miss is on
+    if (stage === 'myth') put(WIN - 1, 'mythic');
+    if (stage === 'legend') put(WIN - 1, 'legendary');
     // no two of the same rarity next to each other anywhere on the line (staged slots stay put)
     for (let i = 0; i < N; i++) {
       if (keep.has(i)) continue;
@@ -2988,9 +2981,8 @@ async function openCrate(match, starter, preview) {
     const half = wrap.clientWidth / 2;
     // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
     const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
-    const into = prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : myth < 0 ? 0.02 + Math.random() * 0.04 : myth > 0 ? 0.94 + Math.random() * 0.04 : frac;
-    const fin = stage === 'fakeout' ? 0.03 + Math.random() * 0.05 : into;
-    const end = left[WIN] + wOf(prize) * fin - half;
+    const into = prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : frac;
+    const end = left[WIN] + wOf(prize) * into - half;
     // the path the line takes is always the same: fast at first, then a long, slow crawl. The
     // tricks above only arrange the slots and where it stops - never how it moves
     const OUT = (u) => 1 - Math.pow(1 - u, 5);
