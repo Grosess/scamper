@@ -2954,18 +2954,18 @@ async function openCrate(match, starter, preview) {
     // one per crate, each only now and then:
     //   myth     a mythic sliver right next to your prize: it creeps just past it, or stops just short
     //   legend   the same with a legendary
-    //   fakeout  it slows almost to a stop on a legendary just before yours... hangs... creeps over
-    //   pullback it overshoots onto something great past yours, then slides back
+    //   fakeout  it slows almost to a stop on a legendary just before yours... hangs... clicks over
     //   stairs   the rarities climb right before yours: uncommon, rare, epic, legendary
-    const roll = Math.random(), pr = rankOf(prize);
-    let stage = prize.tier === 'mythic' ? 'none' : roll < 0.05 ? 'myth' : roll < 0.12 ? 'legend' : roll < 0.19 ? 'fakeout' : roll < 0.25 ? 'pullback' : roll < 0.31 ? 'stairs' : 'none';
+    // (the developer panel can force one for previews)
+    const roll = Math.random(), pr = rankOf(prize), forced = preview && $('devTrick').value;
+    let stage = prize.tier === 'mythic' ? 'none' : roll < 0.04 ? 'myth' : roll < 0.09 ? 'legend' : roll < 0.14 ? 'fakeout' : roll < 0.18 ? 'stairs' : 'none';
+    if (forced && forced !== 'random') stage = prize.tier === 'mythic' ? 'none' : forced;
     if (pr >= 4 && (stage === 'legend' || stage === 'stairs' || stage === 'fakeout')) stage = 'myth';
     const keep = new Set([WIN]), put = (i, tier) => { items[i] = ofTier(tier); keep.add(i); };
     const side = Math.random() < 0.5 ? -1 : 1;
     if (stage === 'myth') put(WIN + side, 'mythic');
     if (stage === 'legend') put(WIN + side, 'legendary');
     if (stage === 'fakeout') put(WIN - 1, 'legendary');
-    if (stage === 'pullback') put(WIN + 1, Math.random() < 0.3 ? 'mythic' : pr >= 3 ? 'legendary' : 'epic');
     if (stage === 'stairs') ['uncommon', 'rare', 'epic', 'legendary'].forEach((tid, k) => put(WIN - 4 + k, tid));
     const myth = stage === 'myth' || stage === 'legend' ? side : 0;   // which side the near miss is on
     // no two of the same rarity next to each other anywhere on the line (staged slots stay put)
@@ -2989,13 +2989,12 @@ async function openCrate(match, starter, preview) {
     // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
     const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
     const into = prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : myth < 0 ? 0.02 + Math.random() * 0.04 : myth > 0 ? 0.94 + Math.random() * 0.04 : frac;
-    const fin = stage === 'fakeout' ? 0.04 + Math.random() * 0.06 : stage === 'pullback' ? 0.65 + Math.random() * 0.2 : into;
+    const fin = stage === 'fakeout' ? 0.04 + Math.random() * 0.06 : into;
     const end = left[WIN] + wOf(prize) * fin - half;
     // the path the line takes: fast at first, then a long, slow crawl (plus the staged detours)
     const OUT = (u) => 1 - Math.pow(1 - u, 5), HOLD = () => 0, INOUT = (u) => (1 - Math.cos(Math.PI * u)) / 2;
     let keys = [[0, 0], [1, end, OUT]], T = 8200;
     if (stage === 'fakeout') { const x1 = left[WIN] - 5 - half; keys = [[0, 0], [0.78, x1, OUT], [0.88, x1, HOLD], [1, end, INOUT]]; T = 9600; }
-    if (stage === 'pullback') { const x1 = left[WIN + 1] + Math.min(20, wOf(items[WIN + 1]) * 0.4) - half; keys = [[0, 0], [0.84, x1, OUT], [1, end, INOUT]]; T = 9200; }
     const pathX = (k) => {
       for (let i = 1; i < keys.length; i++) if (k <= keys[i][0]) { const [k0, x0] = keys[i - 1], [k1, x1, e] = keys[i]; return x0 + (x1 - x0) * e((k - k0) / (k1 - k0)); }
       return end;
@@ -3004,7 +3003,14 @@ async function openCrate(match, starter, preview) {
     let last = -1, tense = false;
     await new Promise((done) => {
       const f = (now) => {
-        const k = Math.min(1, (now - t0) / T), x = pathX(k);
+        const k = Math.min(1, (now - t0) / T), raw = pathX(k);
+        // like a prize wheel: as it slows, it catches against each edge (a peg) and then clicks
+        // over it - inside a slot it eases up to the edge, and jumps on just after crossing it
+        let slot = 0;
+        while (slot < N - 1 && left[slot + 1] <= raw + half) slot++;
+        const sw = left[slot + 1] - left[slot], fr = Math.max(0, Math.min(1, (raw + half - left[slot]) / sw));
+        const peg = Math.max(0, Math.min(1, (k - 0.5) / 0.3));
+        const x = left[slot] + sw * (fr + ((1 - (1 - fr) * (1 - fr)) - fr) * peg) - half;
         reel.style.transform = `translateX(${-x}px)`;
         if (!tense && k > 0.72) {   // the last stretch: the marker pulses, a low tone climbs
           tense = true;
@@ -3016,7 +3022,8 @@ async function openCrate(match, starter, preview) {
         while (at > 0 && left[at] > x + half) at--;   // (it can slide back)
         if (at !== last) {
           last = at;
-          tone(700 + 700 * k, 600 + 600 * k, k > 0.72 ? 0.05 : 0.025, 'square', k > 0.72 ? 0.05 : 0.025);   // ticks climb, and get heavier at the end
+          // the click of the peg: sharper and louder the slower it goes
+          tone(900 + 600 * k, 300, k > 0.72 ? 0.045 : 0.025, 'square', k > 0.72 ? 0.06 : 0.025);
           const tt = tierOf(items[at]);
           $('reelInfo').innerHTML = `<b style="--tc:${tt.color}">${tt.name}</b> ${tierChance(tt)}% chance`;
         }
