@@ -2919,7 +2919,8 @@ async function openCrate(match, starter, preview) {
     const W = { common: 92, uncommon: 76, rare: 60, epic: 46, legendary: 34, mythic: 24 };
     const N = 70, WIN = 60, items = [];
     for (let i = 0; i < N; i++) items.push(i === WIN ? prize : ITEMS.roll([], Math.random));
-    reel.innerHTML = items.map((it) => `<i style="width:${W[it.tier]}px;background:${it.hex}"></i>`).join('');
+    // each slot shows its rarity's color, not the color itself - that's only revealed at the end
+    reel.innerHTML = items.map((it) => `<i style="width:${W[it.tier]}px;background:${tierOf(it).color}"></i>`).join('');
     const left = [0];
     for (let i = 0; i < N; i++) left.push(left[i] + W[items[i].tier]);
     reel.style.transform = 'translateX(0)';
