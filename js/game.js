@@ -698,7 +698,7 @@ const ownsCos = () => devOn();   // cosmetics (neon, ghost, glint, rainbow) are 
 function fixLook() {
   if (!Account.me) { settings.color = GUEST.body; settings.eye = GUEST.eye; return; }
   const own = ownedColors();
-  if (!own.length) return;
+  if (!own.length) { settings.color = GUEST.body; settings.eye = GUEST.eye; return; }   // no colors yet: open your crates
   if (!own.includes(settings.color)) settings.color = own[0];
   // body and eyes can't match - except in developer mode
   if (!own.includes(settings.eye) || (settings.eye === settings.color && !devOn())) settings.eye = own.find((h) => h !== settings.color) || own[0];
@@ -1642,7 +1642,8 @@ function hostHandle(from, m) {
     game.scores[from] = { tags: 0 };
     if (isPlaying() && game.mode === 'koth') game.koth.pts[from] = 0;
     if (game.gp) game.gp.pts[from] = game.gp.pts[from] || 0;
-    hostFeed(`${name} joined`);
+    // an account is announced once the server has confirmed its name (see hostApplyLook)
+    if (!m.ticket) hostFeed(`${name} joined`);
     pushState();
     autoMode();
     teleportPlayer(from, randomSpawn(), World.map.kind === 'race' ? World.map.race.yaw : undefined);
@@ -1664,7 +1665,9 @@ function hostHandle(from, m) {
 
 // what someone may look like. acct: what the account server says they own (null = a guest)
 function lookFor(acct, m) {
-  if (!acct || !acct.colors || !acct.colors.length) {
+  // a real account that hasn't opened its welcome crates yet: its own name, the guest look
+  if (acct && acct.name && (!acct.colors || !acct.colors.length)) return { name: acct.name, color: GUEST.body, eye: GUEST.eye, cos: null };
+  if (!acct) {
     const g = String(m.name || '').toLowerCase();
     return { name: ITEMS.GUEST_NAMES.includes(g) ? g : ITEMS.GUEST_NAMES[Math.floor(Math.random() * ITEMS.GUEST_NAMES.length)], color: GUEST.body, eye: GUEST.eye, cos: null };
   }
@@ -1677,7 +1680,8 @@ function hostApplyLook(id, m, acct) {
   if (!p || p.cpu) return;
   const L = lookFor(acct, m), old = p.name, name = L.name === old ? old : uniqueName(L.name);
   ensurePlayer(id, name, L.color, L.eye, L.cos);
-  if (name !== old && !p.joining) hostFeed(`${old} is now ${name}`);
+  if (p.joining) hostFeed(`${name} joined`);   // announced with their real name
+  else if (name !== old) hostFeed(`${old} is now ${name}`);
   p.joining = false;
   if (p.skinWant !== undefined) hostSetSkin(id, p.skinWant);
   pushState();
@@ -1692,7 +1696,11 @@ function hostVerify(id, m, tries = 0) {
   Account.verify(m.ticket).then((v) => {
     const q = players.get(id);
     if (!q || q.ticket !== m.ticket) return;
-    if (v === 'offline') { if (tries < 4) setTimeout(() => hostVerify(id, m, tries + 1), 3000 * (tries + 1)); return; }
+    if (v === 'offline') {
+      if (tries < 4) setTimeout(() => hostVerify(id, m, tries + 1), 3000 * (tries + 1));
+      else if (q.joining) { q.joining = false; hostFeed(`${q.name} joined`); }   // couldn't check: they stay a guest
+      return;
+    }
     q.acct = v;
     hostApplyLook(id, m, v);
   });
