@@ -690,3 +690,11 @@ span.skel, b.skel { display: inline-block; min-width: 64px; }
 .pub-list li.pub-empty { display: block; font-size: 13px; color: var(--muted); }
 /* the logo: angular */
 .logo { font-family: 'Russo One', Impact, sans-serif; font-size: 44px; letter-spacing: 0.01em; }
+/* host: pick public / private */
+.host-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.host-choice .btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 10px; }
+.host-choice .btn b { font-size: 17px; }
+.host-choice .btn span { font: 500 12px Rubik, sans-serif; color: var(--muted); }
+.vis-row { margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--line); font-size: 12px; color: var(--muted); }
+.vis-tag { display: inline-block; margin-right: 6px; padding: 3px 7px; font: 800 11px Rubik, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; background: var(--line); color: var(--ink); }
+.vis-tag.pub { background: var(--mint); }

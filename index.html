@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Russo+One&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=49">
+  <link rel="stylesheet" href="style.css?v=50">
 </head>
 <body>
 
@@ -75,8 +75,16 @@
               <div id="qIn" class="q-in hidden">Playing as <b id="qName"></b> <a href="#" id="qOut">Log out</a></div>
             </div>
             <div class="tile action host-card">
-              <div class="join-head"><h3>Start a lobby</h3><div class="pills vis-pills" id="hostVis"><button class="pill" type="button" data-v="private">Private</button><button class="pill" type="button" data-v="public">Public</button></div></div>
+              <h3>Start a lobby</h3>
               <button id="hostBtn" class="btn primary big-btn">Host game</button>
+              <div id="hostChoice" class="host-choice hidden">
+                <button class="btn primary" type="button" data-v="public"><b>Public</b><span>Anyone can find and join it</span></button>
+                <button class="btn" type="button" data-v="private"><b>Private</b><span>Only people with the code</span></button>
+              </div>
+            </div>
+            <div class="tile action public-card">
+              <div class="join-head"><h3>Public games</h3><button id="pubRefresh" class="chip-btn" type="button">Refresh</button></div>
+              <ul id="pubList" class="pub-list"></ul>
             </div>
             <div class="tile action join-card">
               <div class="join-head">
@@ -92,10 +100,6 @@
               <input id="codeInput" type="hidden">
               <button id="joinBtn" class="btn big-btn">Join game</button>
               <div id="menuStatus" role="status"></div>
-            </div>
-            <div class="tile action public-card">
-              <div class="join-head"><h3>Public games</h3><button id="pubRefresh" class="chip-btn" type="button">Refresh</button></div>
-              <ul id="pubList" class="pub-list"></ul>
             </div>
           </div>
         </div>
@@ -278,7 +282,7 @@
           <div class="tile">
             <div class="tile-kicker" id="playerCount"></div>
             <ul id="playerList" class="player-list"></ul>
-            <div id="visRow" class="cpu-row hidden"><span class="cpu-lbl">Lobby</span><div class="pills vis-pills" id="hostVis2"><button class="pill" type="button" data-v="private">Private</button><button class="pill" type="button" data-v="public">Public</button></div></div>
+            <div id="visRow" class="vis-row hidden"></div>
             <div id="cpuRow" class="cpu-row hidden">
               <span class="cpu-lbl">Add a CPU</span>
               <div class="pills" id="cpuDiff"><button class="pill" data-v="easy">Easy</button><button class="pill" data-v="medium">Medium</button><button class="pill" data-v="hard">Hard</button></div>
@@ -421,32 +425,32 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=49"></script>
-  <script src="js/config.js?v=49"></script>
-  <script src="js/map.js?v=49"></script>
-  <script src="js/maps/rooftops.js?v=49"></script>
-  <script src="js/maps/shipyard.js?v=49"></script>
-  <script src="js/maps/corridors.js?v=49"></script>
-  <script src="js/maps/fog.js?v=49"></script>
-  <script src="js/maps/playhouse.js?v=49"></script>
-  <script src="js/maps/moon.js?v=49"></script>
-  <script src="js/maps/kitchen.js?v=49"></script>
-  <script src="js/maps/clocktower.js?v=49"></script>
-  <script src="js/maps/lab.js?v=49"></script>
-  <script src="js/maps/skatepark.js?v=49"></script>
-  <script src="js/maps/bounce.js?v=49"></script>
-  <script src="js/maps/infinite.js?v=49"></script>
-  <script src="js/maps/climb.js?v=49"></script>
-  <script src="js/maps/chambers.js?v=49"></script>
-  <script src="js/maps/volcano.js?v=49"></script>
-  <script src="js/character.js?v=49"></script>
-  <script src="js/world.js?v=49"></script>
-  <script src="js/player.js?v=49"></script>
-  <script src="js/bots.js?v=49"></script>
-  <script src="js/net.js?v=49"></script>
-  <script src="js/store.js?v=49"></script>
-  <script src="js/items.js?v=49"></script>
-  <script src="js/account.js?v=49"></script>
-  <script src="js/game.js?v=49"></script>
+  <script src="js/look.js?v=50"></script>
+  <script src="js/config.js?v=50"></script>
+  <script src="js/map.js?v=50"></script>
+  <script src="js/maps/rooftops.js?v=50"></script>
+  <script src="js/maps/shipyard.js?v=50"></script>
+  <script src="js/maps/corridors.js?v=50"></script>
+  <script src="js/maps/fog.js?v=50"></script>
+  <script src="js/maps/playhouse.js?v=50"></script>
+  <script src="js/maps/moon.js?v=50"></script>
+  <script src="js/maps/kitchen.js?v=50"></script>
+  <script src="js/maps/clocktower.js?v=50"></script>
+  <script src="js/maps/lab.js?v=50"></script>
+  <script src="js/maps/skatepark.js?v=50"></script>
+  <script src="js/maps/bounce.js?v=50"></script>
+  <script src="js/maps/infinite.js?v=50"></script>
+  <script src="js/maps/climb.js?v=50"></script>
+  <script src="js/maps/chambers.js?v=50"></script>
+  <script src="js/maps/volcano.js?v=50"></script>
+  <script src="js/character.js?v=50"></script>
+  <script src="js/world.js?v=50"></script>
+  <script src="js/player.js?v=50"></script>
+  <script src="js/bots.js?v=50"></script>
+  <script src="js/net.js?v=50"></script>
+  <script src="js/store.js?v=50"></script>
+  <script src="js/items.js?v=50"></script>
+  <script src="js/account.js?v=50"></script>
+  <script src="js/game.js?v=50"></script>
 </body>
 </html>

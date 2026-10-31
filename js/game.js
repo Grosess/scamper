@@ -3651,7 +3651,17 @@ function enterGame() {
   updatePauseUI();
 }
 
-$('hostBtn').onclick = () => {
+// Host game -> pick Public or Private (fixed for that lobby), then host
+$('hostBtn').onclick = () => { $('hostBtn').classList.add('hidden'); $('hostChoice').classList.remove('hidden'); };
+$('hostChoice').onclick = (e) => {
+  const b = e.target.closest('[data-v]');
+  if (!b) return;
+  lobbyPublic = b.dataset.v === 'public';
+  $('hostChoice').classList.add('hidden');
+  $('hostBtn').classList.remove('hidden');
+  hostGame();
+};
+function hostGame() {
   audio();
   const name = getName();
   setStatus('Creating game…');
@@ -3668,7 +3678,7 @@ $('hostBtn').onclick = () => {
     sendSkin();
     lobbyBeat();
   });
-};
+}
 
 function join() {
   audio();
@@ -3701,27 +3711,18 @@ $('joinBtn').onclick = join;
 // everyone's "Public games" list; it drops off about a minute after it stops. Private games are
 // only joinable with the code, like before.
 const lobbyKey = [...crypto.getRandomValues(new Uint8Array(12))].map((x) => x.toString(16).padStart(2, '0')).join('');
-let listedCode = '';
+let listedCode = '', lobbyPublic = false;   // picked when you host; can't change after
 function renderVis() {
-  for (const id of ['hostVis', 'hostVis2']) $(id).querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === (settings.hostPublic ? 'public' : 'private')));
+  $('visRow').innerHTML = lobbyPublic ? '<span class="vis-tag pub">Public lobby</span> anyone can find it' : '<span class="vis-tag">Private lobby</span> join with the code';
 }
 function lobbyBeat() {
-  const listed = inGame && Net.isHost && settings.hostPublic && Net.code;
+  const listed = inGame && Net.isHost && lobbyPublic && Net.code;
   if (!listed) { if (listedCode) { Account.lobbyDown(listedCode, lobbyKey); listedCode = ''; } return; }
   listedCode = Net.code;
   Account.lobbyUp({ code: Net.code, key: lobbyKey, host: myName(), mode: modeInfo(isPlaying() ? game.mode : getSetup().mode).name, map: World.map.name,
     n: [...players.values()].filter((p) => !p.cpu).length, playing: isPlaying() });
 }
 setInterval(lobbyBeat, 30000);
-const setVis = (e) => {
-  const b = e.target.closest('.pill');
-  if (!b) return;
-  settings.hostPublic = b.dataset.v === 'public';
-  saveSettings();
-  renderVis();
-  lobbyBeat();
-};
-$('hostVis').onclick = $('hostVis2').onclick = setVis;
 addEventListener('pagehide', () => { if (listedCode) Account.lobbyDown(listedCode, lobbyKey, true); });
 renderVis();
 // the list on the Play page: refreshed every 20s while you're looking at it
