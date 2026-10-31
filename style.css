@@ -753,3 +753,7 @@ html.has-acct #nameHint { visibility: hidden; }
 .invite-card .chip-btn { width: 100%; }
 .card-h { margin: 0 0 6px; }
 .lobby-side h3 { font-size: 22px; }
+.acc-rename { margin-top: 14px; padding-top: 12px; border-top: 2px solid var(--line); }
+.acc-rename .btn { width: auto; padding: 9px 16px; font-size: 14px; }
+#accRenameForm { margin-top: 10px; }
+.acc-rename .note { margin: 8px 0 0; font-size: 12px; }

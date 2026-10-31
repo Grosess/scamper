@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Russo+One&family=Rubik:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=65">
+  <link rel="stylesheet" href="style.css?v=66">
 </head>
 <body>
 
@@ -125,11 +125,20 @@
               <label class="field">Password<input id="accPass" type="password" maxlength="72" autocomplete="new-password"></label>
               <label class="field" id="accConfirmRow">Password again<input id="accPass2" type="password" maxlength="72" autocomplete="new-password"></label>
               <button id="accGo" class="btn primary">Create account</button>
-              <p class="note">Without an account you play as a guest: a random name like bobo or kiki, and the guest blue. An account gets you your own name (one per account, forever), two welcome crates to open, and a prize crate every time you win a game against other people. There's no password reset, so don't forget it.</p>
+              <p class="note">Without an account you play as a guest: a random name like bobo or kiki, and the guest blue. An account gets you your own unique name (you can change it once every 30 days), two welcome crates to open, and a prize crate every time you win a game against other people. There's no password reset, so don't forget it.</p>
             </div>
             <div id="accIn" class="hidden">
               <p class="acc-who">You're <b id="accName"></b> <span id="accDev" class="acc-dev hidden">DEV</span></p>
               <div id="accCollection"></div>
+              <div class="acc-rename">
+                <button id="accRenameBtn" class="btn" type="button">Change name</button>
+                <div id="accRenameForm" class="hidden">
+                  <label class="field">New name<input id="accNewName" maxlength="14" autocomplete="off" spellcheck="false"></label>
+                  <label class="field">Password<input id="accRenamePass" type="password" maxlength="72" autocomplete="current-password"></label>
+                  <button id="accRenameGo" class="btn primary" type="button">Change my name</button>
+                </div>
+                <p class="note" id="accRenameNote"></p>
+              </div>
               <button id="accLogout" class="btn">Log out</button>
               <a href="#" id="accDelete" class="acc-delete">Delete my account</a>
             </div>
@@ -431,32 +440,32 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/look.js?v=65"></script>
-  <script src="js/config.js?v=65"></script>
-  <script src="js/map.js?v=65"></script>
-  <script src="js/maps/rooftops.js?v=65"></script>
-  <script src="js/maps/shipyard.js?v=65"></script>
-  <script src="js/maps/corridors.js?v=65"></script>
-  <script src="js/maps/fog.js?v=65"></script>
-  <script src="js/maps/playhouse.js?v=65"></script>
-  <script src="js/maps/moon.js?v=65"></script>
-  <script src="js/maps/kitchen.js?v=65"></script>
-  <script src="js/maps/clocktower.js?v=65"></script>
-  <script src="js/maps/lab.js?v=65"></script>
-  <script src="js/maps/skatepark.js?v=65"></script>
-  <script src="js/maps/bounce.js?v=65"></script>
-  <script src="js/maps/infinite.js?v=65"></script>
-  <script src="js/maps/climb.js?v=65"></script>
-  <script src="js/maps/chambers.js?v=65"></script>
-  <script src="js/maps/volcano.js?v=65"></script>
-  <script src="js/character.js?v=65"></script>
-  <script src="js/world.js?v=65"></script>
-  <script src="js/player.js?v=65"></script>
-  <script src="js/bots.js?v=65"></script>
-  <script src="js/net.js?v=65"></script>
-  <script src="js/store.js?v=65"></script>
-  <script src="js/items.js?v=65"></script>
-  <script src="js/account.js?v=65"></script>
-  <script src="js/game.js?v=65"></script>
+  <script src="js/look.js?v=66"></script>
+  <script src="js/config.js?v=66"></script>
+  <script src="js/map.js?v=66"></script>
+  <script src="js/maps/rooftops.js?v=66"></script>
+  <script src="js/maps/shipyard.js?v=66"></script>
+  <script src="js/maps/corridors.js?v=66"></script>
+  <script src="js/maps/fog.js?v=66"></script>
+  <script src="js/maps/playhouse.js?v=66"></script>
+  <script src="js/maps/moon.js?v=66"></script>
+  <script src="js/maps/kitchen.js?v=66"></script>
+  <script src="js/maps/clocktower.js?v=66"></script>
+  <script src="js/maps/lab.js?v=66"></script>
+  <script src="js/maps/skatepark.js?v=66"></script>
+  <script src="js/maps/bounce.js?v=66"></script>
+  <script src="js/maps/infinite.js?v=66"></script>
+  <script src="js/maps/climb.js?v=66"></script>
+  <script src="js/maps/chambers.js?v=66"></script>
+  <script src="js/maps/volcano.js?v=66"></script>
+  <script src="js/character.js?v=66"></script>
+  <script src="js/world.js?v=66"></script>
+  <script src="js/player.js?v=66"></script>
+  <script src="js/bots.js?v=66"></script>
+  <script src="js/net.js?v=66"></script>
+  <script src="js/store.js?v=66"></script>
+  <script src="js/items.js?v=66"></script>
+  <script src="js/account.js?v=66"></script>
+  <script src="js/game.js?v=66"></script>
 </body>
 </html>

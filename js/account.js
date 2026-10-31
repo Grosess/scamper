@@ -32,7 +32,7 @@ const Account = (() => {
     return j;
   }
   const local = () => ({ settings: read(KEYS.settings) || {}, stats: read(KEYS.stats) || {} });
-  const take = (j) => { me = { name: j.name, token: j.token || (me && me.token), ticket: j.ticket, inv: j.inv, dev: !!j.dev, updated: j.updated }; };
+  const take = (j) => { me = { name: j.name, token: j.token || (me && me.token), ticket: j.ticket, inv: j.inv, dev: !!j.dev, updated: j.updated, renamedAt: j.renamedAt || 0 }; };
 
   // ---- the Account page ----
   function status(t, bad) { const s = $('accStatus'); s.textContent = t; s.classList.toggle('bad', !!bad); }
@@ -59,6 +59,10 @@ const Account = (() => {
     $('accNameHint').classList.toggle('hidden', tab !== 'new');
     if (!inn) return;
     $('accName').textContent = me.name;
+    // name changes: once every 30 days
+    const next = (me.renamedAt || 0) + 30 * 86400e3, wait = next > Date.now();
+    $('accRenameBtn').disabled = wait;
+    $('accRenameNote').textContent = wait ? `You can change your name again on ${new Date(next).toLocaleDateString()}.` : 'You can change your name once every 30 days.';
     $('accDev').classList.toggle('hidden', !me.dev || skel);
     if (skel) {   // placeholder rows for the collection
       $('accCollection').innerHTML = ITEMS.TIERS.map(() => '<div class="acc-tier"><span class="skel">rarity</span><span class="acc-bar skel"></span><b class="skel">0/0</b></div>').join('');
@@ -75,7 +79,7 @@ const Account = (() => {
   function checkName() {
     clearTimeout(checkTimer);
     const n = $('accUser').value.trim(), hint = $('accNameHint');
-    if (tab !== 'new' || !n) { hint.textContent = '3-14 of a-z, 0-9 or _. This is your name in every game, and it can\'t be changed.'; hint.className = 'note'; return; }
+    if (tab !== 'new' || !n) { hint.textContent = '3-14 of a-z, 0-9 or _. This is your name in every game (you can change it once every 30 days).'; hint.className = 'note'; return; }
     const local = ITEMS.nameProblem(n);
     if (local) { hint.textContent = local; hint.className = 'note bad'; return; }
     hint.textContent = 'Checking…';
@@ -174,6 +178,24 @@ const Account = (() => {
       changed();
       status('Your account was deleted.');
     } catch (err) { status(err.message, true); }
+  };
+  $('accRenameBtn').onclick = () => { $('accRenameForm').classList.toggle('hidden'); $('accNewName').focus(); };
+  $('accNewName').addEventListener('input', () => { const el = $('accNewName'), v = el.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); if (v !== el.value) el.value = v; });
+  $('accRenameGo').onclick = async () => {
+    const username = $('accNewName').value.trim(), password = $('accRenamePass').value;
+    const p = ITEMS.nameProblem(username);
+    if (p) { status(p + '.', true); return; }
+    if (!password) { status('Type your password to confirm.', true); return; }
+    status('Changing your name…');
+    try {
+      const j = await call({ action: 'rename', token: me.token, username, password });
+      take(j);
+      write(KEYS.last, j.name);
+      $('accNewName').value = $('accRenamePass').value = '';
+      $('accRenameForm').classList.add('hidden');
+      status(`You're now ${j.name}!`);
+      changed();
+    } catch (e) { status(e.message, true); }
   };
   $('privacyLink').onclick = (e) => { e.preventDefault(); $('privacy').classList.remove('hidden'); };
   $('privacyClose').onclick = () => $('privacy').classList.add('hidden');

@@ -17,6 +17,7 @@
 //  POST { action: 'open', token }  (open one of your crates)              -> { prize, inv, ticket }
 //  POST { action: 'verify', ticket } (a host checking a joiner) -> { name, colors, cos, dev }
 //  POST { action: 'logout', token }
+//  POST { action: 'rename', token, username, password }  (once every 30 days) -> profile
 //  POST { action: 'delete', token, password }  -> deletes the account and everything stored with it
 //  profile = { name, token, ticket, inv: { colors: [ids], cos: [ids] }, dev, updated }
 //
@@ -96,13 +97,16 @@ async function getUser(name) {
   const raw = await redis('GET', userKey(name));
   if (!raw) return null;
   const u = JSON.parse(raw);
+  if (u.tombstone) return null;   // a name someone changed away from (reserved for a while)
   const inv = await redis('GET', invKey(name));
   u.inv = cleanInv(inv ? JSON.parse(inv) : u.inv);
   return u;
 }
 const putUser = (u) => redis('SET', userKey(u.name), JSON.stringify(Object.assign({}, u, { inv: undefined })));
 const putInv = (u) => redis('SET', invKey(u.name), JSON.stringify(u.inv));
-const isDev = (name) => DEVS.includes(String(name).toLowerCase());
+// the developer: marked on the account (so it survives a name change), or one of the DEVS names
+const isDev = (u) => !!u && (u.dev === true || DEVS.includes(String(u.name).toLowerCase()));
+const RENAME_DAYS = 30;
 
 const sign = (s) => crypto.createHmac('sha256', SECRET).update(s).digest('base64url');
 function ticketFor(u) {
@@ -120,7 +124,7 @@ async function ticketUser(t) {
   const k = readTicket(t), u = k && (await getUser(k.name));
   return u && (u.gen || '') === k.gen ? u : null;
 }
-const profile = (u, token) => ({ name: u.name, token, ticket: ticketFor(u), inv: u.inv, dev: isDev(u.name), updated: u.updated });
+const profile = (u, token) => ({ name: u.name, token, ticket: ticketFor(u), inv: u.inv, dev: isDev(u), updated: u.updated, renamedAt: u.renamedAt || 0 });
 
 function cleanData(d) {
   if (!d || typeof d !== 'object') return {};
@@ -246,7 +250,7 @@ module.exports = async (req, res) => {
         // only two players need to pass the full check; any winner who took part (moved a bit) gets a crate
         m.eligible = ok ? winners.filter((n) => m.names.includes(n) && +(play[n] || {}).moved >= MATCH_MIN_MOVED) : [];
         // the developer account is exempt from the play checks (it has to test things alone)
-        for (const n of winners) if (isDev(n) && m.names.includes(n) && !m.eligible.includes(n)) m.eligible.push(n);
+        for (const n of winners) if (m.names.includes(n) && !m.eligible.includes(n) && isDev(await getUser(n))) m.eligible.push(n);
         m.active = active;
         m.done = true;
         m.claimed = [];
@@ -266,7 +270,7 @@ module.exports = async (req, res) => {
         const now = Date.now(), day = new Date().toISOString().slice(0, 10), others = m.active.filter((n) => n !== me);
         if (now - (+(await redis('GET', 'lastclaim:' + me)) || 0) < CLAIM_GAP * 1000) return res.status(429).json({ error: 'Too soon for another prize.' });
         // the same two accounts can only win prizes off each other a few times a day
-        let fresh = isDev(me);   // (the developer isn't capped per opponent)
+        let fresh = isDev(user);   // (the developer isn't capped per opponent)
         if (!fresh) for (const o of others) if (!(await limited(`pair:${[me, o].sort().join(':')}:${day}`, PAIR_PER_DAY, 86400))) fresh = true;
         if (!fresh) return res.status(429).json({ error: 'You\'ve won enough off the same players today - play some new people!' });
         if (await limited('claims:' + me + ':' + day, CLAIMS_PER_DAY, 86400)) return res.status(429).json({ error: 'That\'s all the prizes for today!' });
@@ -294,7 +298,7 @@ module.exports = async (req, res) => {
       case 'verify': {
         const user = await ticketUser(b.ticket);
         if (!user) return res.status(401).json({ error: 'Not a real account.' });
-        const dev = isDev(user.name);
+        const dev = isDev(user);
         return res.json({
           name: user.name, dev,
           colors: dev ? ITEMS.COLORS.map((c) => c.hex) : user.inv.colors.map((id) => ITEMS.byId[id]).filter(Boolean).map((c) => c.hex),
@@ -332,6 +336,33 @@ module.exports = async (req, res) => {
         const code = String(b.code || ''), old = /^[A-Z]{4}$/.test(code) && (await redis('HGET', 'lobbies', code));
         if (old && JSON.parse(old).key === String(b.key || '')) await redis('HDEL', 'lobbies', code);
         return res.json({ ok: true });
+      }
+
+      // change your name: once every 30 days, password to confirm. Everything moves to the new name;
+      // the old one stays reserved for 30 days (a developer name, forever). Other devices are logged out
+      case 'rename': {
+        const user = await sessionUser(b.token);
+        if (!user) return res.status(401).json({ error: 'Logged out.' });
+        if (await limited('try:' + user.name.toLowerCase(), 10, 900)) return res.status(429).json({ error: 'Too many tries. Wait 15 minutes.' });
+        const hash = await scrypt(password, user.salt);
+        if (!crypto.timingSafeEqual(hash, Buffer.from(user.hash, 'hex'))) return res.status(401).json({ error: 'Wrong password.' });
+        const left = (user.renamedAt || 0) + RENAME_DAYS * 86400e3 - Date.now();
+        if (left > 0) return res.status(429).json({ error: `You can change your name again in ${Math.ceil(left / 86400e3)} day${left > 86400e3 ? 's' : ''}.` });
+        const problem = ITEMS.nameProblem(name);
+        if (problem) return res.status(400).json({ error: problem + '.' });
+        if (name === user.name.toLowerCase()) return res.status(400).json({ error: 'That\'s already your name.' });
+        const old = user.name, dev = isDev(user), inv = user.inv;
+        const moved = Object.assign({}, user, { name, renamedAt: Date.now(), dev, inv: undefined });
+        const ok = await redis('SET', userKey(name), JSON.stringify(moved), 'NX');
+        if (ok !== 'OK') return res.status(409).json({ error: 'That name is taken.' });
+        moved.inv = inv;
+        await putInv(moved);
+        await redis('DEL', invKey(old));
+        const stone = JSON.stringify({ tombstone: true, name: old, to: name });
+        if (DEVS.includes(old.toLowerCase()) || dev) await redis('SET', userKey(old), stone);
+        else await redis('SET', userKey(old), stone, 'EX', RENAME_DAYS * 86400);
+        await redis('DEL', 'sess:' + b.token);
+        return res.json(Object.assign(profile(moved, await newSession(moved)), { data: moved.data }));
       }
 
       case 'logout': {
