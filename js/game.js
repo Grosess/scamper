@@ -2896,19 +2896,39 @@ async function openCrate(match, starter, preview) {
         setTimeout(() => c.remove(), 1300);
       }
     };
-    // 1. the crate drops in turning, with light already leaking out of its seams
-    await wait(700);
-    // 2. it charges up: shakes harder and spins faster, the light gets brighter, it ticks louder
+    // 1. the crate drops in turning and lands with a thud and a puff of dust
+    $('crateHint').textContent = '';
+    await wait(620);
+    crate.classList.add('landed');
+    tone(110, 50, 0.18, 'sine', 0.12);
+    await wait(250);
+    // 2. it waits for you: click it (or press Enter) - or it opens by itself after a few seconds
+    $('crateHint').textContent = locked ? 'PRESS ENTER TO OPEN' : 'CLICK TO OPEN';
+    crate.classList.add('ready');
+    await new Promise((go) => {
+      const done = () => { clearTimeout(tm); removeEventListener('keydown', key, true); crate.onclick = null; go(); };
+      const key = (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(); } };
+      const tm = setTimeout(done, 5000);
+      addEventListener('keydown', key, true);
+      crate.onclick = done;
+    });
+    $('crateHint').textContent = '';
+    crate.classList.remove('ready');
+    // 3. it charges up: rattles, swells toward you, spins faster, light pours out of the cracks
     crate.classList.add('shake');
     for (let i = 0; i < 14; i++) tone(150 + i * 28, 110 + i * 28, 0.06, 'square', 0.025 + i * 0.004, i * 0.09);
     for (let i = 0; i < 3; i++) setTimeout(() => sparks(6, ['#ffd166', '#fff'], 90), 300 + i * 320);
     await wait(800);
     crate.classList.add('hard');
     await wait(500);
-    // 3. it blows apart: every side flies outward, a pillar of light, sparks everywhere
-    crate.classList.remove('shake', 'hard');
-    crate.classList.add('open');
+    // 4. a split-second freeze on a white flash... then it blows apart: every side flies outward,
+    // a pillar of light, sparks everywhere
+    crate.classList.add('freeze');
     flash('#ffffff');
+    tone(1800, 1800, 0.12, 'sine', 0.05);
+    await wait(170);
+    crate.classList.remove('shake', 'hard', 'freeze');
+    crate.classList.add('open');
     sparks(40, ['#ffd166', '#ffffff', '#ffb347'], 260);
     tone(90, 40, 0.5, 'sawtooth', 0.07);
     tone(300, 1400, 0.35, 'triangle', 0.09);
@@ -2930,13 +2950,27 @@ async function openCrate(match, starter, preview) {
     const tease = (minRank) => ofTier(ranks[Math.min(5, minRank + Math.floor(Math.random() * (6 - minRank)))]);
     if (Math.random() < 0.75) items[WIN + 1] = tease(Math.max(3, rankOf(prize) + 1));   // just past the prize: something better
     if (Math.random() < 0.5) items[WIN - 1] = tease(Math.max(2, rankOf(prize)));
-    // now and then (1 in 20), just to mess with people: a mythic sliver right next to the prize -
-    // the line either creeps just past it onto yours, or stops just short of it
-    const myth = prize.tier !== 'mythic' && Math.random() < 0.05 ? (Math.random() < 0.5 ? -1 : 1) : 0;
-    if (myth) items[WIN + myth] = ofTier('mythic');
-    // no two of the same rarity next to each other anywhere on the line (the prize and the mythic tease stay put)
+    // staged moments, just for drama (the prize itself was already decided by the server). At most
+    // one per crate, each only now and then:
+    //   myth     a mythic sliver right next to your prize: it creeps just past it, or stops just short
+    //   legend   the same with a legendary
+    //   fakeout  it slows almost to a stop on a legendary just before yours... hangs... creeps over
+    //   pullback it overshoots onto something great past yours, then slides back
+    //   stairs   the rarities climb right before yours: uncommon, rare, epic, legendary
+    const roll = Math.random(), pr = rankOf(prize);
+    let stage = prize.tier === 'mythic' ? 'none' : roll < 0.05 ? 'myth' : roll < 0.12 ? 'legend' : roll < 0.19 ? 'fakeout' : roll < 0.25 ? 'pullback' : roll < 0.31 ? 'stairs' : 'none';
+    if (pr >= 4 && (stage === 'legend' || stage === 'stairs' || stage === 'fakeout')) stage = 'myth';
+    const keep = new Set([WIN]), put = (i, tier) => { items[i] = ofTier(tier); keep.add(i); };
+    const side = Math.random() < 0.5 ? -1 : 1;
+    if (stage === 'myth') put(WIN + side, 'mythic');
+    if (stage === 'legend') put(WIN + side, 'legendary');
+    if (stage === 'fakeout') put(WIN - 1, 'legendary');
+    if (stage === 'pullback') put(WIN + 1, Math.random() < 0.3 ? 'mythic' : pr >= 3 ? 'legendary' : 'epic');
+    if (stage === 'stairs') ['uncommon', 'rare', 'epic', 'legendary'].forEach((tid, k) => put(WIN - 4 + k, tid));
+    const myth = stage === 'myth' || stage === 'legend' ? side : 0;   // which side the near miss is on
+    // no two of the same rarity next to each other anywhere on the line (staged slots stay put)
     for (let i = 0; i < N; i++) {
-      if (i === WIN || (myth && i === WIN + myth)) continue;
+      if (keep.has(i)) continue;
       const bad = (it) => (i > 0 && items[i - 1].tier === it.tier) || (i < N - 1 && items[i + 1].tier === it.tier);
       for (let tries = 0; tries < 40 && bad(items[i]); tries++) items[i] = ITEMS.roll([], Math.random);
       if (bad(items[i])) items[i] = ofTier(ranks.find((r) => (i === 0 || items[i - 1].tier !== r) && (i === N - 1 || items[i + 1].tier !== r)));
@@ -2955,13 +2989,22 @@ async function openCrate(match, starter, preview) {
     // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
     const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
     const into = prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : myth < 0 ? 0.02 + Math.random() * 0.04 : myth > 0 ? 0.94 + Math.random() * 0.04 : frac;
-    const end = left[WIN] + wOf(prize) * into - half;
-    // fast at first, then a long, slow crawl at the end
-    const T = 8200, t0 = performance.now(), ease = (k) => 1 - Math.pow(1 - k, 5);
+    const fin = stage === 'fakeout' ? 0.04 + Math.random() * 0.06 : stage === 'pullback' ? 0.65 + Math.random() * 0.2 : into;
+    const end = left[WIN] + wOf(prize) * fin - half;
+    // the path the line takes: fast at first, then a long, slow crawl (plus the staged detours)
+    const OUT = (u) => 1 - Math.pow(1 - u, 5), HOLD = () => 0, INOUT = (u) => (1 - Math.cos(Math.PI * u)) / 2;
+    let keys = [[0, 0], [1, end, OUT]], T = 8200;
+    if (stage === 'fakeout') { const x1 = left[WIN] - 5 - half; keys = [[0, 0], [0.78, x1, OUT], [0.88, x1, HOLD], [1, end, INOUT]]; T = 9600; }
+    if (stage === 'pullback') { const x1 = left[WIN + 1] + Math.min(20, wOf(items[WIN + 1]) * 0.4) - half; keys = [[0, 0], [0.84, x1, OUT], [1, end, INOUT]]; T = 9200; }
+    const pathX = (k) => {
+      for (let i = 1; i < keys.length; i++) if (k <= keys[i][0]) { const [k0, x0] = keys[i - 1], [k1, x1, e] = keys[i]; return x0 + (x1 - x0) * e((k - k0) / (k1 - k0)); }
+      return end;
+    };
+    const t0 = performance.now();
     let last = -1, tense = false;
     await new Promise((done) => {
       const f = (now) => {
-        const k = Math.min(1, (now - t0) / T), x = end * ease(k);
+        const k = Math.min(1, (now - t0) / T), x = pathX(k);
         reel.style.transform = `translateX(${-x}px)`;
         if (!tense && k > 0.72) {   // the last stretch: the marker pulses, a low tone climbs
           tense = true;
@@ -2970,6 +3013,7 @@ async function openCrate(match, starter, preview) {
         }
         let at = last < 0 ? 0 : last;
         while (at < N - 1 && left[at + 1] <= x + half) at++;
+        while (at > 0 && left[at] > x + half) at--;   // (it can slide back)
         if (at !== last) {
           last = at;
           tone(700 + 700 * k, 600 + 600 * k, k > 0.72 ? 0.05 : 0.025, 'square', k > 0.72 ? 0.05 : 0.025);   // ticks climb, and get heavier at the end

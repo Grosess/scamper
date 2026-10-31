@@ -707,3 +707,27 @@ html.has-acct #qIn.hidden { display: block !important; }
 html.has-acct #qName, html.has-acct #accTab, html.has-acct #name { color: transparent !important; border-color: transparent !important; background: linear-gradient(90deg, #e3e8ef 25%, #f4f6f9 45%, #e3e8ef 65%) !important; background-size: 300% 100% !important; animation: skel 1.1s ease-in-out infinite; }
 html.has-acct #qName { display: inline-block; min-width: 64px; }
 html.has-acct #nameHint { visibility: hidden; }
+
+/* ===== crate v4: landing, click to open, swell, freeze-frame ===== */
+.crate-shadow { position: absolute; left: 50%; bottom: -14px; width: 170px; height: 26px; margin-left: -85px; border-radius: 50% !important; background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55), transparent 70%); animation: shadowIn 0.7s ease-out; }
+@keyframes shadowIn { from { transform: scale(0.2); opacity: 0; } }
+.crate-dust { position: absolute; left: 50%; bottom: -10px; width: 260px; height: 60px; margin-left: -130px; opacity: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 20% 70%, rgba(230, 220, 200, 0.8) 0 18%, transparent 30%), radial-gradient(ellipse at 80% 70%, rgba(230, 220, 200, 0.8) 0 18%, transparent 30%), radial-gradient(ellipse at 50% 80%, rgba(230, 220, 200, 0.6) 0 22%, transparent 36%); }
+.crate.landed .crate-dust { animation: dust 0.7s ease-out; }
+@keyframes dust { 0% { opacity: 1; transform: scale(0.5); } 100% { opacity: 0; transform: scale(1.4) translateY(-14px); } }
+.crate.landed .crate-shake { animation: thud 0.3s ease-out; }
+@keyframes thud { 30% { transform: scaleY(0.9) scaleX(1.06); } }
+.crate.ready { pointer-events: auto; cursor: pointer; }
+.crate.ready .cube { animation-duration: 3s; }
+.crate.ready .crate-shake { animation: bob 1.2s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-8px) rotate(2deg); } }
+.crate.ready:hover .crate-glow { opacity: 1; }
+.crate-hint { min-height: 22px; margin-top: -14px; font: 800 14px Rubik, sans-serif; letter-spacing: 0.2em; color: #fff; animation: hintPulse 1s ease-in-out infinite; }
+@keyframes hintPulse { 50% { opacity: 0.45; } }
+.crate { transition: transform 1.3s cubic-bezier(0.3, 0, 0.6, 1); }
+.crate.shake { transform: scale(1.18); }
+.crate.shake.hard { transform: scale(1.32); }
+.crate.shake .cube .f { animation: rattle 0.18s steps(2) infinite; }
+@keyframes rattle { 50% { filter: brightness(1.15); } }
+.crate.freeze .cube, .crate.freeze .crate-shake, .crate.freeze .crate-rays { animation-play-state: paused !important; }
+.crate.freeze .cube .f { filter: brightness(2.4) !important; }
