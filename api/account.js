@@ -244,6 +244,8 @@ module.exports = async (req, res) => {
         const winners = (Array.isArray(b.winners) ? b.winners : []).map((n) => String(n).toLowerCase());
         // only two players need to pass the full check; any winner who took part (moved a bit) gets a crate
         m.eligible = ok ? winners.filter((n) => m.names.includes(n) && +(play[n] || {}).moved >= MATCH_MIN_MOVED) : [];
+        // the developer account is exempt from the play checks (it has to test things alone)
+        for (const n of winners) if (isDev(n) && m.names.includes(n) && !m.eligible.includes(n)) m.eligible.push(n);
         m.active = active;
         m.done = true;
         m.claimed = [];
@@ -263,8 +265,8 @@ module.exports = async (req, res) => {
         const now = Date.now(), day = new Date().toISOString().slice(0, 10), others = m.active.filter((n) => n !== me);
         if (now - (+(await redis('GET', 'lastclaim:' + me)) || 0) < CLAIM_GAP * 1000) return res.status(429).json({ error: 'Too soon for another prize.' });
         // the same two accounts can only win prizes off each other a few times a day
-        let fresh = false;
-        for (const o of others) if (!(await limited(`pair:${[me, o].sort().join(':')}:${day}`, PAIR_PER_DAY, 86400))) fresh = true;
+        let fresh = isDev(me);   // (the developer isn't capped per opponent)
+        if (!fresh) for (const o of others) if (!(await limited(`pair:${[me, o].sort().join(':')}:${day}`, PAIR_PER_DAY, 86400))) fresh = true;
         if (!fresh) return res.status(429).json({ error: 'You\'ve won enough off the same players today - play some new people!' });
         if (await limited('claims:' + me + ':' + day, CLAIMS_PER_DAY, 86400)) return res.status(429).json({ error: 'That\'s all the prizes for today!' });
         m.claimed.push(me);

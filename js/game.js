@@ -783,8 +783,6 @@ const RANDOM_EVENTS = {
   wind: { name: 'WINDY', sub: 'A gale is blowing everyone sideways', secs: 12 },
   bouncy: { name: 'BOUNCY FLOORS', sub: 'Every landing bounces you back up (hold crouch to stick)', secs: 13 },
   rocket: { name: 'ROCKET JUMP', sub: 'Every jump launches you forward', secs: 12 },
-  quake: { name: 'EARTHQUAKE', sub: 'The ground is shaking you around', secs: 10 },
-  redlight: { name: 'RED LIGHT, GREEN LIGHT', sub: 'Freeze when the light goes red', secs: 14 },
   swap: { name: 'SWAP!', sub: 'Everyone switched places', secs: 2, once: true },
   shuffle: { name: 'TELEPORT', sub: 'Everyone got thrown somewhere random', secs: 2, once: true },
 };
@@ -794,7 +792,7 @@ const hasEv = (k) => isPlaying() && !!game.rnd && game.rnd.evs.includes(k);
 const evScale = () => (hasEv('tiny') ? RANDOM_EVENTS.tiny.scale : 1);
 // blinking happenings run on the shared clock, so everyone's lights go out together
 const isDark = () => hasEv('dark') && Math.floor(worldTime() / 2) % 2 === 0;
-const isRedLight = () => hasEv('redlight') && worldTime() % 3.4 > 2.2;
+const isRedLight = () => false;   // (Red Light Green Light was removed)
 // a direction picked by the host for this happening (wind), the same on every screen
 const evAngle = () => ((game.rnd && game.rnd.seed) || 0) * Math.PI * 2;
 function applyMove() {
@@ -2308,7 +2306,7 @@ const MODES = [
   { id: 'gp', name: 'Grand Prix', kind: 'gp', min: 2, desc: 'A run of rounds, each a random mode on a random map. Every round gives points for your placing - most points at the end wins.',
     opts: [{ key: 'rounds', label: 'Rounds', vals: [[3, '3'], [5, '5'], [7, '7']], def: 5 }] },
 ];
-const hostSetup = { mode: players.size === 2 ? 'duel' : 'bomb', opts: {}, random: false };
+const hostSetup = { mode: players.size === 2 ? 'duel' : 'bomb', opts: {}, random: false, collide: false };
 for (const m of MODES) { hostSetup.opts[m.id] = {}; for (const o of m.opts) hostSetup.opts[m.id][o.key] = o.def; }
 const getSetup = () => (!Net.isHost && game.setup && game.setup.opts ? game.setup : hostSetup);
 const canEditSetup = () => Net.isHost && !isPlaying();
@@ -2343,6 +2341,7 @@ $('modeOpts').onclick = (e) => {
   const b = e.target.closest('.pill');
   if (!b || !canEditSetup()) return;
   if (b.dataset.k === 'random') hostSetup.random = b.dataset.v === '1';
+  else if (b.dataset.k === 'collide') hostSetup.collide = b.dataset.v === '1';
   else hostSetup.opts[hostSetup.mode][b.dataset.k] = +b.dataset.v;
   setupChanged();
 };
@@ -2371,10 +2370,11 @@ function renderSetup() {
   const o = su.opts[mode.id] || {};
   // the randomizer is a modifier for every mode (Grand Prix too)
   const rnd = { key: 'random', label: 'Randomizer', vals: [[0, 'Off'], [1, 'On']] }, rv = su.random ? 1 : 0;
-  $('modeOpts').innerHTML = mode.opts.concat([rnd]).map((op) => `<div class="pill-row"><span>${op.label}</span><div class="pills">` +
-    op.vals.map(([v, l]) => `<button class="pill${(op === rnd ? rv : o[op.key]) === v ? ' on' : ''}" data-k="${op.key}" data-v="${v}"${edit ? '' : ' disabled'}>${l}</button>`).join('') +
+  const col = { key: 'collide', label: 'Bumping', vals: [[0, 'Off'], [1, 'On']] }, cv = su.collide ? 1 : 0;
+  $('modeOpts').innerHTML = mode.opts.concat([rnd, col]).map((op) => `<div class="pill-row"><span>${op.label}</span><div class="pills">` +
+    op.vals.map(([v, l]) => `<button class="pill${(op === rnd ? rv : op === col ? cv : o[op.key]) === v ? ' on' : ''}" data-k="${op.key}" data-v="${v}"${edit ? '' : ' disabled'}>${l}</button>`).join('') +
     '</div></div>').join('');
-  const desc = mode.opts.map((op) => (op.vals.find((v) => v[0] === o[op.key]) || ['', ''])[1]).concat(su.random ? ['Randomizer'] : []).join(' · ');
+  const desc = mode.opts.map((op) => (op.vals.find((v) => v[0] === o[op.key]) || ['', ''])[1]).concat(su.random ? ['Randomizer'] : [], su.collide ? ['Bumping'] : []).join(' · ');
   $('startSummary').innerHTML = gp ? `<b>Grand Prix</b> · ${esc(desc)} rounds` : `<b>${mode.name}</b> on <b>${esc(World.map.name)}</b> · ${esc(desc)}`;
 }
 $('mapSel').innerHTML = MAPS.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
@@ -2581,7 +2581,6 @@ function updateGame(dt) {
   const red = isRedLight();
   const frozen = (playing && game.rl > 0 && (inDuel(myId) || game.mode === 'race' || (game.mode === 'freeze' && isIt(myId)))) || isFrozen(myId) || fallHeld || red;
   if ((fallHeld || red) && me.grounded) { me.vel.x = 0; me.vel.z = 0; }
-  if (red !== wasRed) { wasRed = red; if (red) { flash('rgba(255,90,90,.45)'); tone(220, 160, 0.25, 'square', 0.06); } else if (hasEv('redlight')) tone(440, 660, 0.15, 'square', 0.05); }
   if (isFrozen(myId)) { me.vel.x = 0; me.vel.z = 0; }
   const duelChaser = playing && game.mode === 'duel' && isIt(myId);
   // whoever does the chasing runs a little faster
@@ -2617,6 +2616,7 @@ function updateGame(dt) {
     n++;
   }
   if (n >= 10) acc = 0;
+  if (getSetup().collide) collidePlayers();
   World.wrapPos(me.pos);   // endless maps: off one edge, in at the other
   if (bots.size) botsAfter();
 
@@ -2697,7 +2697,6 @@ function updateGame(dt) {
   // sliding rumbles harder the faster you go
   if (me.sliding && me.grounded) shake = Math.max(shake, Math.min(0.45, hs / 45));
   shake = Math.max(0, shake - dt * 1.4);
-  if (hasEv('quake')) shake = Math.max(shake, 0.6);
   const tr = shake * shake * C.shake * settings.shake, tt = performance.now() / 1000;
   const n1 = Math.sin(tt * 47.3) * 0.6 + Math.sin(tt * 23.1) * 0.4, n2 = Math.sin(tt * 39.7 + 1.3) * 0.6 + Math.sin(tt * 17.9) * 0.4, n3 = Math.sin(tt * 31.1 + 2.1);
   camera.position.set(me.pos.x + n1 * tr * 0.12, camFoot + eyeH + Math.sin(bob * 2) * C.bob * bobW + landOff + n2 * tr * 0.12, me.pos.z);
@@ -3065,6 +3064,33 @@ async function openCrate(match, starter, preview) {
   } finally { crateBusy = false; }
 }
 
+// player bumping (lobby option): nobody walks through anybody. Each screen pushes its own player
+// (and the host its CPUs) out of everyone else, so it works without any extra network messages
+function collidePlayers() {
+  const R = CONFIG.move.radius * 2 * evScale(), W = World.map.wrap, bodies = [];
+  for (const p of players.values()) {
+    if (isOut(p.id) || sitsOut(p.id) || !players.has(p.id)) continue;
+    const pos = p.id === myId ? me.pos : bots.has(p.id) ? bots.get(p.id).p.pos : p.avatar ? p.avatar.root.position : null;
+    if (pos) bodies.push({ id: p.id, pos });
+  }
+  const movers = [[myId, me]].concat([...bots].map(([id, b]) => [id, b.p]));
+  for (const [id, pl] of movers) {
+    if (isOut(id) || sitsOut(id)) continue;
+    for (const o of bodies) {
+      if (o.id === id || Math.abs(pl.pos.y - o.pos.y) > 1.6 * evScale()) continue;
+      let dx = pl.pos.x - o.pos.x, dz = pl.pos.z - o.pos.z;
+      if (W) { dx -= W * Math.round(dx / W); dz -= W * Math.round(dz / W); }
+      const d = Math.hypot(dx, dz);
+      if (d >= R) continue;
+      const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0, push = R - d;
+      // push apart (stopping at walls), and lose the speed going into them
+      if (!World.overlap(pl.pos.x + nx * push, pl.pos.y + 0.05, pl.pos.z + nz * push, pl.h)) { pl.pos.x += nx * push; pl.pos.z += nz * push; }
+      const vn = pl.vel.x * nx + pl.vel.z * nz;
+      if (vn < 0) { pl.vel.x -= vn * nx; pl.vel.z -= vn * nz; }
+    }
+  }
+}
+
 let finishSentAt = 0, boardDirty = true, beepT = 0, fallLockUntil = 0, wasRed = false;
 
 // randomizer happenings that push bodies around (you, and the CPUs on the host), every physics step
@@ -3083,13 +3109,6 @@ function evPhysics(p, wasGrounded, vyBefore, inp) {
   if (hasEv('rocket') && wasGrounded && !p.grounded && p.vel.y > 4 && vyBefore < 1) {
     p.vel.x -= Math.sin(p.yaw) * 9;
     p.vel.z -= Math.cos(p.yaw) * 9;
-  }
-  // the ground jolts you now and then
-  if (hasEv('quake') && p.grounded && Math.random() < STEP * 1.1) {
-    p.vel.y = 3.5 + Math.random() * 3;
-    p.vel.x += (Math.random() - 0.5) * 7;
-    p.vel.z += (Math.random() - 0.5) * 7;
-    p.grounded = false;
   }
 }
 // looks that switch on/off with a happening (the per-frame parts are in updateGame)
@@ -3464,7 +3483,6 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (playing && mode === 'bomb' && isOut(myId)) hint = 'You\'re out - spectating';
   if (playing && mode === 'freeze' && go && !isIt(myId)) hint = isFrozen(myId) ? 'Frozen - a teammate can thaw you by touching you' : game.freeze && game.freeze.frozen.length ? 'Touch frozen teammates to thaw them' : '';
   if (isExposed(myId)) hint = `EXPOSED - they can see you for ${((exposedUntil[myId] - now) / 1000).toFixed(1)}s`;
-  if (hasEv('redlight')) hint = isRedLight() ? 'RED LIGHT - FREEZE!' : 'GREEN LIGHT - GO GO GO';
   if (now < tagHintUntil) hint = tagHint;
   if (frozen && !isFrozen(myId) && !isRedLight()) hint = mode === 'race' ? 'On your marks…' : 'Get ready…';
   // held after a fall: a bar that empties as you wait
