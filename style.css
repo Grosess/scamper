@@ -698,3 +698,6 @@ span.skel, b.skel { display: inline-block; min-width: 64px; }
 .vis-row { margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--line); font-size: 12px; color: var(--muted); }
 .vis-tag { display: inline-block; margin-right: 6px; padding: 3px 7px; font: 800 11px Rubik, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; background: var(--line); color: var(--ink); }
 .vis-tag.pub { background: var(--mint); }
+.reel-wrap.tense .reel-mark { animation: markPulse 0.45s ease-in-out infinite; }
+@keyframes markPulse { 50% { transform: scaleY(1.18); box-shadow: 0 0 14px 3px rgba(255, 255, 255, 0.85); } }
+.reel-wrap.tense .reel-info { animation: markPulse 0.45s ease-in-out infinite; }

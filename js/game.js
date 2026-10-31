@@ -2916,31 +2916,46 @@ async function openCrate(match, starter, preview) {
     crate.style.display = 'none';
     // 3. the line: a flat strip of colors - common ones wide, rare ones thin - races past the marker
     // and slows to a stop on the prize. The marker and the glow take the rarity of what's under it.
-    const W = { common: 92, uncommon: 76, rare: 60, epic: 46, legendary: 34, mythic: 24 };
-    const N = 70, WIN = 60, items = [];
-    for (let i = 0; i < N; i++) items.push(i === WIN ? prize : ITEMS.roll([], Math.random));
-    // each slot shows its rarity's color, not the color itself - that's only revealed at the end
-    reel.innerHTML = items.map((it) => `<i style="width:${W[it.tier]}px;background:${tierOf(it).color}"></i>`).join('');
-    const left = [0];
-    for (let i = 0; i < N; i++) left.push(left[i] + W[items[i].tier]);
+    // every slot the same size. Rarities are spread out (never three of one in a row), and the
+    // slots right next to the prize are often rare ones - so it creeps past a near miss
+    const SW = 64, N = 70, WIN = 60, items = [];
+    const ranks = ITEMS.TIERS.map((x) => x.id), rankOf = (it) => ranks.indexOf(it.tier);
+    const ofTier = (tid) => { const l = ITEMS.COLORS.filter((c) => c.tier === tid); return l[Math.floor(Math.random() * l.length)]; };
+    for (let i = 0; i < N; i++) {
+      if (i === WIN) { items.push(prize); continue; }
+      let it = ITEMS.roll([], Math.random);
+      for (let tries = 0; tries < 6 && i > 1 && items[i - 1].tier === it.tier && items[i - 2].tier === it.tier; tries++) it = ITEMS.roll([], Math.random);
+      items.push(it);
+    }
+    const tease = (minRank) => ofTier(ranks[Math.min(5, minRank + Math.floor(Math.random() * (6 - minRank)))]);
+    if (Math.random() < 0.75) items[WIN + 1] = tease(Math.max(3, rankOf(prize) + 1));   // just past the prize: something better
+    if (Math.random() < 0.5) items[WIN - 1] = tease(Math.max(2, rankOf(prize)));
+    reel.innerHTML = items.map((it) => `<i style="width:${SW}px;background:${tierOf(it).color}"></i>`).join('');
     reel.style.transform = 'translateX(0)';
     reel.style.filter = '';
     $('reelInfo').innerHTML = '';
     wrap.classList.remove('hidden');
-    const half = wrap.clientWidth / 2, w = W[prize.tier];
-    const end = left[WIN] + w * (0.15 + Math.random() * 0.7) - half;   // stop somewhere inside the prize
-    const T = 6200, t0 = performance.now();
-    let last = -1, lastX = 0;
+    wrap.classList.remove('tense');
+    const half = wrap.clientWidth / 2;
+    // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
+    const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
+    const end = WIN * SW + SW * frac - half;
+    // fast at first, then a long, slow crawl at the end
+    const T = 8200, t0 = performance.now(), ease = (k) => 1 - Math.pow(1 - k, 5);
+    let last = -1, tense = false;
     await new Promise((done) => {
       const f = (now) => {
-        const k = Math.min(1, (now - t0) / T), x = end * (1 - Math.pow(1 - k, 4));
+        const k = Math.min(1, (now - t0) / T), x = end * ease(k);
         reel.style.transform = `translateX(${-x}px)`;
-        let at = last < 0 ? 0 : last;
-        while (at < N - 1 && left[at + 1] <= x + half) at++;
+        if (!tense && k > 0.72) {   // the last stretch: the marker pulses, a low tone climbs
+          tense = true;
+          wrap.classList.add('tense');
+          tone(70, 140, 2.2, 'sawtooth', 0.035);
+        }
+        const at = Math.max(0, Math.min(N - 1, Math.floor((x + half) / SW)));
         if (at !== last) {
           last = at;
-          tone(700 + 700 * k, 600 + 600 * k, 0.025, 'square', 0.025);   // ticks climb as it slows
-          // under the line: the rarity of what the marker is on, and its chance
+          tone(700 + 700 * k, 600 + 600 * k, k > 0.72 ? 0.05 : 0.025, 'square', k > 0.72 ? 0.05 : 0.025);   // ticks climb, and get heavier at the end
           const tt = tierOf(items[at]);
           $('reelInfo').innerHTML = `<b style="--tc:${tt.color}">${tt.name}</b> ${tierChance(tt)}% chance`;
         }
@@ -2948,6 +2963,7 @@ async function openCrate(match, starter, preview) {
       };
       requestAnimationFrame(f);
     });
+    wrap.classList.remove('tense');
     reel.style.filter = '';
     await wait(350);
     // 4. the reveal: rays, a flash and a big card - bigger and louder the rarer it is
