@@ -48,6 +48,8 @@ const Account = (() => {
     $('qName').textContent = inn ? me.name : 'loading';
     $('qName').classList.toggle('skel', skel);
     $('accName').classList.toggle('skel', skel);
+    $('name').classList.toggle('skel', skel);
+    document.documentElement.classList.remove('has-acct');   // the early placeholders hand over to these
     document.dispatchEvent(new Event('account-loading'));
     $('accTabNew').classList.toggle('on', tab === 'new');
     $('accTabLogin').classList.toggle('on', tab === 'login');

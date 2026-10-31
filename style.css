@@ -701,3 +701,9 @@ span.skel, b.skel { display: inline-block; min-width: 64px; }
 .reel-wrap.tense .reel-mark { animation: markPulse 0.45s ease-in-out infinite; }
 @keyframes markPulse { 50% { transform: scaleY(1.18); box-shadow: 0 0 14px 3px rgba(255, 255, 255, 0.85); } }
 .reel-wrap.tense .reel-info { animation: markPulse 0.45s ease-in-out infinite; }
+/* before the scripts load: a saved log-in shows placeholders straight away */
+html.has-acct #qForm { display: none !important; }
+html.has-acct #qIn.hidden { display: block !important; }
+html.has-acct #qName, html.has-acct #accTab, html.has-acct #name { color: transparent !important; border-color: transparent !important; background: linear-gradient(90deg, #e3e8ef 25%, #f4f6f9 45%, #e3e8ef 65%) !important; background-size: 300% 100% !important; animation: skel 1.1s ease-in-out infinite; }
+html.has-acct #qName { display: inline-block; min-width: 64px; }
+html.has-acct #nameHint { visibility: hidden; }
