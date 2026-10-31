@@ -923,7 +923,7 @@ function applyState(s) {
   } else if (started && game.mode === 'koth') {
     showBanner('<div class="big gold">KING OF THE TAG</div><div>The crown appears somewhere on the map in a few seconds - race to it, then hold it!</div>', 3);
   } else if (started && game.mode === 'freeze') {
-    showBanner(isIt(myId) ? '<div class="big red">SEEKER</div><div>Freeze them all at once. Released in a few seconds...</div>'
+    showBanner(isIt(myId) ? '<div class="big red">YOU\'RE IT</div><div>Freeze them all at once. Released in a few seconds...</div>'
       : '<div class="big lime">FREEZE TAG</div><div>Don\'t get frozen - touch frozen teammates to thaw them</div>', 3);
   } else if (started && game.mode === 'race') {
     showBanner(`<div class="big">RACE</div><div>${esc(World.map.name)} · fall and you go back to the start</div>`, 3);
@@ -1322,7 +1322,7 @@ function startFreeze(ids, o) {
   H.timeLeft = o.len;
   H.releaseLeft = 4;
   spreadOut(ids);
-  hostFeed(`Freeze Tag! ${game.it.map(nameOf).join(', ')} ${n > 1 ? 'are seekers' : 'is the seeker'}`);
+  hostFeed(`Freeze Tag! ${game.it.map(nameOf).join(', ')} ${n > 1 ? 'are it' : 'is it'}`);
 }
 function freezeRunners() { return [...players.keys()].filter((id) => !isIt(id)); }
 function hostCheckAllFrozen() {
@@ -1533,9 +1533,9 @@ function computeResult(sub) {
     const seekers = list.filter((p) => isIt(p.id)), runners = list.filter((p) => !isIt(p.id));
     const won = runners.length && runners.every((p) => game.freeze.frozen.includes(p.id)) ? 'seekers' : 'runners';
     const w = won === 'seekers' ? seekers : runners;
-    return { mode: 'freeze', winners: w.map((p) => p.id), teams: true, ranking: list.map((p) => p.id), title: won === 'seekers' ? 'Seekers win!' : 'Runners win!',
+    return { mode: 'freeze', winners: w.map((p) => p.id), teams: true, ranking: list.map((p) => p.id), title: won === 'seekers' ? 'It wins!' : 'Runners win!',
       sub: sub || (won === 'seekers' ? 'Everyone got frozen' : 'Not everyone was frozen'),
-      lines: seekers.map((p) => `${p.name} (seeker) - ${tags(p.id)} freezes`).concat(runners.map((p) => `${p.name} - ${tags(p.id)} thaws${game.freeze.frozen.includes(p.id) ? ' (frozen)' : ''}`)) };
+      lines: seekers.map((p) => `${p.name} (it) - ${tags(p.id)} freezes`).concat(runners.map((p) => `${p.name} - ${tags(p.id)} thaws${game.freeze.frozen.includes(p.id) ? ' (frozen)' : ''}`)) };
   }
   if (game.mode === 'koth' && game.koth) {
     const pts = game.koth.pts;
@@ -2338,7 +2338,7 @@ const MODES = [
   { id: 'duel', name: 'Duel', kind: 'tag', min: 2, max: 2, desc: '1v1, taking turns to chase. Catch them before the timer ends to score, or survive to score. First to the target wins.',
     opts: [{ key: 'chase', label: 'Each chase', vals: [[30, '30 sec'], [45, '45 sec'], [60, '1 min']], def: 45 },
            { key: 'target', label: 'First to', vals: [[3, '3'], [5, '5'], [7, '7']], def: 5 }] },
-  { id: 'freeze', name: 'Freeze Tag', kind: 'tag', min: 2, desc: 'Seekers freeze runners by tagging them. Touch a frozen teammate to thaw them. Freeze everyone at once to win - or survive the clock.',
+  { id: 'freeze', name: 'Freeze Tag', kind: 'tag', min: 2, desc: 'Whoever is it freezes runners by tagging them. Touch a frozen teammate to thaw them. Freeze everyone at once to win - or survive the clock.',
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
   { id: 'koth', name: 'King of the Tag', kind: 'tag', min: 2, desc: 'Hold the crown to score a point every second. Run into the king to steal it. Most points wins.',
     opts: [{ key: 'len', label: 'Round length', vals: [[120, '2 min'], [180, '3 min'], [240, '4 min']], def: 180 }] },
@@ -3476,7 +3476,7 @@ function updateHud(hs, frozen, nearestSeeker) {
     } else if (mode === 'freeze' && game.freeze) {
       const r = [...players.keys()].filter((id) => !isIt(id));
       phase = `FREEZE TAG · ${r.filter((id) => game.freeze.frozen.includes(id)).length}/${r.length} FROZEN`;
-      timer = game.rl > 0 ? `Seekers in ${Math.ceil(game.rl)}` : fmtTime(game.tl);
+      timer = game.rl > 0 ? `It is released in ${Math.ceil(game.rl)}` : fmtTime(game.tl);
       urgent = go && game.tl <= 10;
     } else if (mode === 'koth') {
       timer = game.rl > 0 ? `Crown in ${Math.ceil(game.rl)}` : fmtTime(game.tl);
@@ -3507,7 +3507,7 @@ function updateHud(hs, frozen, nearestSeeker) {
   if (playing) {
     if (mode === 'duel') { if (inDuel(myId)) { roleText = isIt(myId) ? 'CHASER' : 'RUNNER'; roleCls = isIt(myId) ? 'it' : 'runner'; } }
     else if (mode === 'bomb') { roleText = isOut(myId) ? 'OUT' : isIt(myId) ? 'YOU HAVE THE BOMB' : 'RUN'; roleCls = isOut(myId) ? 'out' : isIt(myId) ? 'it' : 'runner'; }
-    else if (mode === 'freeze') { roleText = isFrozen(myId) ? 'FROZEN' : isIt(myId) ? 'SEEKER' : 'RUN'; roleCls = isFrozen(myId) ? 'out' : isIt(myId) ? 'it' : 'runner'; }
+    else if (mode === 'freeze') { roleText = isFrozen(myId) ? 'FROZEN' : isIt(myId) ? 'YOU\'RE IT' : 'RUN'; roleCls = isFrozen(myId) ? 'out' : isIt(myId) ? 'it' : 'runner'; }
     else if (mode === 'koth') { roleText = isIt(myId) ? `KING · ${Math.floor(game.koth.pts[myId] || 0)}` : 'STEAL THE CROWN'; roleCls = isIt(myId) ? 'king' : 'it'; }
     else if (mode === 'race' && raceDone) { roleText = `FINISHED ${ord(game.race.order.indexOf(myId) + 1).toUpperCase()}`; roleCls = 'king'; }
   }
@@ -3571,7 +3571,7 @@ function boardRows() {
     const seek = list.filter((p) => isIt(p.id)), run = list.filter((p) => !isIt(p.id));
     run.sort((a, b) => game.freeze.frozen.includes(a.id) - game.freeze.frozen.includes(b.id));
     const f = run.filter((p) => game.freeze.frozen.includes(p.id)).length;
-    return { title: `FREEZE TAG · ${f}/${run.length} FROZEN`, rows: seek.map((p) => row(p, tg(p.id), 'SEEKER', 'hot'))
+    return { title: `FREEZE TAG · ${f}/${run.length} FROZEN`, rows: seek.map((p) => row(p, tg(p.id), 'IT', 'hot'))
       .concat(run.map((p) => row(p, tg(p.id), game.freeze.frozen.includes(p.id) ? 'FROZEN' : '', game.freeze.frozen.includes(p.id) ? 'icy' : ''))) };
   }
   if (mode === 'koth' && game.koth) {
