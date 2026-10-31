@@ -49,6 +49,9 @@ const Store = (() => {
       try { localStorage.setItem(key, text); } catch (e) {}
       writeCookie(key, text);
     },
+    // raw text kept ONLY in cookies (not local storage, never sent to the account server)
+    getCookie(key) { return readCookie(key); },
+    setCookie(key, text) { writeCookie(key, text); },
     remove(key) {
       try { localStorage.removeItem(key); } catch (e) {}
       writeCookie(key, null);

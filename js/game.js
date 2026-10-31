@@ -2110,8 +2110,8 @@ function updatePauseUI() {
 }
 
 // ---------- image skins (developer mode only) ----------
-// A picture you pick is shrunk to a small JPEG and sent straight to the other players (through the
-// host) - never to the account server, never saved: it's gone when you refresh.
+// A picture you pick is shrunk to a small JPEG, kept in this browser's cookies (only there - never
+// on the account server) and sent straight to the other players through the host.
 let mySkinImg = null;
 const pendingSkins = {};
 const myImg = () => (devOn() ? mySkinImg : null);
@@ -2136,19 +2136,21 @@ function pickSkin(file) {
   if (!file) return;
   const url = URL.createObjectURL(file), img = new Image();
   img.onload = () => {
-    const W = 128, H = 244, cv = document.createElement('canvas');
+    const W = 84, H = 160, cv = document.createElement('canvas');   // small: it lives in a cookie
     cv.width = W; cv.height = H;
     const k = Math.max(W / img.width, H / img.height), w = img.width * k, h = img.height * k;
     cv.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
     URL.revokeObjectURL(url);
-    mySkinImg = cv.toDataURL('image/jpeg', 0.82);
+    mySkinImg = cv.toDataURL('image/jpeg', 0.72);
+    Store.setCookie('scamper-skin', mySkinImg);
     renderCos();
     sendSkin();
   };
   img.src = url;
 }
+try { mySkinImg = cleanImg(Store.getCookie('scamper-skin')); } catch (e) {}
 $('skinFile').addEventListener('change', (e) => { pickSkin(e.target.files[0]); e.target.value = ''; });
-$('skinClear').onclick = () => { mySkinImg = null; renderCos(); sendSkin(); };
+$('skinClear').onclick = () => { mySkinImg = null; Store.setCookie('scamper-skin', null); renderCos(); sendSkin(); };
 
 // ---------- you: colors + cosmetics, also mid-game (pause menu -> You) ----------
 // every color by rarity: the ones you own you can click, the rest are locked "?" tiles
