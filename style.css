@@ -688,3 +688,5 @@ span.skel, b.skel { display: inline-block; min-width: 64px; }
 .pub-n { grid-column: 2; grid-row: 1 / 3; font: 800 14px Rubik, sans-serif; color: var(--muted); }
 .pub-list .pill { grid-column: 3; grid-row: 1 / 3; padding: 7px 14px; }
 .pub-list li.pub-empty { display: block; font-size: 13px; color: var(--muted); }
+/* the logo: angular */
+.logo { font-family: 'Russo One', Impact, sans-serif; font-size: 44px; letter-spacing: 0.01em; }
