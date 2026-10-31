@@ -2930,6 +2930,13 @@ async function openCrate(match, starter, preview) {
     const tease = (minRank) => ofTier(ranks[Math.min(5, minRank + Math.floor(Math.random() * (6 - minRank)))]);
     if (Math.random() < 0.75) items[WIN + 1] = tease(Math.max(3, rankOf(prize) + 1));   // just past the prize: something better
     if (Math.random() < 0.5) items[WIN - 1] = tease(Math.max(2, rankOf(prize)));
+    // no two of the same rarity next to each other anywhere on the line (the prize stays put)
+    for (let i = 0; i < N; i++) {
+      if (i === WIN) continue;
+      const bad = (it) => (i > 0 && items[i - 1].tier === it.tier) || (i < N - 1 && items[i + 1].tier === it.tier);
+      for (let tries = 0; tries < 40 && bad(items[i]); tries++) items[i] = ITEMS.roll([], Math.random);
+      if (bad(items[i])) items[i] = ofTier(ranks.find((r) => (i === 0 || items[i - 1].tier !== r) && (i === N - 1 || items[i + 1].tier !== r)));
+    }
     // every rarity the same size - except mythic, a thin sliver
     const wOf = (it) => (it.tier === 'mythic' ? 12 : SW);
     reel.innerHTML = items.map((it) => `<i style="width:${wOf(it)}px;background:${tierOf(it).color}"></i>`).join('');
