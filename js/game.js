@@ -2062,6 +2062,8 @@ function updatePauseUI() {
       `${p.id === myId ? ' <span class="you">(you)</span>' : ''}${tag}${kick}</li>`;
   }).join('');
   $('cpuRow').classList.toggle('hidden', !Net.isHost);
+  $('visRow').classList.toggle('hidden', !Net.isHost);
+  renderVis();
   renderMeEdit();
   $('cpuDiff').querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === cpuDiff));
   $('addCpu').disabled = players.size >= CONFIG.tag.maxPlayers;
@@ -3664,6 +3666,7 @@ $('hostBtn').onclick = () => {
     enterGame();
     pushState();
     sendSkin();
+    lobbyBeat();
   });
 };
 
@@ -3692,6 +3695,53 @@ function join() {
   });
 }
 $('joinBtn').onclick = join;
+
+// ---------- public / private lobbies ----------
+// A public game checks in with the server every 30s (host, mode, map, players) and shows up on
+// everyone's "Public games" list; it drops off about a minute after it stops. Private games are
+// only joinable with the code, like before.
+const lobbyKey = [...crypto.getRandomValues(new Uint8Array(12))].map((x) => x.toString(16).padStart(2, '0')).join('');
+let listedCode = '';
+function renderVis() {
+  for (const id of ['hostVis', 'hostVis2']) $(id).querySelectorAll('.pill').forEach((b) => b.classList.toggle('on', b.dataset.v === (settings.hostPublic ? 'public' : 'private')));
+}
+function lobbyBeat() {
+  const listed = inGame && Net.isHost && settings.hostPublic && Net.code;
+  if (!listed) { if (listedCode) { Account.lobbyDown(listedCode, lobbyKey); listedCode = ''; } return; }
+  listedCode = Net.code;
+  Account.lobbyUp({ code: Net.code, key: lobbyKey, host: myName(), mode: modeInfo(isPlaying() ? game.mode : getSetup().mode).name, map: World.map.name,
+    n: [...players.values()].filter((p) => !p.cpu).length, playing: isPlaying() });
+}
+setInterval(lobbyBeat, 30000);
+const setVis = (e) => {
+  const b = e.target.closest('.pill');
+  if (!b) return;
+  settings.hostPublic = b.dataset.v === 'public';
+  saveSettings();
+  renderVis();
+  lobbyBeat();
+};
+$('hostVis').onclick = $('hostVis2').onclick = setVis;
+addEventListener('pagehide', () => { if (listedCode) Account.lobbyDown(listedCode, lobbyKey, true); });
+renderVis();
+// the list on the Play page: refreshed every 20s while you're looking at it
+async function loadPublic() {
+  const ul = $('pubList');
+  if (!ul.children.length) ul.innerHTML = '<li class="pub-empty skel">loading games</li>';
+  const list = await Account.lobbies();
+  if (list === null) { ul.innerHTML = '<li class="pub-empty">Couldn\'t load the list.</li>'; return; }
+  ul.innerHTML = list.length ? list.map((l) => `<li><span class="pub-who"><b>${esc(l.host)}</b>'s game</span><span class="pub-what">${esc(l.mode)} · ${esc(l.map)}${l.playing ? ' · playing' : ''}</span><span class="pub-n">${l.n}/${l.max}</span><button class="pill" type="button" data-code="${esc(l.code)}">Join</button></li>`).join('')
+    : '<li class="pub-empty">No public games right now. Host one!</li>';
+}
+$('pubList').onclick = (e) => {
+  const b = e.target.closest('[data-code]');
+  if (!b) return;
+  fillCode(b.dataset.code);
+  join();
+};
+$('pubRefresh').onclick = loadPublic;
+setInterval(() => { if (!inGame && document.visibilityState === 'visible' && !$('menu').classList.contains('hidden')) loadPublic(); }, 20000);
+setTimeout(loadPublic, 600);
 // four letter boxes: type to advance, backspace to go back, paste fills them all
 const codeBoxes = [...document.querySelectorAll('#codeBoxes input')];
 const syncCode = () => {

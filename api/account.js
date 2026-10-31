@@ -45,6 +45,7 @@ const MATCH_MIN_JUMPS = 2;    // ...and jumping now and then (idle devices and w
 const MATCH_TOGETHER = 0.3;   // share of the moving time where 2+ players move at once (one person
                               // steering two devices can only move one of them at a time)
 const PAIR_PER_DAY = 3;
+const LOBBY_TTL = 75;   // a public game drops off the list this long after its host stops checking in
 
 async function redis(...cmd) {
   const r = await fetch(DB_URL, { method: 'POST', headers: { Authorization: `Bearer ${DB_TOKEN}` }, body: JSON.stringify(cmd) });
@@ -130,12 +131,26 @@ module.exports = async (req, res) => {
   // tokens travel in the request body (never cookies), so any page may call this - that's how the
   // GitHub Pages copy of the game can use accounts too
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!DB_URL || !DB_TOKEN) return res.status(503).json({ error: 'Accounts are not switched on for this server yet.' });
+  // the public game list. Vercel's edge caches this answer for 10s, so however many people are
+  // looking at the list, the database is read at most about 6 times a minute
+  if (req.method === 'GET') {
+    try {
+      const all = (await redis('HGETALL', 'lobbies')) || [], now = Date.now(), list = [], stale = [];
+      for (let i = 0; i < all.length; i += 2) {
+        try { const l = JSON.parse(all[i + 1]); if (now - l.t < LOBBY_TTL * 1000) list.push({ code: l.code, host: l.host, mode: l.mode, map: l.map, n: l.n, max: l.max, playing: l.playing }); else stale.push(all[i]); } catch (e) { stale.push(all[i]); }
+      }
+      if (stale.length) await redis('HDEL', 'lobbies', ...stale);
+      list.sort((a, b) => b.n - a.n);
+      res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=20');
+      return res.json({ lobbies: list.slice(0, 40) });
+    } catch (e) { return res.status(500).json({ error: 'Server error.' }); }
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   let b = req.body || {};
   if (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
@@ -293,6 +308,26 @@ module.exports = async (req, res) => {
         await redis('DEL', userKey(user.name));
         await redis('DEL', invKey(user.name));
         await redis('DEL', 'sess:' + b.token);
+        return res.json({ ok: true });
+      }
+
+      // a public game checks in (every 30s) / leaves the list. The key proves it's the same host.
+      case 'lobbyUp': {
+        const code = String(b.code || ''), key = String(b.key || '');
+        if (!/^[A-Z]{4}$/.test(code) || !/^[0-9a-z]{16,40}$/.test(key)) return res.status(400).json({ error: 'Bad lobby.' });
+        if (await limited('lob:' + ip, 20, 60)) return res.status(429).json({ error: 'Slow down.' });
+        const old = await redis('HGET', 'lobbies', code);
+        if (old && JSON.parse(old).key !== key) return res.status(409).json({ error: 'Code in use.' });
+        const clean = (v, n) => String(v || '').replace(/[^A-Za-z0-9 _'·-]/g, '').slice(0, n);
+        const host = clean(b.host, 14).toLowerCase();
+        const entry = { code, key, host: ITEMS.nameProblem(host) && !ITEMS.GUEST_NAMES.includes(host) ? 'someone' : host,
+          mode: clean(b.mode, 20), map: clean(b.map, 24), n: Math.max(1, Math.min(12, +b.n || 1)), max: 12, playing: !!b.playing, t: Date.now() };
+        await redis('HSET', 'lobbies', code, JSON.stringify(entry));
+        return res.json({ ok: true });
+      }
+      case 'lobbyDown': {
+        const code = String(b.code || ''), old = /^[A-Z]{4}$/.test(code) && (await redis('HGET', 'lobbies', code));
+        if (old && JSON.parse(old).key === String(b.key || '')) await redis('HDEL', 'lobbies', code);
         return res.json({ ok: true });
       }
 

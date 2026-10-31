@@ -228,6 +228,17 @@ const Account = (() => {
     async matchEnd(match, winners, play, together) {
       try { return (await call({ action: 'matchEnd', match: match.id, key: match.key, winners, play, together })).eligible || []; } catch (e) { return []; }
     },
+    // the public game list (cached at the edge for a few seconds)
+    async lobbies() {
+      try { const r = await fetch(API, { method: 'GET' }); const j = await r.json(); return Array.isArray(j.lobbies) ? j.lobbies : []; } catch (e) { return null; }
+    },
+    // host: put this game on the public list / keep it there (call every 30s) / take it off
+    lobbyUp(info) { call(Object.assign({ action: 'lobbyUp' }, info)).catch(() => {}); },
+    lobbyDown(code, key, leaving) {
+      const body = JSON.stringify({ action: 'lobbyDown', code, key });
+      if (leaving && navigator.sendBeacon) navigator.sendBeacon(API, new Blob([body], { type: 'text/plain' }));
+      else call({ action: 'lobbyDown', code, key }).catch(() => {});
+    },
     // open one of a new account's welcome crates
     async openStarter() {
       if (!me) return null;

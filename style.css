@@ -677,3 +677,14 @@ span.skel, b.skel { display: inline-block; min-width: 64px; }
 .reel-mark::after, .reel-wrap.mythic .reel-mark::after { border-bottom-color: #fff; }
 .reel-info { position: absolute; left: 0; right: 0; top: calc(100% + 26px); text-align: center; font: 600 15px Rubik, sans-serif; color: #fff; }
 .reel-info b { font: 800 13px Rubik, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; margin-right: 6px; background: var(--tc); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+/* public / private + the public game list */
+.vis-pills .pill { padding: 5px 10px; font-size: 12px; }
+.public-card h3 { margin: 0; }
+.pub-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.pub-list li { display: grid; grid-template-columns: 1fr auto auto; grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 8px 0; border-top: 2px solid var(--line); }
+.pub-list li:first-child { border-top: 0; }
+.pub-who { grid-column: 1; font-size: 15px; }
+.pub-what { grid-column: 1; grid-row: 2; font-size: 12px; color: var(--muted); }
+.pub-n { grid-column: 2; grid-row: 1 / 3; font: 800 14px Rubik, sans-serif; color: var(--muted); }
+.pub-list .pill { grid-column: 3; grid-row: 1 / 3; padding: 7px 14px; }
+.pub-list li.pub-empty { display: block; font-size: 13px; color: var(--muted); }
