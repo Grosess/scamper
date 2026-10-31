@@ -2918,7 +2918,7 @@ async function openCrate(match, starter, preview) {
     // and slows to a stop on the prize. The marker and the glow take the rarity of what's under it.
     // every slot the same size. Rarities are spread out (never three of one in a row), and the
     // slots right next to the prize are often rare ones - so it creeps past a near miss
-    const SW = 64, N = 70, WIN = 60, items = [];
+    const SW = 96, N = 70, WIN = 60, items = [];
     const ranks = ITEMS.TIERS.map((x) => x.id), rankOf = (it) => ranks.indexOf(it.tier);
     const ofTier = (tid) => { const l = ITEMS.COLORS.filter((c) => c.tier === tid); return l[Math.floor(Math.random() * l.length)]; };
     for (let i = 0; i < N; i++) {
@@ -2930,9 +2930,13 @@ async function openCrate(match, starter, preview) {
     const tease = (minRank) => ofTier(ranks[Math.min(5, minRank + Math.floor(Math.random() * (6 - minRank)))]);
     if (Math.random() < 0.75) items[WIN + 1] = tease(Math.max(3, rankOf(prize) + 1));   // just past the prize: something better
     if (Math.random() < 0.5) items[WIN - 1] = tease(Math.max(2, rankOf(prize)));
-    // no two of the same rarity next to each other anywhere on the line (the prize stays put)
+    // now and then (1 in 20), just to mess with people: a mythic sliver right next to the prize -
+    // the line either creeps just past it onto yours, or stops just short of it
+    const myth = prize.tier !== 'mythic' && Math.random() < 0.05 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+    if (myth) items[WIN + myth] = ofTier('mythic');
+    // no two of the same rarity next to each other anywhere on the line (the prize and the mythic tease stay put)
     for (let i = 0; i < N; i++) {
-      if (i === WIN) continue;
+      if (i === WIN || (myth && i === WIN + myth)) continue;
       const bad = (it) => (i > 0 && items[i - 1].tier === it.tier) || (i < N - 1 && items[i + 1].tier === it.tier);
       for (let tries = 0; tries < 40 && bad(items[i]); tries++) items[i] = ITEMS.roll([], Math.random);
       if (bad(items[i])) items[i] = ofTier(ranks.find((r) => (i === 0 || items[i - 1].tier !== r) && (i === N - 1 || items[i + 1].tier !== r)));
@@ -2950,7 +2954,8 @@ async function openCrate(match, starter, preview) {
     const half = wrap.clientWidth / 2;
     // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
     const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
-    const end = left[WIN] + wOf(prize) * (prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : frac) - half;
+    const into = prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : myth < 0 ? 0.02 + Math.random() * 0.04 : myth > 0 ? 0.94 + Math.random() * 0.04 : frac;
+    const end = left[WIN] + wOf(prize) * into - half;
     // fast at first, then a long, slow crawl at the end
     const T = 8200, t0 = performance.now(), ease = (k) => 1 - Math.pow(1 - k, 5);
     let last = -1, tense = false;
