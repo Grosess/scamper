@@ -2954,7 +2954,7 @@ async function openCrate(match, starter, preview) {
     // one per crate, each only now and then:
     //   myth     a mythic sliver right next to your prize: it creeps just past it, or stops just short
     //   legend   the same with a legendary
-    //   fakeout  it slows almost to a stop on a legendary just before yours... hangs... clicks over
+    //   fakeout  a legendary right before yours, and it stops just barely past it
     //   stairs   the rarities climb right before yours: uncommon, rare, epic, legendary
     // (the developer panel can force one for previews)
     const roll = Math.random(), pr = rankOf(prize), forced = preview && $('devTrick').value;
@@ -2989,12 +2989,12 @@ async function openCrate(match, starter, preview) {
     // stop just over the edge into the prize, or just short of the next slot - never comfortably in the middle
     const frac = Math.random() < 0.5 ? 0.06 + Math.random() * 0.14 : 0.8 + Math.random() * 0.14;
     const into = prize.tier === 'mythic' ? 0.3 + Math.random() * 0.4 : myth < 0 ? 0.02 + Math.random() * 0.04 : myth > 0 ? 0.94 + Math.random() * 0.04 : frac;
-    const fin = stage === 'fakeout' ? 0.04 + Math.random() * 0.06 : into;
+    const fin = stage === 'fakeout' ? 0.03 + Math.random() * 0.05 : into;
     const end = left[WIN] + wOf(prize) * fin - half;
-    // the path the line takes: fast at first, then a long, slow crawl (plus the staged detours)
-    const OUT = (u) => 1 - Math.pow(1 - u, 5), HOLD = () => 0, INOUT = (u) => (1 - Math.cos(Math.PI * u)) / 2;
-    let keys = [[0, 0], [1, end, OUT]], T = 8200;
-    if (stage === 'fakeout') { const x1 = left[WIN] - 5 - half; keys = [[0, 0], [0.78, x1, OUT], [0.88, x1, HOLD], [1, end, INOUT]]; T = 9600; }
+    // the path the line takes is always the same: fast at first, then a long, slow crawl. The
+    // tricks above only arrange the slots and where it stops - never how it moves
+    const OUT = (u) => 1 - Math.pow(1 - u, 5);
+    const keys = [[0, 0], [1, end, OUT]], T = 8200;
     const pathX = (k) => {
       for (let i = 1; i < keys.length; i++) if (k <= keys[i][0]) { const [k0, x0] = keys[i - 1], [k1, x1, e] = keys[i]; return x0 + (x1 - x0) * e((k - k0) / (k1 - k0)); }
       return end;
