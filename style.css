@@ -731,3 +731,10 @@ html.has-acct #nameHint { visibility: hidden; }
 @keyframes rattle { 50% { filter: brightness(1.15); } }
 .crate.freeze .cube, .crate.freeze .crate-shake, .crate.freeze .crate-rays { animation-play-state: paused !important; }
 .crate.freeze .cube .f { filter: brightness(2.4) !important; }
+/* crates waiting to be opened */
+.crate-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 10px; background: #fff6dc; border: 2px solid var(--ink); }
+.crate-row .crate-ico { width: 22px; height: 22px; background: linear-gradient(#d99a58, #c4823f); border: 2px solid var(--ink); position: relative; }
+.crate-row .crate-ico::after { content: '?'; position: absolute; inset: 0; display: grid; place-items: center; font: 400 14px 'Lilita One', sans-serif; color: var(--yellow); -webkit-text-stroke: 1px var(--ink); }
+.crate-row span:not(.crate-ico) { flex: 1; font-size: 14px; }
+.crate-row .btn { width: auto; padding: 6px 16px; font-size: 14px; }
+.you-slot .char-card { max-width: 420px; margin: 0; }

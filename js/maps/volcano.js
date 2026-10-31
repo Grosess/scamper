@@ -121,9 +121,10 @@ defineMap({
     k.mover(7.5, 19, -2.5, 3.2, 1, 3.2, BASALT, { type: 'spin', speed: -0.7, phase: 0.6 });
     // ferry rock across the north chasm
     k.mover(3.5, 19, -7, 2.6, 1, 2.6, ASH, { type: 'slide', dx: -6, period: 6, phase: 0 });
-    // final kick chimney: orange wall on the core + one 2.8 out, up to the crater rim (31.2)
+    // final kick chimney: orange wall on the core + one 2.8 out. The outer wall runs well past the
+    // crater rim (31.2) and a bit wider, so the last kicks funnel you over the rim into the crater
     blk(-5.4, -5, -4.5, -1, 20, 31.2, '#ff6a3d', KICK);
-    blk(-8.6, -8.2, -4.5, -1, 20, 30, '#ff6a3d', KICK);
+    blk(-8.6, -8.2, -5, -0.5, 20, 34, '#ff6a3d', KICK);
 
     // ===== the crater =====
     blk(-5, 5, -5, -3.8, 30, 31.2, ROCK);

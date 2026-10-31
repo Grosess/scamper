@@ -13,8 +13,8 @@
 //  POST { action: 'matchStart', players: [tickets] }  (host, when a round goes live) -> { match, key }
 //  POST { action: 'matchEnd', match, key, winners: [names], play: { name: { moved, active, jumps } }, together }
 //       -> { eligible: [names] }
-//  POST { action: 'claim', token, match }  (you won that match) -> { prize, inv, ticket }
-//  POST { action: 'starter', token }  (open one of your two welcome crates) -> { prize, inv, ticket }
+//  POST { action: 'claim', token, match }  (you won that match: +1 crate)  -> { inv, ticket }
+//  POST { action: 'open', token }  (open one of your crates)              -> { prize, inv, ticket }
 //  POST { action: 'verify', ticket } (a host checking a joiner) -> { name, colors, cos, dev }
 //  POST { action: 'logout', token }
 //  POST { action: 'delete', token, password }  -> deletes the account and everything stored with it
@@ -87,9 +87,10 @@ const OLD = { lemon: 'butter', lavender: 'lilac', fog: 'sky', cream: 'butter', c
   silver: 'sky', platinum: 'periwinkle', pearl: 'butter', graphite: 'sapphire', crimson: 'bloodmoon', midnight: 'abyss' };
 function cleanInv(inv) {
   const colors = [...new Set((inv && inv.colors || []).map((id) => (ITEMS.byId[id] ? id : OLD[id])).filter((id) => ITEMS.byId[id]))];
-  const starter = Math.max(0, Math.min(2, +(inv && inv.starter) || 0));   // welcome crates still to open
-  while (colors.length + starter < 2) { const s = ITEMS.starter(rnd); for (const id of s) if (colors.length + starter < 2 && !colors.includes(id)) colors.push(id); }
-  return { colors, cos: [], starter };
+  // unopened crates (wins + the two welcome crates) wait in your inventory until you open them
+  const crates = Math.max(0, Math.min(999, (+(inv && inv.crates) || 0) + (+(inv && inv.starter) || 0)));
+  while (colors.length + crates < 2) { const s = ITEMS.starter(rnd); for (const id of s) if (colors.length + crates < 2 && !colors.includes(id)) colors.push(id); }
+  return { colors, cos: [], crates };
 }
 async function getUser(name) {
   const raw = await redis('GET', userKey(name));
@@ -179,7 +180,7 @@ module.exports = async (req, res) => {
         const user = { name, salt, hash, data, gen: newGen(), updated: now, created: now };
         const ok = await redis('SET', userKey(name), JSON.stringify(user), 'NX');
         if (ok !== 'OK') return res.status(409).json({ error: 'That name is taken.' });
-        user.inv = { colors: [], cos: [], starter: 2 };   // two welcome crates, opened in the game
+        user.inv = { colors: [], cos: [], crates: 2 };   // two welcome crates, waiting in the inventory
         await putInv(user);
         return res.json(profile(user, await newSession(user)));
       }
@@ -271,21 +272,21 @@ module.exports = async (req, res) => {
         if (await limited('claims:' + me + ':' + day, CLAIMS_PER_DAY, 86400)) return res.status(429).json({ error: 'That\'s all the prizes for today!' });
         m.claimed.push(me);
         await redis('SET', 'match:' + b.match, JSON.stringify(m), 'EX', 3 * 3600);
-        const prize = ITEMS.roll(user.inv.colors, rnd);
-        if (prize) user.inv.colors.push(prize.id);
+        user.inv.crates++;   // a crate for the inventory - opened whenever you like
         await putInv(user);
         await redis('SET', 'lastclaim:' + me, String(now), 'EX', 86400);
-        return res.json({ prize: prize ? prize.id : null, inv: user.inv, ticket: ticketFor(user) });
+        return res.json({ inv: user.inv, ticket: ticketFor(user) });
       }
 
-      // a new account's welcome crates: two, each a normal roll, never the same color twice
-      case 'starter': {
+      // open one of your crates: a normal roll, never a color you already have
+      case 'open': case 'starter': {
         const user = await sessionUser(b.token);
         if (!user) return res.status(401).json({ error: 'Logged out.' });
-        if (!(user.inv.starter > 0)) return res.status(409).json({ error: 'No crates left.' });
+        if (!(user.inv.crates > 0)) return res.status(409).json({ error: 'No crates left.' });
+        if (await limited('open:' + user.name.toLowerCase(), 30, 60)) return res.status(429).json({ error: 'Slow down.' });
         const prize = ITEMS.roll(user.inv.colors, rnd);
         if (prize) user.inv.colors.push(prize.id);
-        user.inv.starter--;
+        user.inv.crates--;
         await putInv(user);
         return res.json({ prize: prize ? prize.id : null, inv: user.inv, ticket: ticketFor(user) });
       }

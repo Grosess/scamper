@@ -242,25 +242,27 @@ const Account = (() => {
       else call({ action: 'lobbyDown', code, key }).catch(() => {});
     },
     // open one of a new account's welcome crates
-    async openStarter() {
+    // open one of your crates -> the prize's id
+    async openCrate() {
       if (!me) return null;
       try {
-        const j = await call({ action: 'starter', token: me.token });
+        const j = await call({ action: 'open', token: me.token });
         me.inv = j.inv;
         me.ticket = j.ticket;
         changed();
         return j.prize;
       } catch (e) { return null; }
     },
+    // you won a real match: +1 crate in your inventory (true if it worked)
     async claim(match) {
-      if (!me) return null;
+      if (!me) return false;
       try {
         const j = await call({ action: 'claim', token: me.token, match });
         me.inv = j.inv;
         me.ticket = j.ticket;
         changed();
-        return j.prize;
-      } catch (e) { return null; }
+        return true;
+      } catch (e) { return false; }
     },
     // host: what does the player holding this ticket really own? (null = not a real account)
     // 'offline' = couldn't tell right now (try again); null = definitely not a real account

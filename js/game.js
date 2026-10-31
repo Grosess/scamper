@@ -921,7 +921,7 @@ function applyState(s) {
     showBanner(isOut(myId) ? '<div class="big">SPECTATING</div><div>You joined mid-game - next game you\'re in</div>'
       : '<div class="big red">BOMB TAG</div><div>Someone gets the bomb in a few seconds. Run into people to pass it on!</div>', 3);
   } else if (started && game.mode === 'koth') {
-    showBanner('<div class="big gold">KING OF THE TAG</div><div>The crown goes to someone in a few seconds. Steal it and hold it!</div>', 3);
+    showBanner('<div class="big gold">KING OF THE TAG</div><div>The crown appears somewhere on the map in a few seconds - race to it, then hold it!</div>', 3);
   } else if (started && game.mode === 'freeze') {
     showBanner(isIt(myId) ? '<div class="big red">SEEKER</div><div>Freeze them all at once. Released in a few seconds...</div>'
       : '<div class="big lime">FREEZE TAG</div><div>Don\'t get frozen - touch frozen teammates to thaw them</div>', 3);
@@ -1185,9 +1185,23 @@ function hostMatchEnd(r) {
   });
 }
 // a winner of a real match: open a crate
-function onPrize(m) {
-  if (Account.me && Array.isArray(m.names) && m.names.includes(Account.me.name.toLowerCase())) setTimeout(() => openCrate(String(m.match)), 1500);
+// a winner of a real match: a crate goes into your inventory (open it whenever you like)
+async function onPrize(m) {
+  if (!Account.me || !Array.isArray(m.names) || !m.names.includes(Account.me.name.toLowerCase())) return;
+  if (await Account.claim(String(m.match))) {
+    addFeed('+1 crate! Open it from the menu whenever you like');
+    tone(660, 990, 0.12, 'triangle', 0.06); tone(990, 1320, 0.14, 'triangle', 0.06, 0.1);
+  }
 }
+// the crate count + Open buttons (Play page and pause -> You)
+function renderCrates() {
+  const n = Account.me ? Account.me.inv.crates || 0 : 0;
+  for (const [row, cnt] of [['crateRow', 'crateCount'], ['crateRow2', 'crateCount2']]) {
+    $(row).classList.toggle('hidden', !n);
+    $(cnt).innerHTML = `<b>${n}</b> crate${n === 1 ? '' : 's'} to open`;
+  }
+}
+document.querySelectorAll('.crate-open').forEach((b) => (b.onclick = () => openCrate()));
 // --- Grand Prix: a run of rounds, each a random mode on a random map. Every round hands out
 // points by placing; the most points after the last round wins the whole thing ---
 const GP_PTS = [10, 7, 5, 4, 3, 2];
@@ -1366,15 +1380,20 @@ function hostCrown(id, why) {
   if (why) hostFeed(why);
   pushState();
 }
-function hostDropCrown() {
+// the crown is loose: it appears at a random spot on the map (at the start too) - first to reach it wears it
+function hostDropCrown(start) {
   game.it = [];
   game.koth.loose = true;
+  const sp = World.map.spawns, far = (s) => Math.min(...[...players.keys()].map(posOf).filter(Boolean).map((p) => wrapDist({ x: s[0], y: s[1], z: s[2] }, p)));
+  // a random spawn spot, but not right on top of somebody
+  const ok = sp.filter((s) => far(s) > 6);
+  game.koth.spot = (ok.length ? ok : sp)[Math.floor(Math.random() * (ok.length || sp.length))].slice(0, 3);
   H.immune = 0;
   game.im = 0;
-  hostFeed('The crown dropped in the middle!');
+  hostFeed(start ? 'The crown appeared somewhere on the map - grab it!' : 'The crown dropped - it\'s somewhere on the map!');
   pushState();
 }
-const crownSpot = () => World.map.centerSpot || World.map.seekerSpawn;
+const crownSpot = () => (game.koth && game.koth.spot) || World.map.centerSpot || World.map.seekerSpawn;
 
 // --- race: everyone from the start line to the finish, falls send you back to the start ---
 function startRace(ids, o) {
@@ -1439,6 +1458,18 @@ function nearSpawn(from) {
   }
   return best;
 }
+// a runner who fell comes back right beside a seeker (a couple of meters away, on solid ground),
+// so jumping off is never an escape
+function besideSeeker(from) {
+  for (const q of from.sort(() => Math.random() - 0.5)) {
+    for (let a = 0; a < 12; a++) {
+      const ang = a / 12 * Math.PI * 2 + Math.random() * 0.3, x = q.x + Math.cos(ang) * 2.5, z = q.z + Math.sin(ang) * 2.5;
+      const fy = World.floorBelow(x, q.y + 1, z);
+      if (fy > -1e8 && Math.abs(fy - q.y) < 1.2 && !World.overlap(x, fy + 0.02, z, CONFIG.move.standHeight)) return [x, fy, z];
+    }
+  }
+  return nearSpawn(from);
+}
 // is this player one of the runners right now? (the ones being chased)
 function isRunner(id) {
   if (!isPlaying()) return false;
@@ -1458,7 +1489,7 @@ function hostFell(id) {
   const pos = (ids) => ids.filter((x) => x !== id && players.has(x)).map(posOf).filter(Boolean);
   const runner = isRunner(id);
   if (runner) {
-    teleportPlayer(id, nearSpawn(pos(seekerIds())));
+    teleportPlayer(id, besideSeeker(pos(seekerIds())));
     H.exposed[id] = performance.now() + (CONFIG.tag.fallLock + EXPOSE_SECS) * 1000;
   } else teleportPlayer(id, farSpawn(pos([...players.keys()].filter(isRunner))));
   if (game.mode === 'duel') {
@@ -1720,7 +1751,7 @@ function hostTick(dt) {
       if (H.releaseLeft <= 0) {
         H.releaseLeft = 0;
         if (game.mode === 'bomb') hostDropBomb();
-        else if (game.mode === 'koth') { const ids = [...players.keys()]; hostCrown(ids[Math.floor(Math.random() * ids.length)], null); }
+        else if (game.mode === 'koth') hostDropCrown(true);
       }
     } else {
       H.timeLeft -= dt;
@@ -2139,11 +2170,12 @@ addEventListener('mousemove', (e) => {
   swTip.style.top = `${e.clientY - 14}px`;
   swTip.classList.remove('hidden');
 });
+// the pause menu's You tab shows the same card as the main menu (it's moved there while paused)
 function renderMeEdit() {
-  $('pNameText').textContent = myName();
   $('youSub').textContent = Account.me ? '' : 'Guests are always blue. Make an account from the main menu to get your own name and colors.';
-  $('pBody').innerHTML = paletteHTML('body');
-  $('pEye').innerHTML = paletteHTML('eye');
+  markColors();
+  renderCos();
+  renderCrates();
 }
 function sendMe() {
   if (!inGame) return;
@@ -2161,8 +2193,7 @@ function pickSwatch(e, part) {
   sendMe();
   return true;
 }
-$('pBody').onclick = (e) => pickSwatch(e, 'body');
-$('pEye').onclick = (e) => pickSwatch(e, 'eye');
+
 
 // ---------- CPU players (host) ----------
 let cpuDiff = 'medium', cpuN = 0;
@@ -2862,19 +2893,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const TIER_TOTAL = ITEMS.TIERS.reduce((n, t) => n + t.weight, 0);
 const tierChance = (t) => { const p = t.weight / TIER_TOTAL * 100; return p >= 10 ? Math.round(p) : +p.toFixed(1); };
 let crateBusy = false;
-// starter = one of a new account's two welcome crates (title shows which one).
-// preview = the developer panel's test run: plays everything, but nothing is won or saved
-async function openCrate(match, starter, preview) {
+// open one of your crates. preview = the developer panel's test run: plays everything, but
+// nothing is won or saved
+async function openCrate(preview) {
   if (crateBusy) return;
   crateBusy = true;
   try {
-    const toOpen = starter && Account.me ? Account.me.inv.starter : 2;
-    const id = preview ? preview : starter ? await Account.openStarter() : await Account.claim(match), prize = id && ITEMS.byId[id];
+    const id = preview ? preview : await Account.openCrate(), prize = id && ITEMS.byId[id];
     if (!prize) return;
     const box = $('prize'), crate = $('crate'), wrap = $('reelWrap'), reel = $('reel'), reveal = $('reveal'), fl = $('prizeFlash');
     const tierOf = (it) => ITEMS.tier(it.tier), t = tierOf(prize), rank = ITEMS.TIERS.indexOf(t);
     const flash = (c) => { fl.style.setProperty('--fc', c); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); };
-    $('prizeTitle').textContent = preview ? 'PREVIEW CRATE' : starter ? `WELCOME CRATE ${3 - toOpen} OF 2` : 'YOU WON A CRATE';
+    $('prizeTitle').textContent = preview ? 'PREVIEW CRATE' : 'CRATE';
     box.className = 'prize';
     crate.className = 'crate';
     crate.style.display = '';
@@ -3477,7 +3507,7 @@ function updateHud(hs, frozen, nearestSeeker) {
   let hint = '';
   const now = performance.now();
   if (playing && mode === 'koth' && go && !isIt(myId) && game.im > 0 && game.it.length) hint = `Crown protected for ${game.im.toFixed(1)}s`;
-  if (playing && mode === 'koth' && go && game.koth && game.koth.loose) hint = 'The crown is loose in the middle - grab it!';
+  if (playing && mode === 'koth' && go && game.koth && game.koth.loose) hint = 'The crown is loose - follow the arrow and grab it!';
   if (playing && mode === 'bomb' && isIt(myId) && go && now < tagReadyAt) hint = 'Get ready to pass it…';
   if (playing && mode === 'race' && go && !raceDone) hint = `${Math.round(raceToGo(me.pos))}m to go`;
   if (playing && mode === 'bomb' && isOut(myId)) hint = 'You\'re out - spectating';
@@ -3598,7 +3628,7 @@ const preview = (() => {
   return {
     set,
     render(dt) {
-      if (inGame || !canvas.offsetParent) return;
+      if (!canvas.offsetParent) return;   // (also draws in the pause menu's You tab)
       const w = canvas.clientWidth, h = canvas.clientHeight;
       // keep the camera's shape matched to the box (it crops around the middle, never stretches)
       if (canvas.width !== Math.round(w * r.getPixelRatio()) || canvas.height !== Math.round(h * r.getPixelRatio())) { r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
@@ -3679,7 +3709,7 @@ $('devCrate').onclick = (e) => {
   if (!b || !devOn()) return;
   const list = ITEMS.COLORS.filter((c) => b.dataset.t === 'random' || c.tier === b.dataset.t);
   const pick = b.dataset.t === 'random' ? ITEMS.roll([], Math.random) : list[Math.floor(Math.random() * list.length)];
-  openCrate(null, false, pick.id);   // preview: nothing is won
+  openCrate(pick.id);   // preview: nothing is won
 };
 // which happening comes first when you host with the Randomizer on (a setting, kept)
 $('devEvent').innerHTML = '<option value="">Random (normal)</option>' + Object.keys(RANDOM_EVENTS).map((k) => `<option value="${k}">${RANDOM_EVENTS[k].name}</option>`).join('');
@@ -3688,24 +3718,9 @@ $('devEvent').onchange = () => { settings.devFirstEv = $('devEvent').value; save
 const devFirst = () => (devOn() && RANDOM_EVENTS[settings.devFirstEv] ? settings.devFirstEv : null);
 const renderDev = () => $('devPanel').classList.toggle('hidden', !devOn());
 
-// a new account opens its two welcome crates, one after the other
-let starterRunning = false;
-async function openStarters() {
-  if (starterRunning) return;
-  starterRunning = true;
-  try {
-    while (Account.me && Account.me.inv.starter > 0) {
-      while (crateBusy) await wait(500);
-      const before = Account.me.inv.starter;
-      await openCrate(null, true);
-      if (!Account.me || Account.me.inv.starter >= before) break;   // couldn't open (offline): try again next time
-      await wait(600);
-    }
-  } finally { starterRunning = false; }
-}
 // your account loaded / changed (logged in or out, won something, developer mode)
 function onAccount() {
-  if (Account.me && Account.me.inv.starter > 0) setTimeout(openStarters, 400);
+  renderCrates();
   fixLook();
   saveSettings();
   preview.set();
@@ -3721,7 +3736,7 @@ function onAccount() {
 Account.onChange(onAccount);
 renderName();
 renderDev();
-if (Account.me && Account.me.inv.starter > 0) setTimeout(openStarters, 1500);
+renderCrates();
 $('devModeRow').classList.toggle('hidden', !(Account.me && Account.me.dev));
 
 function getName() { return myName(); }
