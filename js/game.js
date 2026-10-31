@@ -1548,8 +1548,10 @@ function computeResult(sub) {
     const r = game.race, rest = list.filter((p) => !p.cpu).filter((p) => r.done[p.id] === undefined).sort((a, b) => raceToGo(posOf(a.id)) - raceToGo(posOf(b.id)));
     const lines = r.order.filter((id) => players.has(id)).map((id, i) => `${ord(i + 1)} ${nameOf(id)} - ${fmtRace(r.done[id])}`)
       .concat(rest.map((p) => `${p.name} - ${Math.round(raceToGo(posOf(p.id)))}m to go`));
-    const w = r.order[0];
-    return { mode: 'race', winners: w ? [w] : [], ranking: r.order.filter((id) => players.has(id)).concat(rest.map((p) => p.id)), title: w ? `${nameOf(w)} wins the race!` : 'Nobody finished', sub: sub || World.map.name, lines };
+    // ended before anyone finished (the host stopped it, or time ran out): whoever got furthest wins
+    const w = r.order[0] || (rest[0] && rest[0].id);
+    return { mode: 'race', winners: w ? [w] : [], ranking: r.order.filter((id) => players.has(id)).concat(rest.map((p) => p.id)),
+      title: w ? (r.order[0] ? `${nameOf(w)} wins the race!` : `${nameOf(w)} got furthest!`) : 'Nobody raced', sub: sub || World.map.name, lines };
   }
   return { mode: game.mode, winners: [], title: 'Round over', sub: sub || '', lines: [] };
 }

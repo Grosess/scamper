@@ -738,3 +738,18 @@ html.has-acct #nameHint { visibility: hidden; }
 .crate-row span:not(.crate-ico) { flex: 1; font-size: 14px; }
 .crate-row .btn { width: auto; padding: 6px 16px; font-size: 14px; }
 .you-slot .char-card { max-width: 420px; margin: 0; }
+
+/* ===== in-game menu, built like the main menu ===== */
+.pause-state { display: inline-block; margin-top: 10px; padding: 3px 9px; font: 800 11px Rubik, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; background: var(--yellow); color: var(--ink); border: 2px solid var(--ink); }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 20px; }
+.side-bottom .big-btn { margin: 0; }
+.side-bottom .nav-btn.danger { justify-content: center; }
+.lobby-grid { grid-template-columns: 1fr 280px; }
+.lobby-side { display: flex; flex-direction: column; gap: 16px; }
+.lobby-side .tile { margin: 0; }
+.invite-card h3 { margin: 0 0 10px; }
+.invite-card .code-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.invite-card .chip-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.invite-card .chip-btn { width: 100%; }
+.card-h { margin: 0 0 6px; }
+.lobby-side h3 { font-size: 22px; }
