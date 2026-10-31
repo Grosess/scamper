@@ -1237,6 +1237,7 @@ function hostRandomTick(dt) {
   const pick = (no) => { const pool = Object.keys(RANDOM_EVENTS).filter((k) => !no.includes(k) && !skip.includes(k)); return pool[Math.floor(Math.random() * pool.length)]; };
   // developer setting: a chosen happening always comes first
   const first = H.rndCount++ === 0 ? devFirst() : null;
+  if (first) { settings.devFirstEv = ''; saveSettings(); $('devEvent').value = ''; }   // used once, then back to random
   const evs = [first || pick(H.rndLast)];
   if (Math.random() < 0.2 && !RANDOM_EVENTS[evs[0]].once) evs.push(pick(H.rndLast.concat(evs, ['swap', 'shuffle'])));
   H.rndLast = evs;
